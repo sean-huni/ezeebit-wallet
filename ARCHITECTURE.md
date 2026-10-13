@@ -2,7 +2,7 @@
 
 How the system is shaped and why. README.md covers running it; SOLUTION.md covers task choice, trade-offs and how tasks 3 to 6 slot in.
 
-**Built vs designed.** At this commit the repository contains the running skeleton only: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service, with Liquibase wired and no changesets yet; local observability and alerting (section 3). Every business endpoint, table and flow in sections 4 to 7 is **designed, not yet implemented**. Where a sentence describes something that exists, it says so.
+**Built vs designed.** At this commit the repository contains: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service; local observability and alerting (section 3); and **the Task 1 ledger (section 4): deposits, balances and the statement, built and tested**. Task 2 (section 5) and the ledger's conversion-posting endpoints are **designed, not yet implemented**. Where a sentence describes something that exists, it says so.
 
 ## 1. How the design was derived
 
@@ -94,8 +94,8 @@ A context earns its own service only if it passes all three tests:
 | Service | Port | Role | Exists today |
 |---|---|---|---|
 | gateway-svc | 8080 | single client-facing entry; Spring Cloud Gateway Server WebMVC; routes by registry name | yes: routes and 503/504 mapping |
-| ledger-svc | 8081 | Task 1: balances, internal deposits, journal | skeleton: boots, registers, migrates an empty changelog |
-| conversion-svc | 8082 | Task 2: quotes and conversions | skeleton: as above |
+| ledger-svc | 8081 | Task 1: balances, internal deposits, journal | yes: deposits, balances, statement (section 4) |
+| conversion-svc | 8082 | Task 2: quotes and conversions | skeleton: boots, registers, migrates an empty changelog |
 | config-svc | 8888 | Spring Cloud Config Server, native backend | yes |
 | eureka-svc | 8761 | Eureka service registry | yes |
 | lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Tempo, Loki, OTLP collector (one container) | yes |
@@ -146,6 +146,8 @@ Rehearsed outage, measured once with Slack live on a local run (counts from Graf
 | RESOLVED delivered (sent=2, failed=0) | t+175s |
 
 ## 4. Ledger design (Task 1)
+
+**Built**, except the parts that belong to Task 2: the `PLATFORM_FX` account type, the `CONVERSION` journal type, the `VOID` status and the conversion-posting deadline are not in the schema yet (each arrives with the conversion work, by a new changeset widening the CHECK constraints). Where the build departs from or adds to the design below, the "As built" list at the end of this section says so.
 
 ### Double-entry model
 
@@ -206,6 +208,23 @@ Every POST that moves money carries an idempotency key, named per endpoint:
 | `POST .../quotes` | none: a quote moves no money and is cheap to repeat |
 
 The stored identity is (`merchant_id`, `type`, key), never the key alone, so two merchants choosing the same key cannot collide and a rail reference cannot collide with a `conversionId`. Same key and same request hash replays the original result; same key and a different body is 422. The row is inserted first and a unique violation is read as "replay the stored result", so two concurrent identical requests give one posting and two identical answers, never a 500. The key is stored in the journal row itself, in the same transaction as the entries, so a crash cannot leave a recorded key without its posting or the reverse.
+
+### As built
+
+Code: `services/ledger-svc`, package `io.ezeebit.ledger` (`ctl`, `service`, `domain`, `data/model`, `data/repo`, `mapper`, `api/advice`, `exception`). Schema: `db/changelog/2026/10/001` to `004`.
+
+- **Reference data.** The five currencies are seeded by Liquibase, and so is one `PLATFORM_DEPOSIT_CLEARING` account per currency, with fixed ids, so every environment agrees on them.
+- **`entry.seq`.** An identity column the design did not have. It is assigned at insert, under the merchant row lock, so it is the order in which `balance_after` values were computed. The statement is ordered by it and pages on it (`after` cursor). `created` is the transaction start time and is not a safe order: a transaction that starts first can take the lock second.
+- **Amounts.** Decimal strings on the wire (`"1500.00"`), `BigDecimal` from the string, `NUMERIC(38,18)` in storage, and shown at the currency's scale. The scale rule counts significant decimals: `"10.500"` is accepted for ZAR because nothing is lost, `"10.001"` is refused. More than 20 digits before the point is refused (`AMOUNT_TOO_LARGE`), because it could not be stored.
+- **Request hash.** SHA-256 over the request's fields exactly as sent (merchant id, currency, the amount string, reference), each length-prefixed. It is not a hash of the raw body bytes: a rail that re-serialises the same deposit with different whitespace or key order replays rather than getting 422, while `"100.0"` and `"100.00"` still count as different requests.
+- **Replay mechanics.** The duplicate is caught outside the transaction it rolled back, and the stored journal is read in a new one. A concurrent duplicate waits on the unique index until the first commits, then replays its answer: there is no in-flight 409. Every answer, first or replay, is built from the stored rows, so a replay is byte-identical.
+- **Keys never expire.** The key is the rail's transfer reference, a permanent identity, not a client retry token.
+- **Envelope and errors.** Success bodies are `{"data": ...}`. Errors are RFC 9457 problem details with a stable `code`, a `field` where one applies, and text from `i18n/messages.properties`.
+- **Versioning.** Path segment 1 is the API version (`/api/v1/...`, `/internal/v1/...`); another version is 400 `UNSUPPORTED_API_VERSION` at the service. The gateway routes v1 only.
+- **Statement.** `currency` is optional (without it, every currency, each entry with its own account's `balance_after`); `from` inclusive and `to` exclusive on `created`; `limit` 1 to 500, default 100.
+- **Reconciliation** (journals sum to zero per currency; merchant `balance` equals the sum of its entries) is asserted by the concurrency acceptance scenario and was run against the live database during the smoke test (0 unbalanced journals, 0 merchant accounts off). It is not yet a scheduled job or an alert.
+
+Proven by tests (`./gradlew :services:ledger-svc:check`): 50 concurrent distinct deposits to one account sum exactly and equal the sum of the statement; 20 concurrent copies of one deposit give 20 identical 201 answers and one journal; an entry whose currency differs from its account's is refused by the database. Each of these was seen red with its control removed (the row lock, the journal unique constraint, the composite foreign key) before being trusted.
 
 ## 5. Conversion design (Task 2)
 
@@ -274,16 +293,16 @@ No saga and no compensation are needed because the only money movement is one at
 
 ## 6. API summary
 
-**Designed, not yet implemented.** Today the `/api/v1/...` paths are routed by the gateway and answer 404 from a running service, or 503 when the service is down. The `/internal/v1/...` rows are never routed: the gateway answers 404 for them.
+**Built:** the deposits, balances and entries rows. **Designed, not yet implemented:** the quotes, conversions and conversion-postings rows; their `/api/v1/...` paths are routed by the gateway and answer 404 from conversion-svc. The `/internal/v1/...` rows are never routed: the gateway answers 404 for them. Success bodies are wrapped as `{"data": ...}`; errors are problem details with a stable `code` (README lists them for the ledger).
 
 | Method | Path | Idempotency | Status codes |
 |---|---|---|---|
 | GET | `/api/v1/merchants/{merchantId}/balances` | n/a | 200 list per currency |
-| GET | `/api/v1/merchants/{merchantId}/entries?currency=&from=&to=` | n/a | 200 statement, each row with `balance_after` |
+| GET | `/api/v1/merchants/{merchantId}/entries?currency=&from=&to=&limit=&after=` | n/a | 200 statement, each row with `balance_after`, keyset pages; 400 unknown currency or bad parameter |
 | POST | `/api/v1/merchants/{merchantId}/quotes` | not needed (a quote moves no money) | 201; 400 (including sell currency == buy currency); 502 bad rate; 503 rate service timeout |
 | POST | `/api/v1/merchants/{merchantId}/conversions` | `Idempotency-Key` from the merchant, required; quote is single-use | 201 COMPLETED; 202 PENDING; 404 quote of another merchant; 409 `QUOTE_EXPIRED` or `QUOTE_ALREADY_USED`; 422 `INSUFFICIENT_FUNDS` or key reused with a different body |
 | GET | `/api/v1/merchants/{merchantId}/conversions/{conversionId}` | n/a | 200; 404 |
-| POST | `/internal/v1/deposits` (not routed; money-in rail only) | `Idempotency-Key` = the rail's transfer reference, required, stored as (`merchantId`, DEPOSIT, key) | 201 created or replayed; 400 bad amount/scale; 422 key reused with a different body |
+| POST | `/internal/v1/deposits` (not routed; money-in rail only) | `Idempotency-Key` = the rail's transfer reference, required, stored as (`merchantId`, DEPOSIT, key) | 201 created or replayed; 400 bad amount/scale, unknown currency or missing key; 422 key reused with a different body |
 | POST | `/internal/v1/conversion-postings` (not routed) | idempotent on `conversionId`; carries a deadline | 201 posted or replayed; 409 deadline passed or voided; 422 `INSUFFICIENT_FUNDS` |
 | GET | `/internal/v1/conversion-postings/{conversionId}` (not routed; sweeper) | n/a | 200; 404 |
 | POST | `/internal/v1/conversion-postings/{conversionId}/void` (not routed; sweeper) | identity (`merchantId`, CONVERSION, `conversionId`) | 201 voided or replayed; 409 already posted |
@@ -300,7 +319,7 @@ No saga and no compensation are needed because the only money movement is one at
 | Rate service slow | quote fails after about 2s with 503; no cached or default rate | designed |
 | Rate service returns a bad rate | quote refused with 502 and a reason | designed |
 | Ledger slow during accept | conversion stays PENDING (202); a same-key retry returns its state; the sweeper resolves it after the posting deadline, voiding if nothing posted | designed |
-| Duplicate client request | replayed from the stored journal or conversion; never posted twice | designed |
+| Duplicate client request | replayed from the stored journal or conversion; never posted twice | deposits: built, tested (sequential and 20 concurrent); conversions: designed |
 | Concurrent debits of one account | serialised by the merchant row lock; the loser is rejected with `INSUFFICIENT_FUNDS` | designed |
 
 ## 8. Single repository and the 12-factor trade-off
@@ -313,8 +332,9 @@ The rest of 12-factor is followed: config comes from the environment with commit
 
 ## 9. Known gaps at this commit
 
-- No business endpoints, tables or domain code: the Liquibase changelogs are empty.
-- No concurrency, idempotency or reconciliation tests yet; the 6 existing tests cover boot and gateway routing.
+- Task 2 is not built: no quote or conversion tables, endpoints or tests; conversion-svc's changelog is empty, and the ledger has no conversion-posting endpoints.
+- Reconciliation is a test assertion and a manual query, not a scheduled job with an alert.
+- No alert on a broken ledger invariant: a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` is logged at error and is visible only as an HTTP 5xx.
 - No exchange-rate client or local stub for the rate feed.
 - Alerts reach one Slack channel and there is no on-call rota: a 3am alert reaches a channel, not a person.
 - Nothing watches the monitoring stack: rules are evaluated inside the same lgtm container, so if it dies nothing pages.

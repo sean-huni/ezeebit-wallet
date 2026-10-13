@@ -12,8 +12,9 @@ the contact point re-provision from files in `docker/lgtm/`, and no stale alert 
 restart to page on the next boot. Before that change a restart produced 4 false pages (reproduced
 with Slack disconnected); after it the same script produced 0.
 
-Every service exports metrics (every 10 s), traces (100% sampled) and logs over OTLP/HTTP to
-`localhost:4318`. A log line written inside a request carries its `trace_id` and `span_id`. Each JVM is its own
+Every service exports metrics (every 10 s), traces (100% sampled) and logs over OTLP (OpenTelemetry
+Protocol) on HTTP to `localhost:4318` (`OTLP_URL` overrides it). A log line written inside a request carries
+its `trace_id` and `span_id`. Each JVM (Java virtual machine) is its own
 series: `service.instance.id` is `${HOSTNAME:localhost}:<port>:<pid>` (Prometheus label `instance`) and
 `service.name` is the application name (label `job`), so two instances of one service never write
 into one series. The pid makes a restarted JVM a new series, as a new pod is under Kubernetes: a restart that
@@ -34,7 +35,7 @@ differs from what the script writes, so a hand edit to the JSON or a forgotten r
 
 | Dashboard | Shows | Variables |
 |---|---|---|
-| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, GC, warnings and errors | service, rate window |
+| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, garbage collection, warnings and errors | service, rate window |
 | Money | deposits by currency and outcome; quotes by pair, refusals by reason and rule; rate-feed calls; conversion requests by pair and outcome; settled outcomes; ledger postings; overdue PENDING; sweeper actions; p95 of each business step | currency, pair, outcome, rate window |
 | Traces | a trace by ID (in a collapsed row: a trace panel with no ID is an error), merchant requests, traces with an error or a 5xx, slow merchant requests, business spans with their attributes, the service map, span rates | service, trace ID, min duration, rate window |
 | Logs | lines per service and level, the lines, warnings and errors | service, level, search, trace ID |
@@ -51,7 +52,8 @@ How the boards connect:
   carrying the time range (`${__url_time_range}`).
 - **Dashboard links** (top bar) keep the time range and the variables the boards share.
 - **Exemplars.** Latency panels (diamonds) carry one real request each; its `trace_id` opens Tempo. They
-  ride on histogram buckets, which the shared config enables for the HTTP and business timers.
+  ride on histogram buckets, which the shared config enables for the HTTP timers and every business timer
+  but `ezeebit.sweep`.
 - **Datasources** (`docker/lgtm/datasources.yaml`, replacing the image's file): Loki's `trace_id` field
   links to Tempo; Tempo links a span to its logs (filtered by trace id) and to its service's request rate,
   p95 and 5xx ratio; the Prometheus step is 10 s, the services' export interval.
@@ -79,8 +81,8 @@ Each span also produces a timer of the same name (`ezeebit_quote_milliseconds_*`
 the same values. A span starts as `outcome=error` and keeps it when the step ends in neither an answer
 nor a refusal. A refusal is an answer, so it is tagged, not recorded as an error (its message can echo
 caller input). A database or transaction failure is recorded on the business span, and the catch-all
-500 handler records the exception on the request span. JDBC statements have no spans: no JDBC
-instrumentation is on the classpath, and Hikari's pool metrics stand in.
+500 handler records the exception on the request span. JDBC (Java Database Connectivity) statements have no
+spans: no JDBC instrumentation is on the classpath, and Hikari's pool metrics stand in.
 
 Every log line written inside a request carries `trace_id` and `span_id` as Loki structured metadata.
 
@@ -105,9 +107,9 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 Requests refused before the service layer (malformed JSON, a missing field) are counted only by the
 HTTP metrics.
 
-Beside these, every service exports Spring's RED timers: `http_server_requests_milliseconds_*` per route
-template and status (with an exact 500 ms bucket for the latency SLO) and `http_client_requests_milliseconds_*`
-per called host, both as histograms so p95 and exemplars work. Each business span adds a timer of its
+Beside these, every service exports Spring's RED (rate, errors, duration) timers:
+`http_server_requests_milliseconds_*` per route template and status (with an exact 500 ms bucket for the
+latency service level objective, SLO) and `http_client_requests_milliseconds_*` per called host, both as histograms so p95 and exemplars work. Each business span adds a timer of its
 name (`ezeebit_deposit`, `ezeebit_ledger_posting`, `ezeebit_quote`, `ezeebit_conversion_accept`,
 `ezeebit_ratelimit_decision`, `ezeebit_sweep`, all `_milliseconds_*`) with the span's bounded tags. ledger-svc
 and conversion-svc export Hikari's `hikaricp_connections_{active,idle,pending,max,timeout_total}` and
@@ -134,7 +136,7 @@ every rule carries a `runbook` annotation.
 | ConversionsStuckPending | `max(ezeebit_conversion_pending_overdue) > 0`; the sweeper runs every 10 s, so a due row normally lives seconds | after 5 min |
 | RateLimiterUnavailable (critical) | `sum(increase(ezeebit_gateway_ratelimit_total{outcome="unavailable"}[1m])) > 0`: the gateway refused merchant requests because Redis did not answer. The limiter fails closed, so this is an edge outage for every merchant | after 1 min |
 | RateLimiterStoreDown (critical) | `(1 - min(last_over_time(ezeebit_gateway_ratelimit_store_up[30s]))) or absent_over_time(ezeebit_gateway_ratelimit_store_up[30s])`: a gateway cannot PING Redis, or no gateway has reported for 30 s | after 1 min; needs no traffic |
-| LatencySLOBurn | SLO 99% of business requests within 500 ms. The slow share (against the exact `le="500.0"` bucket) burns the 1% budget more than 14.4 times too fast over both 5 min and 1 h, while the service sees at least 3 requests a minute | after 2 min; one alert per service |
+| LatencySLOBurn | SLO: 99% of business requests within 500 ms. The slow share (against the exact `le="500.0"` bucket) burns the 1% budget more than 14.4 times too fast over both 5 min and 1 h, while the service sees more than 3 requests a minute | after 2 min; one alert per service |
 | DbPoolSaturated | a thread waited for a Hikari connection in each of the last 30 s windows (`max_over_time(hikaricp_connections_pending[30s]) > 0`) | after 1 min; one alert per JVM |
 | LedgerInvariantBroken (critical) | the ledger refused its own posting as `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` (both map to 500: a code defect, never bad input) in the last 5 min, counted with the same born-in-window arm as RateFeedRefusing | at once; one alert per code |
 
@@ -159,7 +161,7 @@ container installs the Slack contact point at start only in that case, because G
 start on a Slack contact point with an empty URL; without it no contact point exists and alerts stay
 visible in Grafana only. Grafana expands the URL from its environment; it is never written to a file.
 
-## Rehearsals (local, 2026-10-13, measured once each)
+## Rehearsals (local, 2026-10-13)
 
 **Delivery, Slack live.** conversion-svc stopped; counts from Grafana's
 `grafana_alerting_notifications_total`:
@@ -172,6 +174,9 @@ visible in Grafana only. Grafana expands the URL from its environment; it is nev
 | Delivered to Slack (sent=1, failed=0); service restored | t+115s |
 | Normal | t+146s |
 | RESOLVED delivered (sent=2, failed=0) | t+175s |
+
+Repeated at 16:23 SAST (UTC+2) the same day, with the timings in
+[observability-evidence.md](observability-evidence.md#alerts-to-slack). Every other rehearsal below ran once.
 
 **Business alerts, Slack disconnected.** ledger-svc frozen with SIGSTOP and a conversion accepted
 (202 PENDING); the WireMock rate service stopped while a quote was sent every 2 s:

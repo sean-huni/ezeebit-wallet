@@ -1,11 +1,11 @@
 # Observability evidence
 
-Back to [observability.md](observability.md). Captured on 2026-10-13 against the local fleet (one JVM per
-service, Grafana 13.2.3 in `grafana/otel-lgtm:0.36.0`, Slack disconnected) by the Playwright suite in
-[docs/observability/verification/](observability/verification/), right after its traffic run: deposits
-(one replayed, one refused), quotes and conversions over four pairs, an unsupported pair, a conversion
-refused for funds, a stale-rate refusal, and a 180-request burst on one merchant. Times are SAST
-(UTC+2); the services had last been restarted at about 15:52, as the 5xx and ServiceDown markers show. The
+Back to [observability.md](observability.md). Captured on 2026-10-13 against the local fleet (one JVM, Java virtual
+machine, per service, Grafana 13.2.3 in `grafana/otel-lgtm:0.36.0`, Slack disconnected) by the Playwright suite in
+[docs/observability/verification/](observability/verification/), right after its traffic run: four deposits
+(each replayed once) and one refused, quotes and conversions over four pairs, an unsupported pair, a conversion
+refused for funds, a stale-rate refusal, and a 180-request burst on one merchant. Times are South African
+Standard Time (SAST, UTC+2); the services had last been restarted at about 15:52, as the 5xx and ServiceDown markers show. The
 suite's own log, 65 checks passed and 0 failed, is
 [2026-10-13-dashboards-playwright-run.log](observability/verification/2026-10-13-dashboards-playwright-run.log).
 
@@ -17,7 +17,8 @@ failure, so what each picture shows is written under it.
 ![Fleet Overview: health and RED per service](observability/evidence/fleet-overview-health-red.png)
 
 **Proves** every service is up and exports as exactly one JVM series (the metric-identity check:
-`count by (job) (group by (job, instance) (jvm_threads_live))` is 1 for each of the five); RED per service
+`count by (job) (group by (job, instance) (present_over_time(jvm_threads_live[30s])))` is 1 for each of the
+five); RED (rate, errors, duration) per service
 over business routes, with the dashed 5% and 500 ms lines the alerts use; exemplar diamonds on the p95
 panel. The 5xx peak at about 15:52 is the gateway answering 503 while the services restarted, and the
 3.3% on conversion-svc is the deliberate stale-rate quote (502 `RATE_REJECTED`), which also holds

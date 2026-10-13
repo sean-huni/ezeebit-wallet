@@ -9,7 +9,7 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 | Task | Runs in | Reads | Needs |
 |---|---|---|---|
 | `checkSecrets` | every `./gradlew build` (root `check`) | the git history and the working tree | Docker; no images |
-| `checkSupplyChain` | only when asked | secrets again, then the five images, their SBOMs and the compose and docker files | `bootBuildImageAll`, which it depends on |
+| `checkSupplyChain` | only when asked | secrets again, then the five images, their SBOMs (software bills of materials) and the compose and docker files | `bootBuildImageAll`, which it depends on |
 
 ```sh
 ./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.1.0, one per service, Paketo only
@@ -28,7 +28,7 @@ architecture.
 |---|---|---|
 | secrets | gitleaks `git --log-opts="--all --diff-merges=first-parent"` | every commit reachable from any ref, merges included as their diff against the first parent; the console prints the commits gitleaks scanned beside the commits git counts, and a mismatch fails |
 | secrets | gitleaks `dir`, then trivy `fs --scanners secret` | tracked files plus untracked files that `.gitignore` does not exclude, copied out first, so `.env` never reaches a scanner |
-| images | trivy `image --input` on a `docker save` tarball | the OS packages, JRE, buildpack helpers and jars in each image; the scanner gets no Docker socket |
+| images | trivy `image --input` on a `docker save` tarball | the operating-system packages, Java runtime (JRE), buildpack helpers and jars in each image; the scanner gets no Docker socket |
 | sbom | trivy `--format cyclonedx` from the same tarball | one CycloneDX document per image in `build/supply-chain/sbom/` |
 | config | trivy `config` | `compose.yaml`, `docker/` and any tracked `Dockerfile*`; reported, never gating |
 
@@ -66,8 +66,10 @@ quoting an older console.
 
 ## State
 
-PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run at commit `eae19eb` with the trivy DB of 2026-10-13. The
-first run failed on nine CVEs in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
+PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run at commit `eae19eb` with the trivy database of
+2026-10-13. **That verdict is stale:** since `eae19eb` the images gained Bucket4j and Lettuce (gateway-svc's
+Redis rate limiter), springdoc-openapi and `spring-boot-starter-validation`, and no later full `checkSupplyChain`
+run is recorded. The first run failed on nine CVEs (Common Vulnerabilities and Exposures) in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
 of Boot's own properties in the root `build.gradle` (`tomcat.version`, `jackson-bom.version`,
 `jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties`: Tomcat 11.0.26,
 Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders with it, so it is

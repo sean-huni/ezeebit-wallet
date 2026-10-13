@@ -285,8 +285,9 @@ published status.
 ## 5. Conversion design (Task 2)
 
 Code: `services/conversion-svc`, package `io.ezeebit.conversion`; schema changesets
-`001-quote.xml`, `002-conversion.xml`. Ledger side: `ConversionPostingCtrl`, `ConversionPoster`,
-`ConversionVoider`.
+`001-quote.xml`, `002-conversion.xml`. Ledger side: `ConversionPostingCtrl` and the
+`service/conversion` package (`ConversionPostingService`, `ConversionPoster`, `ConversionVoider` and
+their collaborators, mapped in [docs/project-layout.md](docs/project-layout.md)).
 
 ### Two steps: quote, then accept
 
@@ -482,7 +483,8 @@ All five services live in one repository with one Gradle build root, which depar
 that builds and runs with one command. The cost is contained: the services share no business code,
 database or runtime, and each ships as its own jar. The only shared code is `observability/` (a
 logback-to-OpenTelemetry bridge and its config), compiled into each jar rather than published as a
-library. Splitting into one repository per service later is mechanical.
+library, and `architecture/`, the dependency-injection budget gate compiled into each service's
+`test` task only. Splitting into one repository per service later is mechanical.
 
 The rest of 12-factor is followed: config from the environment with committed working defaults (a
 clean clone runs with no `.env`), backing services attached by URL, and no process state (quotes

@@ -11,8 +11,9 @@ Walkthrough video: link to be added.
 
 I spent about 3 hours of my own attention, directing AI agents (Claude Code) that wrote most of the
 code and docs under review gates: tests seen failing before they were trusted, reviews of each
-branch, and a final review of the whole repository. The agents' work ran from 02:44 to about 10:11 on
-13 October 2026 (commit timestamps, UTC+2), well past the brief's two to three hours. The brief says
+branch, and a final review of the whole repository. The agents' work ran from 02:44 to 17:20 on
+13 October 2026 (commit timestamps, UTC+2), well past the brief's two to three hours; release
+`0.1.0` was tagged at 10:19 and the rest landed on `dev` after it. The brief says
 to stop and write up the rest; I kept building the extras listed below, which a reviewer can
 ignore. Section 8 says where I accepted, changed or rejected what the agents produced.
 
@@ -24,14 +25,16 @@ of it:
 
 | Addition | Merge on `dev` | Where it is described |
 |---|---|---|
-| Local observability: Grafana LGTM, dashboards, alert rules, optional Slack delivery | `feat-observability`, `feat-business-observability` | [docs/observability.md](docs/observability.md) |
+| Local observability: Grafana LGTM, OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
 | SAST and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
 | Supply-chain gate: secrets scanning, Paketo images, SBOMs, trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
 | OpenAPI: per-service specs with derived problem responses, one Swagger UI on the gateway, snapshots checked in `check` | `feat-openapi` | [README](README.md#api-reference), [ARCHITECTURE.md](ARCHITECTURE.md#openapi) |
 | Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
+| Use-case packages and a map of every package and class | `refactor-ledger-packages` | [docs/project-layout.md](docs/project-layout.md) |
+| Dependency-injection budget: the build fails on any bean with more than 3 injected dependencies; 8 beans split by job to meet it | `bugfix-di-flooding` | [docs/quality-gates.md](docs/quality-gates.md#architecture-gates) |
 
-Each landed as its own `feat-*` merge on `dev`, so `git show --stat <merge>` shows exactly what it
+Each landed as its own merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means
 resolving conflicts rather than a one-command revert.
 
@@ -185,7 +188,8 @@ In order:
    keeping its own copy.
 5. **A two-instance run of conversion-svc** to prove the sweeper live across processes.
 6. **A transactional outbox** for ledger events, which Task 5 depends on.
-7. **An OpenAPI contract** per service, and generated client DTOs for the conversion-to-ledger seam.
+7. **Generated client data transfer objects (DTOs)** for the conversion-to-ledger seam, from ledger-svc's committed internal
+   spec (`docs/openapi/ledger-svc-internal.json`); today `PostingDto` and `LedgerReplyDto` are hand-written.
 8. **Quote retention**, and a MySQL 8 run of the same suite to back the portability claim.
 
 ## 7. Known gaps and unfinished work
@@ -223,8 +227,8 @@ This is the single list; the other documents link here.
 **Money correctness**
 
 - Reconciliation is a test assertion and a manual query, not a scheduled job with an alert.
-- No alert on a broken ledger invariant: a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` is
-  logged at error and visible only as an HTTP 5xx.
+- A broken ledger invariant (a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING`) pages as
+  LedgerInvariantBroken, proven by promtool only, never by a rehearsed outage.
 - Rate drift: each quote's rate is checked only against the pair's recent quote, so a slow drift of
   under 5% per quote is bounded only by the static band.
 - Currency scales live in the ledger and in conversion-svc's config. Drift fails safe (the
@@ -243,12 +247,14 @@ This is the single list; the other documents link here.
   not with two running conversion-svc instances.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
-- RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither rule has
-  a unit test (no `promtool` in the build), like the other rules.
+- RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests five of the nine rules (ServiceDown,
+  RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken) and is run by hand, not
+  by the Gradle build or the CircleCI pipeline.
 
 **Not built**
 
-- Tasks 3 to 6 (section 5). No OpenAPI schema. Quotes are never deleted.
+- Tasks 3 to 6 (section 5). No generated client DTOs between services. Quotes are never deleted.
 
 ## 8. AI usage notes
 
@@ -296,3 +302,5 @@ the services and tests and drafted the documentation, which I reviewed.
 
 **Rejected:** an early table of services and datastores that included Redis rate limiting, MongoDB
 for notifications, and read replicas for settlement. Nothing in Tasks 1 and 2 needs any of them.
+Redis rate limiting was later added at the gateway as an extra beyond the brief (section 3); the
+other two stay rejected.

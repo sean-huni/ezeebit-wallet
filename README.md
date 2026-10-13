@@ -11,6 +11,26 @@ container stands in for it. Design, trade-offs, scope, known gaps and AI usage n
 
 Walkthrough video: link to be added.
 
+## Contents
+
+**Documents**
+
+| Document | What it covers |
+|---|---|
+| [SOLUTION.md](SOLUTION.md) | Tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6 fit, known gaps, AI usage notes |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, API, failure handling |
+| [docs/project-layout.md](docs/project-layout.md) | Every package and class per service, measured dependencies, where new code goes |
+| [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, SAST (static application security testing) and coverage |
+| [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, SBOMs (software bills of materials), how to read the console |
+| [docs/ci.md](docs/ci.md) | The CircleCI pipeline (not yet run) |
+| [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
+| [docs/observability-evidence.md](docs/observability-evidence.md) | Screenshots of the dashboards, an end-to-end trace, trace-correlated logs, alert timings |
+| [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
+
+**This README**
+
+[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting)
+
 ## Find your way around
 
 [docs/project-layout.md](docs/project-layout.md) is the map: the repository to service level, then
@@ -48,7 +68,7 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ./fleet.sh up       # Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other three together,
                     # each waited until healthy, then a routing check, then Grafana LGTM
 ./fleet.sh status   # port and /actuator/health HTTP code per service (000 = not answering)
-./fleet.sh down     # stop the JVMs, then docker compose down (data volumes are kept)
+./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down (data volumes are kept)
 ```
 
 The tail of `up` (Docker's own progress lines left out):
@@ -197,7 +217,8 @@ Each service port is defined once, in that service's `src/main/resources/applica
 ```
 ezeebit-wallet/
 ├── README.md, ARCHITECTURE.md, SOLUTION.md
-├── docs/                   project layout, quality gates, supply chain, CI, observability
+├── docs/                   project layout, quality gates, supply chain, CI, observability, OpenAPI snapshots
+├── architecture/           the dependency-injection budget gate, compiled into every service's `test` task
 ├── build.gradle            shared build conventions for every service
 ├── settings.gradle         the five service projects
 ├── gradle.properties       Spring Boot, Spring Cloud, quality-tool and override versions; Paketo pins
@@ -283,6 +304,7 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 | `RATES_URL` | `http://localhost:${RATES_PORT}` | Base URL of the exchange-rate service |
 | `EUREKA_URL` | http://localhost:8761/eureka/ | Registry address for the clients |
 | `OTLP_URL` | http://localhost:4318 | OTLP/HTTP base URL for metrics, traces and logs |
+| `OPENAPI_PUBLIC_URL` | http://localhost:8080/api | The server named in each public OpenAPI spec, where Swagger UI "Try it out" sends calls |
 | `REDIS_PORT` | 6379 | Host port for Redis, and the port the gateway dials |
 | `REDIS_HOST` | localhost | Where the gateway's rate limiter finds Redis |
 | `REDIS_PASSWORD` | redis-local | Redis `requirepass` in compose and the gateway's credential. Override outside local runs |
@@ -297,10 +319,10 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 per process when starting a service by hand, not in `.env`, or every service picks up the same value.
 
 Served configuration lives in `services/config-svc/src/main/resources/served/`: `application.yml`
-(shared by all clients, including the gateway proof secret), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
+(shared by all clients: registry settings, the gateway proof secret and the public spec URL), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
 policy: quote TTL, posting grace, sweeper timing, rate-service timeouts and freshness, jump limit,
-currency scales, per-pair band and spread) and `gateway-svc.yml` (the route table with its path rewrite and proof
-header, the proxy read timeout, and the rate limits and Redis connection).
+ledger client timeouts, currency scales, per-pair band and spread) and `gateway-svc.yml` (the route table with its path rewrite and proof
+header, the two Swagger UI spec routes, the proxy read timeout, and the rate limits and Redis connection).
 
 ## Troubleshooting
 
@@ -318,16 +340,3 @@ header, the proxy read timeout, and the rate limits and Redis connection).
 | A dashboard shows no data right after `up` | Metrics export every 10 s; wait one step |
 
 Run state (pids and logs) lives in `.fleet/`, which is gitignored.
-
-## Further reading
-
-- [SOLUTION.md](SOLUTION.md): tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6
-  fit, known gaps, AI usage notes.
-- [ARCHITECTURE.md](ARCHITECTURE.md): how the design was derived, data model, flows, API, failure
-  handling.
-- [docs/quality-gates.md](docs/quality-gates.md): test tiers, SAST and coverage.
-- [docs/supply-chain.md](docs/supply-chain.md): secrets, images, SBOMs, how to read the console.
-- [docs/ci.md](docs/ci.md): the CircleCI pipeline (not yet run).
-- [docs/observability.md](docs/observability.md): dashboards, tracing, business metrics, alerts, rehearsal, and the Playwright suite
-- [docs/observability-evidence.md](docs/observability-evidence.md): screenshots of the dashboards, an end-to-end trace, trace-correlated logs and the alerts
-  timings.

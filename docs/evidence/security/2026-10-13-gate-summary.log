@@ -1,0 +1,30 @@
+Summary lines copied verbatim from the Gradle console of three runs on 2026-10-13 at commit d538b32,
+with uncommitted changes in the working tree. The full console logs were not committed; these are
+Gradle's own result lines. The shell exit code was not written to the logs, so BUILD SUCCESSFUL is
+the only record that each run passed. Times are when each log file was last written.
+
+== full gate: clean build, every task executed   (log written 21:28:14, UTC+2)
+> Task :build
+> Task :services:config-svc:build
+> Task :services:conversion-svc:build
+> Task :services:eureka-svc:build
+> Task :services:gateway-svc:build
+> Task :services:ledger-svc:build
+BUILD SUCCESSFUL in 2m 57s
+86 actionable tasks: 86 executed
+
+== bootBuildImageAll   (log written 21:29:51, UTC+2)
+Successfully built image 'docker.io/ezeebit/config-svc:0.1.0'
+Successfully built image 'docker.io/ezeebit/conversion-svc:0.1.0'
+Successfully built image 'docker.io/ezeebit/eureka-svc:0.1.0'
+Successfully built image 'docker.io/ezeebit/gateway-svc:0.1.0'
+Successfully built image 'docker.io/ezeebit/ledger-svc:0.1.0'
+> Task :bootBuildImageAll
+BUILD SUCCESSFUL in 55s
+25 actionable tasks: 5 executed, 20 up-to-date
+
+== checkSupplyChain   (log written 21:31:15, UTC+2)
+   console: 2026-10-13-supply-chain-console.txt; per-scanner exit codes: 2026-10-13-supply-chain-status.txt
+SUPPLY CHAIN GATE: PASSED  (no finding is HIGH or CRITICAL AND fixable AND in a SERVICE layer)
+BUILD SUCCESSFUL in 1m 18s
+26 actionable tasks: 6 executed, 20 up-to-date

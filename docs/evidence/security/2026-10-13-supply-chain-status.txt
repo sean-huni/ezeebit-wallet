@@ -1,0 +1,14 @@
+gitleaks-history exit=0
+gitleaks-tree exit=0
+trivy-secrets exit=0
+image-config-svc exit=0
+sbom-config-svc exit=0
+image-conversion-svc exit=0
+sbom-conversion-svc exit=0
+image-eureka-svc exit=0
+sbom-eureka-svc exit=0
+image-gateway-svc exit=0
+sbom-gateway-svc exit=0
+image-ledger-svc exit=0
+sbom-ledger-svc exit=0
+misconfig exit=0

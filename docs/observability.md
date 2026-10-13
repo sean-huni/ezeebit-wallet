@@ -177,7 +177,7 @@ visible in Grafana only. Grafana expands the URL from its environment; it is nev
 
 Repeated at 16:23 South African Standard Time, 2 hours ahead of Coordinated Universal Time
 (UTC), the same day, with the timings in
-[observability-evidence.md](observability-evidence.md#alerts-to-slack). Every other rehearsal below ran once.
+[EVIDENCE.md](../EVIDENCE.md#alerts-to-slack). Every other rehearsal below ran once.
 
 **Business alerts, Slack disconnected.** ledger-svc frozen with SIGSTOP and a conversion accepted
 (202 PENDING); the WireMock rate service stopped while a quote was sent every 2 s:
@@ -250,5 +250,5 @@ the `/api/ds/query` requests: time picker, every variable, a data link, dashboar
 trace opening in Tempo, the trace view and alert annotations. Captures land in `out/` (gitignored); a
 check passing is not the verdict, the pictures are read. The run of 2026-10-13 is
 `2026-10-13-dashboards-playwright-run.log` (65 passed, 0 failed) and the curated captures are in
-[observability-evidence.md](observability-evidence.md). A new wave of dashboard work adds a new dated
+[EVIDENCE.md](../EVIDENCE.md#monitoring-and-observability). A new wave of dashboard work adds a new dated
 suite and re-runs this one.

@@ -10,6 +10,7 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 
 // Records each money outcome on a counter and on its business span, with the same bounded tags: never a
 // merchant, an id or an amount. Counters are flows: each replica counts its own and dashboards sum them.
@@ -55,13 +56,14 @@ public class LedgerMetrics {
 				.lowCardinalityKeyValue(CODE, NONE);
 	}
 
-	// A refusal is tagged by the step, not recorded as an error: its message can echo the caller's input.
+	// A refusal is tagged by the step, not recorded as an error: its message can echo the caller's input. A database or
+	// transaction failure is recorded.
 	public <T> T observe(final Observation span, final Supplier<T> step) {
 		span.start();
 		try (Observation.Scope scope = span.openScope()) {
 			return step.get();
 		}
-		catch (DataAccessException failure) {
+		catch (DataAccessException | TransactionException failure) {
 			span.error(failure);
 			throw failure;
 		}

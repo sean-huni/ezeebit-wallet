@@ -9,6 +9,7 @@ import io.ezeebit.conversion.exception.ConversionException;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 
 // One span (and one timer) per business step. Low-cardinality values become metric tags, so each is a bounded enum:
 // never a merchant, an id or an amount. Counts go in high-cardinality values, which reach the span only.
@@ -46,13 +47,14 @@ public class ConversionSpans {
 		return Observation.createNotStarted(SWEEP, observations).contextualName("sweep").lowCardinalityKeyValue("result", "error");
 	}
 
-	// A refusal is tagged by the step, not recorded as an error: its message can echo the caller's input.
+	// A refusal is tagged by the step, not recorded as an error: its message can echo the caller's input. A database or
+	// transaction failure is recorded.
 	public <T> T observe(final Observation span, final Supplier<T> step) {
 		span.start();
 		try (Observation.Scope scope = span.openScope()) {
 			return step.get();
 		}
-		catch (DataAccessException failure) {
+		catch (DataAccessException | TransactionException failure) {
 			span.error(failure);
 			throw failure;
 		}

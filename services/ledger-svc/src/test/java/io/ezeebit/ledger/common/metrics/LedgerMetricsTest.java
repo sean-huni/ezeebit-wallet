@@ -16,6 +16,7 @@ import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.TransactionSystemException;
 
 class LedgerMetricsTest {
 
@@ -115,6 +116,19 @@ class LedgerMetricsTest {
 
 		TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat().hasBeenStopped()
 				.hasError(down).hasLowCardinalityKeyValue("outcome", "error");
+	}
+
+	// The transaction manager's own failure (a rollback that cannot complete) replaces the database error that caused it.
+	@Test
+	void aTransactionFailureIsRecordedOnTheSpanToo() {
+		Observation span = metrics.depositSpan();
+		TransactionSystemException rollback = new TransactionSystemException("could not roll back");
+
+		assertThatThrownBy(() -> metrics.observe(span, () -> {
+			throw rollback;
+		})).isSameAs(rollback);
+
+		TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat().hasError(rollback);
 	}
 
 }

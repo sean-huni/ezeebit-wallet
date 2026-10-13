@@ -11,6 +11,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record ConversionProperties(Duration quoteTtl, Duration postingGrace, Duration maxTransactionTime, Rates rates,
 		Ledger ledger, Map<String, Integer> currencies, Map<String, Pair> pairs) {
 
+	public ConversionProperties {
+		currencies = currencies == null ? null : Map.copyOf(currencies);
+		pairs = pairs == null ? null : Map.copyOf(pairs);
+	}
+
 	public record Rates(String url, Duration connectTimeout, Duration readTimeout, Duration maxAge,
 			BigDecimal maxJumpPercent, Duration jumpWindow) {
 	}

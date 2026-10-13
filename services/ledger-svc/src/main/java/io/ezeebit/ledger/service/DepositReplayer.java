@@ -2,6 +2,7 @@ package io.ezeebit.ledger.service;
 
 import java.util.UUID;
 
+import io.ezeebit.ledger.common.RequestFingerprint;
 import io.ezeebit.ledger.data.model.JournalEntity;
 import io.ezeebit.ledger.data.repo.JournalRepo;
 import io.ezeebit.ledger.domain.JournalType;
@@ -25,7 +26,7 @@ public class DepositReplayer {
 	public UUID storedJournal(final MerchantId merchant, final String key, final String requestHash) {
 		JournalEntity stored = journals.findByIdentity(merchant.value(), JournalType.DEPOSIT.name(), key)
 				.orElseThrow(() -> new IllegalStateException("duplicate key reported but no journal for %s".formatted(key)));
-		if (!stored.requestHash().equals(requestHash)) {
+		if (!RequestFingerprint.sameHash(stored.requestHash(), requestHash)) {
 			throw new LedgerException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "Idempotency-Key", key);
 		}
 		return stored.id();

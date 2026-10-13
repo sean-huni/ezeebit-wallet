@@ -16,8 +16,8 @@ public class ConversionRepo {
 
 	private static final String SELECT = """
 			SELECT c.id AS c_id, c.merchant_id AS c_merchant_id, c.quote_id, c.idempotency_key, c.status AS c_status,
-			c.reason, c.deadline, c.created AS c_created, c.completed, %s
-			FROM conversion c JOIN quote q ON q.id = c.quote_id""".formatted(QuoteRepo.COLUMNS);
+			c.reason, c.deadline, c.created AS c_created, c.completed,\s"""
+			+ QuoteRepo.COLUMNS + " FROM conversion c JOIN quote q ON q.id = c.quote_id";
 
 	private final JdbcClient jdbc;
 

@@ -1,6 +1,11 @@
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort
+
 plugins {
 	id 'org.springframework.boot' version "${springBootVersion}" apply false
 	id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
+	id 'com.github.spotbugs' version "${spotbugsPluginVersion}" apply false
+	id 'org.sonarqube' version "${sonarPluginVersion}"
 }
 
 // services/* only: the intermediate :services project is a folder, not an application.
@@ -113,5 +118,256 @@ configure(subprojects.findAll { it.name in tieredServices }) {
 
 	tasks.named('check') {
 		dependsOn integrationTest, acceptanceTest
+	}
+}
+
+// Quality gates, one convention for every service. README "Quality gates" says what each reads and fails on.
+// Floors sit a few points under a measured run; checkCoverageFloors fails when one drifts more than
+// coverageBand below it, so they ratchet up. A service with no branches declares no BRANCH floor.
+def coverageFloors = [
+	'config-svc'    : [LINE: '0.57'],
+	'eureka-svc'    : [LINE: '0.57'],
+	'gateway-svc'   : [LINE: '0.67', BRANCH: '0.47'],
+	'ledger-svc'    : [LINE: '0.93', BRANCH: '0.87'],
+	'conversion-svc': [LINE: '0.90', BRANCH: '0.84'],
+]
+def coverageBand = new BigDecimal('0.05')
+def findsecbugsPluginId = 'com.h3xstream.findsecbugs'
+
+def services = subprojects.findAll { it.parent != rootProject }
+configure(services) {
+	apply plugin: 'checkstyle'
+	apply plugin: 'jacoco'
+	apply plugin: 'com.github.spotbugs'
+
+	def serviceName = project.name
+	def floors = coverageFloors[serviceName]
+	if (floors == null) {
+		throw new GradleException("${serviceName} has no entry in coverageFloors in the root build.gradle")
+	}
+
+	checkstyle {
+		toolVersion = checkstyleVersion
+		configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+		configDirectory = rootProject.file('config/checkstyle')
+		ignoreFailures = false
+		maxWarnings = 0
+		maxErrors = 0
+	}
+
+	spotbugs {
+		toolVersion = spotbugsVersion
+		// MAX and LOW: the security detectors are the point, and most taint findings are low confidence.
+		effort = Effort.valueOf('MAX')
+		reportLevel = Confidence.valueOf('LOW')
+		excludeFilter = rootProject.file('config/spotbugs/exclude.xml')
+		ignoreFailures = false
+	}
+
+	dependencies {
+		spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:${findsecbugsVersion}"
+	}
+
+	// Test code is read by Checkstyle only; SpotBugs on tests reports the shapes tests are made of.
+	tasks.matching { it.name.startsWith('spotbugs') && it.name != 'spotbugsMain' }.configureEach {
+		enabled = false
+	}
+
+	def spotbugsMain = tasks.named('spotbugsMain') {
+		reports {
+			xml.required = true
+			html.required = true
+		}
+	}
+	def spotbugsXml = spotbugsMain.flatMap { it.reports.getByName('xml').outputLocation }
+
+	// Its own task with no outputs, so it reads the report on every build, including when spotbugsMain is UP-TO-DATE.
+	// A plugin jar on the classpath is not a running detector: the report must show it loaded and enabled.
+	def checkSpotbugsReport = tasks.register('checkSpotbugsReport') {
+		group = 'verification'
+		description = 'Fails unless the SpotBugs report shows Find Security Bugs enabled over a full, error-free analysis.'
+		dependsOn spotbugsMain
+		doLast {
+			tasks.withType(com.github.spotbugs.snom.SpotBugsTask).each { task ->
+				def narrowed = [visitors: task.visitors.getOrElse([]), omitVisitors: task.omitVisitors.getOrElse([])].findAll { it.value }
+				def flags = task.extraArgs.getOrElse([]).findAll { it in ['-visitors', '-omitVisitors', '-chooseVisitors'] }
+				if (narrowed || flags) {
+					throw new GradleException("spotbugs(${serviceName}): ${task.name} narrows the detector set (${narrowed} ${flags})," +
+						" so a clean report does not cover every detector")
+				}
+			}
+			def report = spotbugsXml.get().asFile
+			if (!report.isFile() || report.length() == 0L) {
+				throw new GradleException("spotbugs(${serviceName}): ${report} is absent or empty, so there is no evidence of a clean run")
+			}
+			def parsed = new groovy.xml.XmlSlurper(false, false).parse(report)
+			def plugins = parsed.Project.Plugin.collectEntries { [(it.@id.text()): it.@enabled.text()] }
+			if (plugins[findsecbugsPluginId] != 'true') {
+				throw new GradleException("spotbugs(${serviceName}): report lists plugins ${plugins}; ${findsecbugsPluginId} is not" +
+					" loaded with enabled=\"true\", so no security detector ran and a clean report means nothing")
+			}
+			def errors = (parsed.Errors[0].@errors.text() ?: '0') as int
+			def missing = (parsed.Errors[0].@missingClasses.text() ?: '0') as int
+			if (errors > 0 || missing > 0) {
+				throw new GradleException("spotbugs(${serviceName}): ${errors} analysis error(s) and ${missing} missing class(es)," +
+					" so the analysis resolved less than the code holds; see ${report}")
+			}
+			// Counted from the class files handed to the analyser: FindBugsSummary total_classes reads 0 on 4.10.5.
+			def analysed = parsed.Project.Jar.size()
+			if (analysed == 0) {
+				throw new GradleException("spotbugs(${serviceName}): no class files were analysed, so a clean report means nothing")
+			}
+			logger.lifecycle("spotbugs(${serviceName}): ${analysed} class files, plugins ${plugins}, 0 errors, 0 missing classes," +
+				" ${parsed.BugInstance.size()} findings")
+		}
+	}
+
+	jacoco {
+		toolVersion = jacocoVersion
+	}
+
+	// One report per service, merged over every test tier it has (unit, integration, acceptance).
+	def testTasks = tasks.withType(Test)
+	tasks.named('jacocoTestReport') {
+		dependsOn testTasks
+		executionData.setFrom(testTasks.collect { it.extensions.getByType(JacocoTaskExtension).destinationFile })
+		reports {
+			xml.required = true
+			html.required = true
+		}
+	}
+
+	tasks.named('jacocoTestCoverageVerification') {
+		dependsOn testTasks
+		executionData.setFrom(testTasks.collect { it.extensions.getByType(JacocoTaskExtension).destinationFile })
+		violationRules {
+			rule {
+				element = 'BUNDLE'
+				floors.each { String counterName, String floor ->
+					limit {
+						counter = counterName
+						value = 'COVEREDRATIO'
+						minimum = new BigDecimal(floor)
+					}
+				}
+			}
+		}
+	}
+
+	def coverageXml = tasks.named('jacocoTestReport').flatMap { it.reports.xml.outputLocation }
+	def checkCoverageFloors = tasks.register('checkCoverageFloors') {
+		group = 'verification'
+		description = 'Fails when a declared coverage floor no longer describes the measured run.'
+		dependsOn tasks.named('jacocoTestReport')
+		// No outputs on purpose: a gate that can be UP-TO-DATE is a gate that did not read the report.
+		doLast {
+			def xml = coverageXml.get().asFile
+			if (!xml.isFile()) {
+				throw new GradleException("checkCoverageFloors(${serviceName}): no report at ${xml}")
+			}
+			def slurper = new groovy.xml.XmlSlurper(false, false)
+			slurper.setFeature('http://apache.org/xml/features/disallow-doctype-decl', false)
+			slurper.setFeature('http://apache.org/xml/features/nonvalidating/load-external-dtd', false)
+			def counters = [:]
+			slurper.parse(xml).counter.each { c ->
+				def missed = c.@missed.text() as int
+				def covered = c.@covered.text() as int
+				if (missed + covered > 0) {
+					counters[c.@type.text()] = new BigDecimal(covered).divide(new BigDecimal(missed + covered), 4, java.math.RoundingMode.DOWN)
+				}
+			}
+			if (!counters.containsKey('LINE')) {
+				throw new GradleException("checkCoverageFloors(${serviceName}): the report measured no lines, so every floor would pass on nothing")
+			}
+			def problems = []
+			['LINE', 'BRANCH'].each { String counterName ->
+				def measured = counters[counterName]
+				def floor = floors[counterName]
+				if (measured == null) {
+					if (floor != null) {
+						problems << "${counterName} floor ${floor} is declared but the report has no ${counterName} to measure"
+					}
+					return
+				}
+				def suggestion = (measured - new BigDecimal('0.03')).setScale(2, java.math.RoundingMode.DOWN)
+				if (floor == null) {
+					problems << "${counterName} is measured at ${measured} and has no floor: set ${counterName}: '${suggestion}'"
+				} else if (new BigDecimal(floor) > measured) {
+					problems << "${counterName} floor ${floor} is above the measured ${measured}"
+				} else if (measured - new BigDecimal(floor) > coverageBand) {
+					problems << "${counterName} floor ${floor} is more than ${coverageBand} below the measured ${measured}: set ${counterName}: '${suggestion}'"
+				}
+				logger.lifecycle("checkCoverageFloors(${serviceName}): ${counterName} measured ${measured}, floor ${floor}")
+			}
+			if (!problems.isEmpty()) {
+				throw new GradleException("checkCoverageFloors(${serviceName}), fix coverageFloors in the root build.gradle:\n  " + problems.join('\n  '))
+			}
+		}
+	}
+
+	tasks.named('check') {
+		dependsOn tasks.named('jacocoTestCoverageVerification'), checkCoverageFloors, checkSpotbugsReport
+	}
+
+	// observability/ is compiled into every service, but Sonar indexes a file once per project: ledger-svc owns it.
+	def sonarSources = sourceSets.main.java.srcDirs.findAll {
+		it.isDirectory() && (serviceName == 'ledger-svc' || it.toPath().startsWith(projectDir.toPath()))
+	}
+	sonar {
+		properties {
+			property 'sonar.sources', sonarSources.join(',')
+			property 'sonar.coverage.jacoco.xmlReportPaths', coverageXml.get().asFile.path
+			property 'sonar.java.checkstyle.reportPaths', sourceSets.collect { layout.buildDirectory.file("reports/checkstyle/${it.name}.xml").get().asFile.path }.join(',')
+		}
+	}
+}
+
+configure(services.findAll { it.name in tieredServices }) {
+	sonar {
+		properties {
+			properties['sonar.tests'] += sourceSets.acceptanceTest.java.srcDirs.findAll { it.isDirectory() }
+			property 'sonar.java.test.libraries', (sourceSets.test.compileClasspath + sourceSets.acceptanceTest.compileClasspath)
+					.files.findAll { it.exists() }.join(',')
+		}
+	}
+}
+
+// SonarQube is opt-in: with no SONAR_TOKEN, sonarAll prints why and runs nothing. Decided at configuration time
+// because a skipped task's dependencies would still run.
+def sonarConfigured = System.getenv('SONAR_TOKEN')?.trim() as boolean
+sonar {
+	properties {
+		property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: 'ezeebit-wallet'
+		property 'sonar.projectName', 'ezeebit-wallet'
+		property 'sonar.host.url', System.getenv('SONAR_HOST_URL') ?: 'http://localhost:9000'
+		property 'sonar.java.source', '25'
+		property 'sonar.qualitygate.wait', true
+	}
+}
+
+tasks.named('sonar') {
+	if (sonarConfigured) {
+		dependsOn services.collect { "${it.path}:check" }
+	}
+	onlyIf('SONAR_TOKEN is set') { sonarConfigured }
+}
+gradle.taskGraph.whenReady { graph ->
+	if (!sonarConfigured && graph.hasTask(':sonar')) {
+		logger.lifecycle('sonar: SKIPPED, nothing ran. SONAR_TOKEN is not set; export SONAR_TOKEN and SONAR_HOST_URL to analyse.')
+	}
+}
+
+tasks.register('sonarAll') {
+	group = 'verification'
+	description = 'Runs the SonarQube analysis over every service, or skips with a reason when SONAR_TOKEN is absent.'
+	if (sonarConfigured) {
+		dependsOn 'sonar'
+	}
+	doLast {
+		if (sonarConfigured) {
+			logger.lifecycle("sonarAll: analysed ${services.size()} services; sonar.qualitygate.wait fails this build on a failing gate")
+		} else {
+			logger.lifecycle('sonarAll: SKIPPED, nothing ran. SONAR_TOKEN is not set; export SONAR_TOKEN and SONAR_HOST_URL to analyse.')
+		}
 	}
 }

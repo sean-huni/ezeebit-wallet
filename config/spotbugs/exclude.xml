@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One justification per entry; each names the classes it covers, so a new site of the pattern is still reported. -->
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0">
+
+	<!-- An inventory detector (one per request mapping), not a weakness: it names no flaw and prescribes no fix. -->
+	<Match>
+		<Bug pattern="SPRING_ENDPOINT"/>
+		<Class name="~io\.ezeebit\.[a-z]+\.ctl\.[A-Za-z]+Ctrl"/>
+	</Match>
+
+	<!-- Constructor injection of Spring singletons: sharing the collaborator is the intent. Exact types: type takes no regex. -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP2"/>
+		<Method name="&lt;init&gt;"/>
+		<Or>
+			<Field type="io.ezeebit.ledger.data.repo.AccountRepo"/>
+			<Field type="io.ezeebit.ledger.data.repo.EntryRepo"/>
+			<Field type="io.ezeebit.ledger.data.repo.JournalRepo"/>
+			<Field type="io.ezeebit.conversion.data.repo.ConversionRepo"/>
+			<Field type="io.ezeebit.conversion.data.repo.QuoteRepo"/>
+			<Field type="io.ezeebit.conversion.service.ConversionSettler"/>
+			<Field type="io.micrometer.core.instrument.MeterRegistry"/>
+			<Field type="org.springframework.web.client.RestClient"/>
+			<Field type="org.springframework.transaction.support.TransactionTemplate"/>
+		</Or>
+	</Match>
+
+	<!-- Arguments here go through LogText.oneLine (LogTextTest), which FSB cannot see. Filters stop at method level. -->
+	<Match>
+		<Bug pattern="CRLF_INJECTION_LOGS"/>
+		<Priority value="3"/>
+		<Or>
+			<And>
+				<Class name="io.ezeebit.conversion.api.advice.BusinessExceptionHandler"/>
+				<Method name="business" params="io.ezeebit.conversion.exception.ConversionException"
+						returns="org.springframework.http.ProblemDetail"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerClient"/>
+				<Method name="call" params="java.util.function.Supplier" returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>
+				<Method name="fetch" params="java.lang.String,java.lang.String" returns="io.ezeebit.conversion.domain.MarketRate"/>
+			</And>
+		</Or>
+	</Match>
+
+	<!-- policy() only sees codes require() admitted as ASCII [A-Z]{3,5}; CurrencyCatalogTest proves the guard. -->
+	<Match>
+		<Bug pattern="IMPROPER_UNICODE"/>
+		<Class name="io.ezeebit.conversion.service.CurrencyCatalog"/>
+		<Method name="policy"/>
+	</Match>
+
+</FindBugsFilter>

@@ -2,6 +2,7 @@ package io.ezeebit.ledger.data.repo;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
@@ -59,17 +60,20 @@ public class EntryRepo {
 		params.put("merchantId", filter.merchantId());
 		params.put("after", filter.after());
 		params.put("limit", filter.limit());
-		if (filter.currency() != null) {
+		String currency = filter.currency();
+		if (currency != null) {
 			sql.append(" AND e.currency = :currency");
-			params.put("currency", filter.currency());
+			params.put("currency", currency);
 		}
-		if (filter.from() != null) {
+		Instant from = filter.from();
+		if (from != null) {
 			sql.append(" AND e.created >= :from");
-			params.put("from", filter.from().atOffset(ZoneOffset.UTC));
+			params.put("from", from.atOffset(ZoneOffset.UTC));
 		}
-		if (filter.to() != null) {
+		Instant to = filter.to();
+		if (to != null) {
 			sql.append(" AND e.created < :to");
-			params.put("to", filter.to().atOffset(ZoneOffset.UTC));
+			params.put("to", to.atOffset(ZoneOffset.UTC));
 		}
 		sql.append(" ORDER BY e.seq LIMIT :limit");
 		return jdbc.sql(sql.toString()).params(params).query(EntryRepo::line).list();

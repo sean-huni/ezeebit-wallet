@@ -15,7 +15,8 @@ public record StatementReq(
 		@Nullable String currency,
 		@Nullable @SupportedInstant Instant from,
 		@Nullable @SupportedInstant Instant to,
-		@Nullable @Min(value = 1, message = "{validation.limit.range}") @Max(value = 500, message = "{validation.limit.range}") Integer limit,
+		@Nullable @Min(value = 1, message = "{validation.limit.range}")
+		@Max(value = 500, message = "{validation.limit.range}") Integer limit,
 		@Nullable @PositiveOrZero(message = "{validation.after.range}") Long after) {
 
 	public static final int DEFAULT_LIMIT = 100;

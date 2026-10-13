@@ -60,9 +60,13 @@ What exists and is verified:
   Money row on Fleet Overview and two alerts: RateFeedRefusing (repeated rate refusals for a pair)
   and ConversionsStuckPending. Both were driven to Alerting on a local run with Slack disconnected.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 284 tests, 0 failures. The ledger runs three tiers: 55 unit tests
+- The build gates static analysis and coverage (README "Quality gates"): SpotBugs with Find Security
+  Bugs, Checkstyle, and JaCoCo floors per service, with SonarQube opt-in. Its first run found a real
+  defect: conversion-svc accepted a currency code spelled with U+212A (Kelvin sign), which lower-cases
+  onto `kes`; codes are now ASCII `[A-Z]{3,5}` as in the ledger.
+- `./gradlew clean build` passes: 303 tests, 0 failures. The ledger runs three tiers: 63 unit tests
   (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 95 unit tests
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 106 unit tests
   (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
   states), 11 integration tests, and 44 acceptance scenarios against the real ledger jar running as
   its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of

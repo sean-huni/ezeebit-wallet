@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.api.advice;
 
+import io.ezeebit.conversion.common.LogText;
 import io.ezeebit.conversion.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	ProblemDetail unexpected(final Exception ex) {
-		LOG.error("unhandled exception", ex);
+		LOG.error("unhandled exception", LogText.sanitised(ex));
 		return problems.of(ErrorCode.INTERNAL_ERROR);
 	}
 

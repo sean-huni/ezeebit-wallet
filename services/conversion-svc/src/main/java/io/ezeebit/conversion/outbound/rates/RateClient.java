@@ -3,6 +3,7 @@ package io.ezeebit.conversion.outbound.rates;
 import java.time.Duration;
 
 import io.ezeebit.conversion.common.ConversionMetrics;
+import io.ezeebit.conversion.common.LogText;
 import io.ezeebit.conversion.domain.MarketRate;
 import io.ezeebit.conversion.domain.RateRejection;
 import io.ezeebit.conversion.domain.RateValidator;
@@ -43,12 +44,14 @@ public class RateClient {
 		}
 		catch (ResourceAccessException | RestClientResponseException ex) {
 			metrics.rateCall(since(started), "unavailable");
-			LOG.warn("rate service unavailable for {}/{}: {}", base, quote, ex.getMessage());
+			LOG.warn("rate service unavailable for {}/{}: {}", LogText.oneLine(base), LogText.oneLine(quote),
+					LogText.oneLine(ex.getMessage()));
 			throw new ConversionException(ErrorCode.RATE_UNAVAILABLE, null, base, quote);
 		}
 		catch (RestClientException ex) {
 			metrics.rateCall(since(started), "unreadable");
-			LOG.warn("rate service answered unreadably for {}/{}: {}", base, quote, ex.getMessage());
+			LOG.warn("rate service answered unreadably for {}/{}: {}", LogText.oneLine(base), LogText.oneLine(quote),
+					LogText.oneLine(ex.getMessage()));
 			throw RateValidator.rejected(RateRejection.RATE_MALFORMED);
 		}
 		metrics.rateCall(since(started), "answered");

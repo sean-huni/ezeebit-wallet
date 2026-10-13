@@ -30,7 +30,7 @@ class GatewayApplicationTests {
 		assertThat(statusOf("/api/v1/merchants/m1/quotes")).isEqualTo(503);
 	}
 
-	private int statusOf(String uri) {
+	private int statusOf(final String uri) {
 		HttpStatusCode status = RestClient.create("http://localhost:" + port).get()
 				.uri(uri)
 				.exchange((request, response) -> response.getStatusCode());

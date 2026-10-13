@@ -1,5 +1,6 @@
 package io.ezeebit.ledger.api.advice;
 
+import io.ezeebit.ledger.common.LogText;
 import io.ezeebit.ledger.exception.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ public class BusinessExceptionHandler {
 	@ExceptionHandler(LedgerException.class)
 	ProblemDetail business(final LedgerException ex) {
 		if (ex.code().status() >= SERVER_ERROR) {
-			LOG.error("ledger invariant violated: {}", ex.getMessage(), ex);
+			LOG.error("ledger invariant violated", LogText.sanitised(ex));
 		}
 		ProblemDetail problem = problems.of(ex.code(), ex.args());
 		if (ex.field() != null) {

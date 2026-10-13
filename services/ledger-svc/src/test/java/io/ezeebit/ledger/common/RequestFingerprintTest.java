@@ -41,4 +41,12 @@ class RequestFingerprintTest {
 				.isNotEqualTo(fingerprint.of("m", "ZAR", "100.00", "ref2"));
 	}
 
+	@Test
+	void sameHashIsTrueOnlyForIdenticalFingerprints() {
+		String stored = fingerprint.of("m", "ZAR", "100.00", "ref");
+		assertThat(RequestFingerprint.sameHash(stored, fingerprint.of("m", "ZAR", "100.00", "ref"))).isTrue();
+		assertThat(RequestFingerprint.sameHash(stored, fingerprint.of("m", "ZAR", "100.01", "ref"))).isFalse();
+		assertThat(RequestFingerprint.sameHash(stored, stored.substring(1))).isFalse();
+	}
+
 }

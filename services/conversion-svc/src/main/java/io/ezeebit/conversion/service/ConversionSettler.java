@@ -7,6 +7,7 @@ import io.ezeebit.conversion.common.ConversionMetrics;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
+import io.ezeebit.conversion.domain.RejectionReason;
 import io.ezeebit.conversion.domain.Settlement;
 import io.ezeebit.conversion.mapper.ConversionMapper;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
@@ -45,8 +46,11 @@ public class ConversionSettler {
 	// Present only when this call's compare-and-set moved the row, so each conversion is counted once.
 	// Counting is the caller's job: only the caller knows when the update has committed.
 	public Optional<Settlement> settle(final ConversionEntity conversion, final LedgerAnswer answer) {
-		return answer.settlement().filter(settlement -> conversions.settle(conversion.id(), settlement.status().name(),
-				settlement.reason() == null ? null : settlement.reason().name(), clock.instant()) == 1);
+		return answer.settlement().filter(settlement -> {
+			RejectionReason reason = settlement.reason();
+			return conversions.settle(conversion.id(), settlement.status().name(), reason == null ? null : reason.name(),
+					clock.instant()) == 1;
+		});
 	}
 
 }

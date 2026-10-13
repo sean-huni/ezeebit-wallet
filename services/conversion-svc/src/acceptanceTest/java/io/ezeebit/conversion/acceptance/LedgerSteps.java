@@ -4,9 +4,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
@@ -21,8 +25,10 @@ public class LedgerSteps {
 
 	private static final String POSTINGS = "/internal/v1/conversion-postings";
 	private static final int FAULT = 1;
-	// Longer than the 1 s ledger read timeout these tests run conversion-svc with.
-	private static final int TOO_SLOW_MILLIS = 2_500;
+	// Longer than the 2 s ledger read timeout these tests run conversion-svc with.
+	private static final int TOO_SLOW_MILLIS = 3_500;
+	// The first request has reached the ledger and been answered there; its reply is still delayed.
+	private static final long RACE_HEAD_START_MILLIS = 250;
 
 	private final Http http;
 	private final ScenarioState state;
@@ -48,6 +54,66 @@ public class LedgerSteps {
 	public void answerLost() {
 		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT)
 				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(TOO_SLOW_MILLIS)));
+	}
+
+	@Given("the ledger's first answer takes {int} ms and its second {int} ms")
+	public void answersInTurn(final int first, final int second) {
+		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).inScenario("turns").whenScenarioStateIs(STARTED)
+				.willSetStateTo("second")
+				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(first)));
+		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).inScenario("turns").whenScenarioStateIs("second")
+				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(second)));
+	}
+
+	@Given("the ledger refuses every posting with {int} {word}")
+	public void refusesEvery(final int status, final String code) {
+		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).willReturn(aResponse().withStatus(status)
+				.withHeader("Content-Type", "application/problem+json")
+				.withBody("{\"status\":%d,\"code\":\"%s\"}".formatted(status, code))));
+	}
+
+	@When("{string} accepts quote {string} with key {string}, and while that answer is on its way {string} {word} arrives and {string} sends the same request again")
+	public void raceWithDeposit(final String merchant, final String quote, final String key, final String amount,
+			final String currency, final String sameMerchant) {
+		UUID merchantId = state.merchant(merchant);
+		String path = "/api/v1/merchants/%s/conversions".formatted(merchantId);
+		String body = "{\"quoteId\":\"%s\"}".formatted(state.quoteId(quote));
+		String deposit = """
+				{"merchantId":"%s","currency":"%s","amount":"%s","reference":"late"}""".formatted(merchantId, currency, amount);
+		CompletableFuture<Reply> first = CompletableFuture.supplyAsync(() -> http.conversion("POST", path, key, body));
+		pause(RACE_HEAD_START_MILLIS);
+		Reply funded = http.ledger("POST", "/internal/v1/deposits", "late-" + merchantId, deposit);
+		assertThat(funded.status()).as(funded.body()).isEqualTo(201);
+		Reply second = http.conversion("POST", path, key, body);
+		Reply firstReply = first.join();
+		state.recordAll(List.of(firstReply, second));
+		Arrays.asList(firstReply, second).forEach(reply -> {
+			if (reply.body().contains("\"conversionId\"")) {
+				state.converted(reply.status() < 300 ? reply.read("$.data.conversionId") : reply.read("$.conversionId"),
+						merchantId);
+			}
+		});
+	}
+
+	@Then("both answers are refused with {int} {word}")
+	public void bothRefused(final int status, final String code) {
+		assertThat(state.replies()).hasSize(2).allSatisfy(reply -> {
+			assertThat(reply.status()).as(reply.body()).isEqualTo(status);
+			assertThat(reply.<String>read("$.code")).isEqualTo(code);
+		});
+	}
+
+	// COMPLETED exactly when the ledger holds the posting; anything else exactly when it does not.
+	@Then("the conversion and the ledger agree")
+	public void conversionAndLedgerAgree() {
+		String conversionId = state.conversion();
+		Reply conversion = http.conversion("GET", "/api/v1/merchants/%s/conversions/%s"
+				.formatted(state.merchantOf(conversionId), conversionId), null, null);
+		List<String> ledger = Externals.get().ledgerDb().sql("""
+				SELECT status FROM journal WHERE type = 'CONVERSION' AND idempotency_key = :id""")
+				.param("id", conversionId).query(String.class).list();
+		boolean completed = "COMPLETED".equals(conversion.read("$.data.status"));
+		assertThat(ledger.contains("POSTED")).as("conversion %s, ledger %s", conversion.body(), ledger).isEqualTo(completed);
 	}
 
 	@Given("the ledger answers normally again")
@@ -137,6 +203,16 @@ public class LedgerSteps {
 	private void passDeadline(final String conversionId) {
 		conversionDb.sql("UPDATE conversion SET deadline = now() - interval '1 hour' WHERE id = :id")
 				.param("id", UUID.fromString(conversionId)).update();
+	}
+
+	private static void pause(final long millis) {
+		try {
+			Thread.sleep(millis);
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	private static WireMockServer proxy() {

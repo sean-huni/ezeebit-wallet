@@ -24,6 +24,7 @@ public enum ErrorCode {
 	UNSUPPORTED_MEDIA_TYPE("error.media.type.unsupported", 415),
 	IDEMPOTENCY_KEY_REUSED("error.idempotency.key.reused", 422),
 	INSUFFICIENT_FUNDS("error.funds.insufficient", 422),
+	BALANCE_LIMIT_EXCEEDED("error.balance.limit.exceeded", 422),
 	INTERNAL_ERROR("error.internal", 500),
 	RATE_REJECTED("error.rate.rejected", 502),
 	RATE_UNAVAILABLE("error.rate.unavailable", 503);

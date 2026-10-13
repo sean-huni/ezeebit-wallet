@@ -28,11 +28,16 @@ public record Money(BigDecimal amount, Currency currency) {
 		if (value.signum() <= 0) {
 			throw new ConversionException(ErrorCode.AMOUNT_NOT_POSITIVE, "amount", raw);
 		}
-		BigDecimal significant = value.stripTrailingZeros();
+		return new Money(value.setScale(currency.scale(), RoundingMode.UNNECESSARY), currency).storable();
+	}
+
+	// A computed amount is held to the same limit as a requested one: the ledger could not store it otherwise.
+	public Money storable() {
+		BigDecimal significant = amount.stripTrailingZeros();
 		if (significant.precision() - significant.scale() > MAX_INTEGER_DIGITS) {
-			throw new ConversionException(ErrorCode.AMOUNT_TOO_LARGE, "amount", raw, MAX_INTEGER_DIGITS);
+			throw new ConversionException(ErrorCode.AMOUNT_TOO_LARGE, "amount", text(), MAX_INTEGER_DIGITS);
 		}
-		return new Money(value.setScale(currency.scale(), RoundingMode.UNNECESSARY), currency);
+		return this;
 	}
 
 	public String text() {

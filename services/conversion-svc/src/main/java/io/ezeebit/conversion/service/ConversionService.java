@@ -75,7 +75,8 @@ public class ConversionService {
 		return mapper.toResp(conversion, quotes.of(conversion.quote()));
 	}
 
-	// Returns the current state. A PENDING conversion is posted again only while its quote is live: never at a stale rate.
+	// Returns the current state. A PENDING conversion is posted again only while its quote is live: never at a
+	// stale rate. A refusal is final at the ledger, so posting again cannot turn a REJECTED into money moved.
 	private ConversionResp replay(final ConversionEntity conversion, final UUID quoteId) {
 		if (!conversion.quoteId().equals(quoteId)) {
 			throw new ConversionException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "Idempotency-Key", conversion.idempotencyKey());
@@ -89,9 +90,7 @@ public class ConversionService {
 
 	private ConversionResp answer(final ConversionEntity conversion) {
 		if (ConversionStatus.REJECTED.name().equals(conversion.status())) {
-			ErrorCode code = RejectionReason.INSUFFICIENT_FUNDS.name().equals(conversion.reason())
-					? ErrorCode.INSUFFICIENT_FUNDS : ErrorCode.CONVERSION_REJECTED;
-			throw new ConversionException(code, null, conversion.id(), conversion.reason())
+			throw new ConversionException(RejectionReason.valueOf(conversion.reason()).answer(), null, conversion.id(), conversion.reason())
 					.with("conversionId", conversion.id()).with("reason", conversion.reason());
 		}
 		return mapper.toResp(conversion, quotes.of(conversion.quote()));

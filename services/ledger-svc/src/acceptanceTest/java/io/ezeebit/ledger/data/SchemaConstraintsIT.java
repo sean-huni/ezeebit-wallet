@@ -103,6 +103,32 @@ class SchemaConstraintsIT {
 	}
 
 	@Test
+	void aRefusalWithoutItsReasonIsRefused() {
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference)
+				VALUES (:id, :merchant, 'CONVERSION', 'REFUSED', 'k', 'h', 'r')""")
+				.param("id", UUID.randomUUID()).param("merchant", UUID.randomUUID()).update())
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_journal_status");
+	}
+
+	@Test
+	void refusedMarkerHoldsTheConversionIdentityAgainstALatePosting() {
+		UUID merchant = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference, reason)
+				VALUES (:id, :merchant, 'CONVERSION', 'REFUSED', 'c-1', 'h', 'r', 'INSUFFICIENT_FUNDS')""")
+				.param("id", UUID.randomUUID()).param("merchant", merchant).update();
+
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference)
+				VALUES (:id, :merchant, 'CONVERSION', 'POSTED', 'c-1', 'h', 'r')""")
+				.param("id", UUID.randomUUID()).param("merchant", merchant).update())
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("uq_journal_idempotency");
+	}
+
+	@Test
 	void voidMarkerHoldsTheConversionIdentityAgainstALatePosting() {
 		UUID merchant = UUID.randomUUID();
 		jdbc.sql("""

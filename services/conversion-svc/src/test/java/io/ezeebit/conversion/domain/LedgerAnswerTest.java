@@ -27,6 +27,9 @@ class LedgerAnswerTest {
 		return switch (answer) {
 			case POSTED -> Optional.of(new Settlement(ConversionStatus.COMPLETED, null));
 			case INSUFFICIENT_FUNDS -> Optional.of(new Settlement(ConversionStatus.REJECTED, RejectionReason.INSUFFICIENT_FUNDS));
+			case BALANCE_LIMIT_EXCEEDED -> Optional.of(new Settlement(ConversionStatus.REJECTED,
+					RejectionReason.BALANCE_LIMIT_EXCEEDED));
+			case INPUT_REFUSED -> Optional.of(new Settlement(ConversionStatus.REJECTED, RejectionReason.INPUT_REFUSED));
 			case DEADLINE_PASSED -> Optional.of(new Settlement(ConversionStatus.REJECTED, RejectionReason.DEADLINE_PASSED));
 			case VOIDED -> Optional.of(new Settlement(ConversionStatus.REJECTED, RejectionReason.VOIDED));
 			case ABSENT, UNKNOWN -> Optional.empty();

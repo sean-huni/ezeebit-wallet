@@ -28,7 +28,8 @@ public class ConversionSettler {
 		this.clock = clock;
 	}
 
-	// Idempotent on the conversion id at the ledger, so posting the same conversion again cannot move money twice.
+	// The ledger keeps one journal per conversion id, POSTED, VOID or REFUSED, and replays it: posting again
+	// returns the first outcome, so money moves at most once and never after a recorded refusal.
 	public ConversionEntity postAndSettle(final ConversionEntity conversion) {
 		return settle(conversion, ledger.post(mapper.toPosting(conversion, quotes.of(conversion.quote()))));
 	}

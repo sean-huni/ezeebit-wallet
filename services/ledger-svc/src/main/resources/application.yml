@@ -1,5 +1,7 @@
 server:
   port: ${SERVER_PORT:8081}
+  # Loopback unless SERVER_ADDRESS says otherwise: /internal/** moves money and has no authentication.
+  address: ${SERVER_ADDRESS:127.0.0.1}
 spring:
   application:
     name: ledger-svc

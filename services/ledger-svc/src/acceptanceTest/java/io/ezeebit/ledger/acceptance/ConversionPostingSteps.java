@@ -95,6 +95,29 @@ public class ConversionPostingSteps {
 		assertThat(reply.<String>read("$.code")).isEqualTo(code);
 	}
 
+	@Then("conversion {string} of {string} is recorded as {word} with no entries")
+	public void recordedWithoutEntries(final String conversion, final String merchant, final String status) {
+		List<String> statuses = jdbc.sql("""
+				SELECT status FROM journal WHERE merchant_id = :merchant AND type = 'CONVERSION' AND idempotency_key = :key""")
+				.param("merchant", state.merchant(merchant)).param("key", state.conversion(conversion).toString())
+				.query(String.class).list();
+		assertThat(statuses).containsExactly(status);
+		assertThat(jdbc.sql("""
+				SELECT count(*) FROM entry e JOIN journal j ON j.id = e.journal_id
+				WHERE j.merchant_id = :merchant AND j.type = 'CONVERSION' AND j.idempotency_key = :key""")
+				.param("merchant", state.merchant(merchant)).param("key", state.conversion(conversion).toString())
+				.query(Integer.class).single()).isZero();
+	}
+
+	@Then("looking up conversion {string} for {string} shows status {word} because {word}")
+	public void lookupShowsBecause(final String conversion, final String merchant, final String status,
+			final String reason) {
+		Reply reply = lookup(conversion, merchant);
+		assertThat(reply.status()).as(reply.body()).isEqualTo(200);
+		assertThat(reply.<String>read("$.data.status")).isEqualTo(status);
+		assertThat(reply.<String>read("$.data.reason")).isEqualTo(reason);
+	}
+
 	@Then("exactly {int} postings are accepted and the rest are refused with {int} {word}")
 	public void acceptedAndRefused(final int accepted, final int status, final String code) {
 		assertThat(state.replies().stream().filter(reply -> reply.status() == 201)).hasSize(accepted);

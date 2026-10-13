@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- A refused conversion holds its identity like a VOID: the refusal is final, a later posting conflicts. -->
+    <changeSet id="006-journal-reason-column" author="ledger-svc">
+        <preConditions onFail="MARK_RAN"><not><columnExists tableName="journal" columnName="reason"/></not></preConditions>
+        <addColumn tableName="journal">
+            <column name="reason" type="VARCHAR(32)"/>
+        </addColumn>
+        <rollback><dropColumn tableName="journal" columnName="reason"/></rollback>
+    </changeSet>
+
+    <changeSet id="006-journal-status-refused" author="ledger-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'ck_journal_status' AND pg_get_constraintdef(oid) LIKE '%REFUSED%'</sqlCheck>
+        </preConditions>
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE journal DROP CONSTRAINT ck_journal_status;
+ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED', 'VOID', 'REFUSED')
+    AND (status = 'POSTED' OR type = 'CONVERSION') AND ((status = 'REFUSED') = (reason IS NOT NULL)));</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE journal DROP CONSTRAINT ck_journal_status;
+ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED', 'VOID') AND (status = 'POSTED' OR type = 'CONVERSION'));</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

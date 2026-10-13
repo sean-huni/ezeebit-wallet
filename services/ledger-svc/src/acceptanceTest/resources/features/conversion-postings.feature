@@ -22,18 +22,36 @@ Feature: The ledger posts a conversion in one transaction
     And every journal sums to zero in each currency
     And every merchant balance equals the sum of its entries
 
-  Scenario: A merchant cannot convert more than it holds
+  Scenario: A merchant cannot convert more than it holds, and the refusal is recorded
     When conversion "c-1" for "Acme" sells "1000.01" ZAR for "54.000000" USDT with a deadline 1 minute away
     Then the request is refused with 422 INSUFFICIENT_FUNDS
     And "Acme" holds exactly:
       | currency | balance |
       | ZAR      | 1000.00 |
-    And exactly 0 postings are recorded for conversion "c-1" of "Acme"
+    And conversion "c-1" of "Acme" is recorded as REFUSED with no entries
+    And looking up conversion "c-1" for "Acme" shows status REFUSED because INSUFFICIENT_FUNDS
+
+  Scenario: A refusal is final: money arriving later does not let the same conversion post
+    When conversion "c-1" for "Acme" sells "1500.00" ZAR for "81.000000" USDT with a deadline 1 minute away
+    Then the request is refused with 422 INSUFFICIENT_FUNDS
+    Given the rail has deposited "1000.00" ZAR for "Acme" with key "t-2"
+    When conversion "c-1" is sent again
+    Then the request is refused with 422 INSUFFICIENT_FUNDS
+    And conversion "c-1" of "Acme" is recorded as REFUSED with no entries
+    And "Acme" holds exactly:
+      | currency | balance |
+      | ZAR      | 2000.00 |
+
+  Scenario: Voiding a refused conversion answers its refusal
+    When conversion "c-1" for "Acme" sells "1500.00" ZAR for "81.000000" USDT with a deadline 1 minute away
+    And the sweeper voids conversion "c-1" for "Acme"
+    Then the posting is accepted with status REFUSED
+    And conversion "c-1" of "Acme" is recorded as REFUSED with no entries
 
   Scenario: A merchant cannot sell a currency it never held
     When conversion "c-1" for "Acme" sells "1.000000" USDC for "18.00" ZAR with a deadline 1 minute away
     Then the request is refused with 422 INSUFFICIENT_FUNDS
-    And exactly 0 postings are recorded for conversion "c-1" of "Acme"
+    And conversion "c-1" of "Acme" is recorded as REFUSED with no entries
 
   Scenario: A posting that arrives after its deadline is refused and moves nothing
     When conversion "c-1" for "Acme" sells "184.32" ZAR for "10.000000" USDT with a deadline 1 minute ago

@@ -44,6 +44,11 @@ public class QuoteSteps {
 				{"sell":"%s","buy":"%s","sellAmount":"10.00","buyAmount":"1.000000"}""".formatted(sell, buy));
 	}
 
+	@When("{string} sends the quote request {string}")
+	public void sendsQuote(final String merchant, final String body) {
+		ask(merchant, "raw", body);
+	}
+
 	@Given("{string} has quote {string} to sell {string} {word} for {word}")
 	public void hasQuoteSelling(final String merchant, final String name, final String amount, final String sell,
 			final String buy) {

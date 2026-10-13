@@ -37,6 +37,9 @@ ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED')
     </changeSet>
 
     <changeSet id="005-account-seed-fx" author="ledger-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM account WHERE type = 'PLATFORM_FX' AND merchant_id IS NULL</sqlCheck>
+        </preConditions>
         <comment>One platform FX account per currency, with fixed ids: the platform's open position per currency.</comment>
         <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000001"/><column name="currency" value="ZAR"/><column name="type" value="PLATFORM_FX"/></insert>
         <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000002"/><column name="currency" value="NGN"/><column name="type" value="PLATFORM_FX"/></insert>

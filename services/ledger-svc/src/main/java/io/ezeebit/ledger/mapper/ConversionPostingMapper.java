@@ -27,7 +27,7 @@ public class ConversionPostingMapper {
 		StatementLineEntity buy = merchantLines.stream().filter(line -> line.amount().signum() > 0).findFirst()
 				.orElse(null);
 		return new ConversionPostingResp(journal.id(), UUID.fromString(journal.idempotencyKey()), journal.merchantId(),
-				journal.status(), sell == null ? null : sell.currency(),
+				journal.status(), journal.reason(), sell == null ? null : sell.currency(),
 				sell == null ? null : format.format(sell.amount().negate(), currencies.get(sell.currency()).scale()),
 				buy == null ? null : buy.currency(),
 				buy == null ? null : format.format(buy.amount(), currencies.get(buy.currency()).scale()),

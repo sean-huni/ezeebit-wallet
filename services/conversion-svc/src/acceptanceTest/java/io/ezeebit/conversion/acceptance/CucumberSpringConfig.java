@@ -15,7 +15,7 @@ import org.springframework.test.context.DynamicPropertySource;
 // conversion-svc reaches the ledger by its registry name; here that name resolves to the fault-injecting proxy.
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = { "conversion.sweep-interval=1h", "conversion.ledger.read-timeout=1s" })
+		properties = { "conversion.sweep-interval=1h", "conversion.ledger.read-timeout=2s" })
 @ActiveProfiles("acceptance")
 @Import({ TestcontainersConfiguration.class, CucumberSpringConfig.Glue.class })
 public class CucumberSpringConfig {

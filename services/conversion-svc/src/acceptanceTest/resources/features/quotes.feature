@@ -39,6 +39,24 @@ Feature: A merchant is quoted a firm price
     Then the request is refused with 400 VALIDATION_FAILED
     And the problem names the field "sellAmount"
 
+  Scenario Outline: A quote whose computed side the ledger could not hold is refused
+    When "Acme" sends the quote request '<body>'
+    Then the request is refused with 400 AMOUNT_TOO_LARGE
+
+    Examples:
+      | body                                                            |
+      | {"sell":"USDT","buy":"NGN","sellAmount":"99999999999999999999"} |
+      | {"sell":"NGN","buy":"USDT","buyAmount":"99999999999999999999"}  |
+
+  Scenario Outline: A quote so small that rounding would change the rate by more than 1% is refused
+    When "Acme" sends the quote request '<body>'
+    Then the request is refused with 400 AMOUNT_TOO_SMALL
+
+    Examples:
+      | body                                                |
+      | {"sell":"ZAR","buy":"USDT","buyAmount":"0.000001"}  |
+      | {"sell":"USDT","buy":"ZAR","sellAmount":"0.001"}    |
+
   Scenario: An amount too small to buy anything is refused
     When "Acme" asks for quote "q1" to sell "0.000001" USDT for ZAR
     Then the request is refused with 400 AMOUNT_TOO_SMALL

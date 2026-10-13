@@ -14,6 +14,14 @@ class LedgerAnswerMapperTest {
 
 	@ParameterizedTest
 	@CsvSource(nullValues = "null", value = {
+			"200, REFUSED:INSUFFICIENT_FUNDS, null, INSUFFICIENT_FUNDS",
+			"201, REFUSED:BALANCE_LIMIT_EXCEEDED, null, BALANCE_LIMIT_EXCEEDED",
+			"200, REFUSED:SOMETHING_NEW, null, UNKNOWN",
+			"422, null, BALANCE_LIMIT_EXCEEDED, BALANCE_LIMIT_EXCEEDED",
+			"400, null, AMOUNT_TOO_LARGE, INPUT_REFUSED",
+			"400, null, AMOUNT_SCALE_EXCEEDED, INPUT_REFUSED",
+			"400, null, UNKNOWN_CURRENCY, INPUT_REFUSED",
+			"422, null, IDEMPOTENCY_KEY_REUSED, UNKNOWN",
 			"201, POSTED, null, POSTED",
 			"200, POSTED, null, POSTED",
 			"201, VOID, null, VOIDED",
@@ -24,11 +32,13 @@ class LedgerAnswerMapperTest {
 			"409, null, CONVERSION_VOIDED, VOIDED",
 			"409, null, CONVERSION_ALREADY_POSTED, POSTED",
 			"404, null, NOT_FOUND, ABSENT",
-			"400, null, VALIDATION_FAILED, UNKNOWN",
+			"400, null, VALIDATION_FAILED, INPUT_REFUSED",
 			"503, null, null, UNKNOWN",
 			"500, null, INTERNAL_ERROR, UNKNOWN" })
 	void eachLedgerReplyMeansOneThing(final int status, final String state, final String code, final LedgerAnswer answer) {
-		LedgerReplyDto reply = new LedgerReplyDto(state == null ? null : new LedgerReplyDto.Data(state), code);
+		String[] stateAndReason = state == null ? null : state.split(":");
+		LedgerReplyDto reply = new LedgerReplyDto(stateAndReason == null ? null : new LedgerReplyDto.Data(stateAndReason[0],
+				stateAndReason.length > 1 ? stateAndReason[1] : null), code);
 
 		assertThat(mapper.toDomain(status, reply)).isEqualTo(answer);
 	}

@@ -56,7 +56,7 @@ public class ConversionPoster {
 		String buyCurrency = command.buy().currency().value();
 		journals.insert(new JournalEntity(journalId, merchantId, JournalType.CONVERSION.name(),
 				JournalStatus.POSTED.name(), command.conversionId().toString(), command.requestHash(),
-				"conversion %s".formatted(command.conversionId()), null));
+				"conversion %s".formatted(command.conversionId()), null, null));
 		accounts.openMerchant(UUID.randomUUID(), merchantId, buyCurrency);
 		UUID sourceId = accounts.merchantAccountId(merchantId, sellCurrency)
 				.orElseThrow(() -> new LedgerException(ErrorCode.INSUFFICIENT_FUNDS, null, sellCurrency));

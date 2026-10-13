@@ -30,7 +30,8 @@ What exists and is verified:
   transaction (four entries, the merchant's two accounts locked in id order, funds checked, a
   deadline checked on the ledger's clock); the answer settles it COMPLETED or REJECTED, and an
   answer that never arrives leaves it PENDING (202) for a sweeper, which finds the posting or voids
-  it in the ledger so a late arrival is refused. A WireMock container stands in for the rate service.
+  it in the ledger so a late arrival is refused. A refusal (insufficient funds) is recorded in the
+  ledger before it is answered, so money arriving later can never let that conversion post. A WireMock container stands in for the rate service.
 - Five Spring Boot 4.1.1 services (Java 25, Spring Cloud 2025.1.3) in one Gradle 9.8.1 build:
   `gateway-svc` (8080), `ledger-svc` (8081), `conversion-svc` (8082), `config-svc` (8888),
   `eureka-svc` (8761).
@@ -55,11 +56,11 @@ What exists and is verified:
 - Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
   service, four provisioned dashboards, two alert rules with optional Slack delivery.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 232 tests, 0 failures. The ledger runs three tiers: 50 unit tests
-  (no Spring, no Docker), 12 Spring integration tests and 55 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 67 unit tests
+- `./gradlew clean build` passes: 259 tests, 0 failures. The ledger runs three tiers: 50 unit tests
+  (no Spring, no Docker), 16 Spring integration tests and 57 Cucumber acceptance scenarios over
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 81 unit tests
   (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
-  states), 11 integration tests, and 33 acceptance scenarios against the real ledger jar running as
+  states), 11 integration tests, and 40 acceptance scenarios against the real ledger jar running as
   its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of
   band, jump, unreadable) and injecting ledger faults (answer never sent, answer lost). The three 500s a review reached (a balance past the
   column's 20 digits, a NUL in `reference`, a statement window outside timestamptz's range) are
@@ -107,8 +108,10 @@ Two domain services, each owning its own database, behind one gateway.
 - **A PENDING conversion is resolved, never guessed.** After the posting deadline plus the maximum
   transaction time, a sweeper asks the ledger by conversion id: found means COMPLETED; not found
   means it writes a VOID marker under the same identity (a late posting then conflicts and is
-  refused) and marks REJECTED. A same-key retry returns the current state and never re-posts at a
-  stale rate.
+  refused) and marks REJECTED. A ledger refusal is recorded at the ledger before it is answered, so
+  it is final. A same-key retry posts a PENDING conversion again only while its quote is live (the
+  ledger replays whatever it holds for that id), and otherwise returns the current state, so it never
+  posts at a stale rate.
 - **Concurrency** is handled with `SELECT ... FOR UPDATE` on the merchant account rows only, locked
   in ascending id order, plus `CHECK (balance >= 0)` on merchant accounts as the last line of
   defence. Platform accounts are never locked: every posting writes them, so a lock would serialise
@@ -161,7 +164,9 @@ The brief leaves these open. I made a choice for each so the design is concrete.
    both. Every pair is configured at 50 bps as a placeholder: the real number is a business
    decision. The sanity bands in `served/conversion-svc.yml` are likewise wide placeholders around
    today's rates.
-7. **Rounding.** Always in the platform's favour, by at most one minor unit. Quoted by sell
+7. **Rounding.** Always in the platform's favour, by at most one minor unit, and never enough to
+   move the rate the merchant really gets more than 1% from the stated rate (such a quote is
+   refused as too small). Quoted by sell
    amount: the amount the merchant receives rounds down to the buy currency's scale. Quoted by buy
    amount: the amount the merchant pays rounds up to the sell currency's scale.
 8. **Quotes are single-use.** A quote can be accepted once (enforced by a unique constraint on the
@@ -282,6 +287,11 @@ disconnected, fixed by moving Grafana's database to tmpfs, and green on the same
   because Eureka's own client had picked up that builder and conversion-svc never registered. The
   client now adds the load-balancer interceptor directly, and a test boots with Eureka on and goes
   red with the old bean.
+- A review of Task 2 found that a ledger refusal was not final: the ledger kept no record of it, so
+  a same-key retry after a deposit could post while conversion-svc recorded REJECTED. The ledger now
+  commits a REFUSED journal before answering; the race is reproduced in a scenario that goes red
+  without that write. The same review found two quotes that answered 500 (a computed amount too
+  large to store) and tiny quotes whose rounding made the stated rate untrue; both are now 400.
 - A "slow rate service" test measured 5 seconds for a refusal configured at 2. The service was
   right; the test's own HTTP client (Apache HttpClient, present on the test classpath) silently
   retried every 503 after a second. The test client is now the JDK one, which never retries.

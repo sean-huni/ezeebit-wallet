@@ -35,11 +35,11 @@ the root `build.gradle` (a service opts in by being added to its `tieredServices
 
 | Gradle task | Source | What it is | ledger-svc | conversion-svc |
 |---|---|---|---|---|
-| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle; no Spring context, no Docker | 50 | 67 |
-| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses; for conversion-svc also the Eureka client wiring | 12 | 11 |
-| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance | 55 scenarios | 33 scenarios |
+| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle; no Spring context, no Docker | 50 | 81 |
+| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses; for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the LAN address | 16 | 11 |
+| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance | 57 scenarios | 40 scenarios |
 
-The other three services have one `test` task each (4 tests). Total: 232 tests. The Spring tiers
+The other three services have one `test` task each (4 tests). Total: 259 tests. The Spring tiers
 start `postgres:18.6-alpine` containers through Testcontainers, so Docker must be running. They run
 under the `acceptance` profile and boot each service alone, with the config server, the registry and
 OTLP export switched off. conversion-svc's acceptance tier also runs the **real ledger-svc jar** as
@@ -166,8 +166,8 @@ Conversion answers and errors:
 
 | Call | Success | Errors (problem detail with a stable `code`) |
 |---|---|---|
-| `POST /api/v1/merchants/{id}/quotes` `{sell, buy, sellAmount \| buyAmount}` | 201 quote | 400 `SAME_CURRENCY`, `UNSUPPORTED_PAIR`, `UNKNOWN_CURRENCY`, `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `AMOUNT_TOO_LARGE`, `AMOUNT_TOO_SMALL` (rounds to nothing), `VALIDATION_FAILED` (both or neither amount, `errors[]` names `sellAmount`); 502 `RATE_REJECTED` with `reason` (`RATE_NOT_POSITIVE`, `RATE_STALE`, `RATE_OUT_OF_BAND`, `RATE_JUMP`, `RATE_MALFORMED`); 503 `RATE_UNAVAILABLE` (timeout, refused connection, error status) |
-| `POST /api/v1/merchants/{id}/conversions` `{quoteId}` + `Idempotency-Key` | 201 COMPLETED; 202 PENDING (the ledger's answer did not arrive; the sweeper settles it) | 400 `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED`; 404 `QUOTE_NOT_FOUND` (including another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED` (with `reason`); 422 `INSUFFICIENT_FUNDS` (with `conversionId`), `IDEMPOTENCY_KEY_REUSED` |
+| `POST /api/v1/merchants/{id}/quotes` `{sell, buy, sellAmount \| buyAmount}` | 201 quote | 400 `SAME_CURRENCY`, `UNSUPPORTED_PAIR`, `UNKNOWN_CURRENCY`, `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `AMOUNT_TOO_LARGE` (the fixed or the computed side would pass 20 digits), `AMOUNT_TOO_SMALL` (rounding would move the rate more than 1%), `VALIDATION_FAILED` (both or neither amount, `errors[]` names `sellAmount`); 502 `RATE_REJECTED` with `reason` (`RATE_NOT_POSITIVE`, `RATE_STALE`, `RATE_OUT_OF_BAND`, `RATE_JUMP`, `RATE_MALFORMED`); 503 `RATE_UNAVAILABLE` (timeout, refused connection, error status) |
+| `POST /api/v1/merchants/{id}/conversions` `{quoteId}` + `Idempotency-Key` | 201 COMPLETED; 202 PENDING (the ledger's answer did not arrive; the sweeper settles it) | 400 `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED`; 404 `QUOTE_NOT_FOUND` (including another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED` (with `reason`: `INPUT_REFUSED`, `DEADLINE_PASSED`, `VOIDED`); 422 `INSUFFICIENT_FUNDS` or `BALANCE_LIMIT_EXCEEDED` (with `conversionId`; the ledger has recorded the refusal, so it is final), `IDEMPOTENCY_KEY_REUSED` |
 | `GET /api/v1/merchants/{id}/conversions/{conversionId}` | 200 with `status` PENDING, COMPLETED or REJECTED and a `reason` when rejected | 404 `CONVERSION_NOT_FOUND` |
 
 ## The exchange-rate service (WireMock)
@@ -239,6 +239,7 @@ or put them in an optional root `.env` (gitignored); `fleet.sh` sources it, and
 | `DB_URL` | `jdbc:postgresql://localhost:${POSTGRES_PORT}/<ledger or conversion>` | JDBC URL |
 | `DB_USER`, `DB_PASSWORD` | `ledger`/`ledger`, `conversion`/`conversion` | Database credentials. The roles are created in `docker/postgres/initdb/01-databases.sql`: an override needs a matching change there plus `docker compose down -v` |
 | `SERVER_PORT` | per service, see above | HTTP port of one service started by hand; `fleet.sh` ignores it |
+| `SERVER_ADDRESS` | 127.0.0.1 | Address every service binds and registers in Eureka. Loopback on purpose: `/internal/**` moves money and has no authentication. Production needs network policy or mTLS on `/internal/**` (ARCHITECTURE.md section 5) |
 | `CONFIG_SERVER_URL` | http://localhost:8888 | Where ledger, conversion and gateway fetch config |
 | `CONFIG_IMPORT_OPTIONALITY` | empty (config-svc mandatory) | Set to `optional:` to start ledger, conversion or gateway without config-svc |
 | `CONFIG_SEARCH_LOCATIONS` | `classpath:/served` | Where config-svc reads the configuration it serves |

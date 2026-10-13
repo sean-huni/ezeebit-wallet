@@ -29,18 +29,20 @@ public class ConversionPostingService {
 	private final ConversionPoster poster;
 	private final ConversionVoider voider;
 	private final ConversionReplayer replayer;
+	private final RefusalRecorder refusals;
 	private final JournalRepo journals;
 	private final EntryRepo entries;
 	private final ConversionPostingMapper mapper;
 
 	public ConversionPostingService(final CurrencyCatalog catalog, final RequestFingerprint fingerprint,
 			final ConversionPoster poster, final ConversionVoider voider, final ConversionReplayer replayer,
-			final JournalRepo journals, final EntryRepo entries, final ConversionPostingMapper mapper) {
+			final RefusalRecorder refusals, final JournalRepo journals, final EntryRepo entries, final ConversionPostingMapper mapper) {
 		this.catalog = catalog;
 		this.fingerprint = fingerprint;
 		this.poster = poster;
 		this.voider = voider;
 		this.replayer = replayer;
+		this.refusals = refusals;
 		this.journals = journals;
 		this.entries = entries;
 		this.mapper = mapper;
@@ -62,7 +64,10 @@ public class ConversionPostingService {
 			poster.post(new ConversionPostingCommand(merchant, request.conversionId(), sell, buy, request.deadline(), hash));
 		}
 		catch (DuplicateKeyException duplicate) {
-			replayer.storedPosting(merchant, request.conversionId(), hash);
+			replayer.storedPosting(merchant, request.conversionId(), hash, request.sellCurrency(), request.buyCurrency());
+		}
+		catch (LedgerException refusal) {
+			refusals.recordAndRethrow(merchant, request, hash, refusal);
 		}
 		return read(merchant, request.conversionId());
 	}

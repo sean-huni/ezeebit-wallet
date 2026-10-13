@@ -31,13 +31,19 @@ public class LedgerClient {
 		return call(() -> ledger.post().uri(POSTINGS).contentType(MediaType.APPLICATION_JSON).body(posting));
 	}
 
+	// A 400 on a lookup or a void is about this caller's request, never the conversion: the outcome stays open.
 	public LedgerAnswer lookup(final UUID conversionId, final UUID merchantId) {
-		return call(() -> ledger.get().uri(POSTINGS + "/{id}?merchantId={merchant}", conversionId, merchantId));
+		return aboutTheConversion(call(() -> ledger.get().uri(POSTINGS + "/{id}?merchantId={merchant}", conversionId,
+				merchantId)));
 	}
 
 	public LedgerAnswer voidPosting(final UUID conversionId, final UUID merchantId) {
-		return call(() -> ledger.post().uri(POSTINGS + "/{id}/void", conversionId)
-				.contentType(MediaType.APPLICATION_JSON).body(Map.of("merchantId", merchantId)));
+		return aboutTheConversion(call(() -> ledger.post().uri(POSTINGS + "/{id}/void", conversionId)
+				.contentType(MediaType.APPLICATION_JSON).body(Map.of("merchantId", merchantId))));
+	}
+
+	private static LedgerAnswer aboutTheConversion(final LedgerAnswer answer) {
+		return answer == LedgerAnswer.INPUT_REFUSED ? LedgerAnswer.UNKNOWN : answer;
 	}
 
 	private LedgerAnswer call(final java.util.function.Supplier<RestClient.RequestHeadersSpec<?>> request) {

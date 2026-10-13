@@ -148,7 +148,7 @@ Rehearsed outage, measured once with Slack live on a local run (counts from Graf
 
 ## 4. Ledger design (Task 1)
 
-**Built**, including the parts Task 2 needs: the `PLATFORM_FX` account type (one seeded per currency), the `CONVERSION` journal type and the `VOID` journal status arrive in changeset `005-conversion.xml`, which widens the CHECK constraints of 002 and 003 rather than editing them. Where the build departs from or adds to the design below, the "As built" lists at the end of this section and of section 5 say so.
+**Built**, including the parts Task 2 needs: the `PLATFORM_FX` account type (one seeded per currency), the `CONVERSION` journal type and the `VOID` journal status arrive in changeset `005-conversion.xml`, which widens the CHECK constraints of 002 and 003 rather than editing them; the `REFUSED` status and `journal.reason` arrive in `006-journal-refused.xml`. Where the build departs from or adds to the design below, the "As built" lists at the end of this section and of section 5 say so.
 
 ### Double-entry model
 
@@ -158,7 +158,7 @@ Every movement of money is a **journal** with two or more **entries**. Per journ
 |---|---|---|
 | `currency` | `code` (PK: ZAR, NGN, KES, USDT, USDC), `kind` (FIAT, STABLECOIN), `scale` (2 for fiat, 6 for stablecoins) | an amount with more decimals than `scale` is rejected, never rounded |
 | `account` | `id` UUID, `merchant_id` UUID (null for platform accounts), `currency` FK, `type` (MERCHANT, PLATFORM_DEPOSIT_CLEARING, PLATFORM_FX), `balance` NUMERIC(38,18) (MERCHANT only; null on platform accounts), `created` | UNIQUE (`merchant_id`, `currency`, `type`); partial UNIQUE (`currency`, `type`) WHERE `merchant_id IS NULL` (Postgres treats NULLs as distinct, so the first constraint alone allows duplicate platform accounts); UNIQUE (`id`, `currency`); CHECK `balance >= 0` when `type = MERCHANT` |
-| `journal` | `id` UUID, `merchant_id`, `type` (DEPOSIT, CONVERSION), `status` (POSTED, VOID), `idempotency_key`, `request_hash`, `reference`, `created` | UNIQUE (`merchant_id`, `type`, `idempotency_key`): a rail reference and a `conversionId` can never collide |
+| `journal` | `id` UUID, `merchant_id`, `type` (DEPOSIT, CONVERSION), `status` (POSTED, VOID, REFUSED), `idempotency_key`, `request_hash`, `reference`, `reason` (REFUSED only), `created` | UNIQUE (`merchant_id`, `type`, `idempotency_key`): a rail reference and a `conversionId` can never collide |
 | `entry` | `id`, `journal_id` FK, `account_id`, `currency`, `amount` signed NUMERIC(38,18), `balance_after` (merchant entries only; null on platform entries), `created` | FK (`account_id`, `currency`) references `account` (`id`, `currency`); insert-only |
 
 ### Invariants and where each is enforced
@@ -267,7 +267,7 @@ A timeout or a rate that fails validation returns 503 or 502 with a reason. Ther
 | PLATFORM_FX target | buy | `-buy_amount` |
 | merchant target | buy | `+buy_amount` |
 
-Each currency nets to zero. The result marks the conversion COMPLETED or REJECTED (`INSUFFICIENT_FUNDS`).
+Each currency nets to zero. The result marks the conversion COMPLETED or REJECTED (`INSUFFICIENT_FUNDS`). A refusal is final: before answering it, the ledger commits a REFUSED journal under the same identity (no entries), so the same `conversionId` can never post later, even after the merchant is funded.
 
 ```
 merchant        gateway       conversion-svc           rate service        ledger-svc
@@ -289,7 +289,7 @@ merchant        gateway       conversion-svc           rate service        ledge
 
 ### PENDING recovery, and why there is no saga
 
-If the ledger call times out, the conversion stays PENDING and the client gets 202. A same-key retry of the accept re-checks quote expiry and returns the conversion's current state; it never re-posts at a stale rate.
+If the ledger call times out, the conversion stays PENDING and the client gets 202. A same-key retry of a PENDING conversion posts it again while its quote is live (the ledger replays whatever it already holds for that `conversionId`: POSTED, VOID or REFUSED); after the quote expires it only returns the current state, so it never posts at a stale rate.
 
 A sweeper resolves a PENDING conversion only after its posting deadline plus the maximum transaction time, when no posting can still commit. It asks the ledger by `conversionId`. Found: mark COMPLETED. Not found: write a VOID marker in the ledger under the same identity (`merchant_id`, CONVERSION, `conversionId`), so any late posting conflicts and is refused, then mark REJECTED.
 
@@ -312,23 +312,26 @@ GET /rates?base=ZAR&quote=USDT
 
 Code: `services/conversion-svc`, package `io.ezeebit.conversion` (`ctl`, `service`, `domain`, `data/model`, `data/repo`, `mapper`, `outbound/rates`, `outbound/ledger`, `scheduler`, `api/advice`, `exception`, `config`). Schema: `db/changelog/2026/10/001-quote.xml`, `002-conversion.xml`. Ledger side: `ConversionPostingCtrl`, `ConversionPoster`, `ConversionVoider`, changeset `005-conversion.xml`. Where it departs from or adds to the design above:
 
-- **VOID is a journal status, not a journal type.** The void marker is a journal row with type `CONVERSION`, status `VOID` and no entries. Only that way does it share the posting's identity (`merchant_id`, `CONVERSION`, `conversionId`), so the existing unique constraint is what refuses a late posting. A CHECK allows `VOID` on `CONVERSION` journals only.
+- **VOID and REFUSED are journal statuses, not journal types.** Each marker is a journal row with type `CONVERSION`, no entries, and the posting's identity (`merchant_id`, `CONVERSION`, `conversionId`), so the existing unique constraint is what refuses any later posting. A CHECK allows them on `CONVERSION` journals only, and `reason` exactly on REFUSED.
+- **Refusals are final at the ledger.** `INSUFFICIENT_FUNDS` and `BALANCE_LIMIT_EXCEEDED` depend on balances, which move. The posting transaction rolls back, then `RefusalRecorder` commits a REFUSED journal in its own transaction and only then answers 422; a replay of that `conversionId` answers the same 422 whatever the balance is now. Without it, a review found this sequence: refused, not yet settled; a deposit lands; a same-key retry posts; the first answer settles REJECTED; the ledger holds the money movement. conversion-svc settles REJECTED from these refusals because the ledger has recorded them. The sweeper's lookup and void both answer a REFUSED journal with its reason, which settles REJECTED.
+- **Refusals of the posting's content are final without a marker.** A 400 for the posting's body (`AMOUNT_TOO_LARGE`, `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `UNKNOWN_CURRENCY`, `SAME_CURRENCY`, `VALIDATION_FAILED`, `MALFORMED_REQUEST`) settles REJECTED with reason `INPUT_REFUSED` (409 `CONVERSION_REJECTED`). It is safe without a marker because the ledger decides it from the body alone and conversion-svc only ever sends one body per `conversionId` (stored amounts and deadline), so that id can never post. `IDEMPOTENCY_KEY_REUSED` is deliberately not final: it means another journal already holds the id, possibly a POSTED one, so the conversion stays PENDING and the sweeper's lookup settles it to what the ledger holds.
 - **The deadline check is the last statement of the posting transaction**, read from `clock_timestamp()` (`now()` is frozen at the transaction start). What remains after it is the commit itself, which the sweeper's `max-transaction-time` (30 s) covers. Correctness does not depend on the two databases' clocks: a posting and a void race on one unique index, and whichever commits first wins; the deadline only stops a posting at a stale price.
 - **Locking order.** The target account is opened first (`INSERT ... ON CONFLICT DO NOTHING`), then both merchant accounts are locked one by one in ascending id order (UUIDs compared as their lowercase text, which is Postgres's byte order). A missing source account is `INSUFFICIENT_FUNDS`.
 - **Ledger endpoints.** `POST /internal/v1/conversion-postings` body `{conversionId, merchantId, sellCurrency, sellAmount, buyCurrency, buyAmount, deadline}`; its request hash covers every field, so the same `conversionId` with any other value is 422 `IDEMPOTENCY_KEY_REUSED`. `GET /internal/v1/conversion-postings/{conversionId}?merchantId=` answers `status` POSTED (with both sides) or VOID, else 404. `POST .../{conversionId}/void` body `{merchantId}`. Each answer is built from the stored rows, so replays are byte-identical. The statement shows a conversion as two lines of type `CONVERSION` with reference `conversion <id>`.
 - **Same-key retry.** A PENDING conversion is posted again while its quote is live: safe, because the ledger is idempotent on the `conversionId` and checks the deadline. After expiry the retry only returns the current state, so nothing is ever posted at a stale rate. A replay of a REJECTED conversion answers what the first call answered: 422 `INSUFFICIENT_FUNDS`, or 409 `CONVERSION_REJECTED` with its `reason` (`DEADLINE_PASSED`, `VOIDED`). Both problem details carry `conversionId`.
-- **Unknown stays PENDING.** Any ledger answer other than posted, insufficient funds, deadline passed or voided (a timeout, a reset, a 5xx, a 400 from configuration drift) leaves the conversion PENDING for the sweeper. Settling is a compare-and-set (`UPDATE ... WHERE status = 'PENDING'`), so the accept path and the sweeper cannot both settle one row.
+- **Unknown stays PENDING.** A timeout, a reset, a 5xx, `IDEMPOTENCY_KEY_REUSED` or any code not listed above leaves the conversion PENDING for the sweeper. A 400 on the sweeper's own lookup or void is about that request, not the conversion, so it is unknown too. Settling is a compare-and-set (`UPDATE ... WHERE status = 'PENDING'`), so the accept path and the sweeper cannot both settle one row.
 - **The sweeper** (`scheduler/PendingConversionSweeper`, every 10 s) claims one due row per transaction with `SELECT ... FOR UPDATE OF c SKIP LOCKED`, asks the ledger, voids if absent, settles, and commits; the row stays locked while the ledger is asked. Rows whose answer is unknown are skipped for the rest of that run through a method-local list; nothing is held between runs, so every replica can run it.
 - **The quote's single use is enforced only by `UNIQUE (quote_id)`.** `quote.status` becomes USED in the same transaction, for reading; no code path depends on it, so the constraint's test cannot pass for a second reason.
-- **Pricing.** `appliedRate = rate x (10000 - spread_bps) / 10000`, exact in decimal. A `sellAmount` quote rounds the received amount down (`FLOOR`) to the buy currency's scale; a `buyAmount` quote rounds the paid amount up (`CEILING`) to the sell currency's scale. An amount that rounds to nothing is 400 `AMOUNT_TOO_SMALL`. The spread is 50 bps on every pair in served config: a placeholder, since the number is a business decision.
+- **Pricing.** `appliedRate = rate x (10000 - spread_bps) / 10000`, exact in decimal. A `sellAmount` quote rounds the received amount down (`FLOOR`) to the buy currency's scale; a `buyAmount` quote rounds the paid amount up (`CEILING`) to the sell currency's scale. A quote whose amounts after rounding deliver a rate more than 1% away from `appliedRate` (`buy / sell` against the stated rate, both kinds) is 400 `AMOUNT_TOO_SMALL`: a review found 0.000001 USDT bought for 0.01 ZAR, about 540 times worse than the stated rate. A computed amount that would not fit the ledger (more than 20 digits before the point) is 400 `AMOUNT_TOO_LARGE`, like a requested one; before that check the insert overflowed `NUMERIC(38,18)` and answered 500. The spread is 50 bps on every pair in served config: a placeholder, since the number is a business decision.
 - **Rate rules** (served config): positive; timestamp within 10 s of now, either side; inside the pair's band; and within 5% of the market rate of the pair's newest quote (any merchant) if that quote is younger than 5 minutes. Order of checks: positive, fresh, band, jump.
 - **Timeouts.** Rate service: 2 s connect and 2 s read, each, so the worst case is about 4 s. Ledger: 1 s connect, 3 s read. Both clients use the JDK HTTP client pinned to HTTP/1.1 and never retry.
+- **Loopback only, locally.** Every service binds `${SERVER_ADDRESS:127.0.0.1}` in its own `application.yml`, and Eureka registers the same address (`eureka.instance.ip-address`), so the gateway still reaches each instance. `/internal/**` moves money and has no authentication: loopback is the local control only. **Production needs a network policy that admits only the named callers to `/internal/**`, or mTLS with caller identity, before these endpoints are deployable.** `LoopbackOnlyIT` connects to the ledger on the host's LAN address and requires a refusal; a manual boot showed every listener on 127.0.0.1, `curl` to the LAN address refused (exit 7), and routing through the gateway unchanged.
 - **Calling the ledger by registry name.** The ledger client is a `RestClient` with Spring Cloud's load-balancer interceptor added directly. A `@LoadBalanced RestClient.Builder` bean was tried first and broke the service live: Eureka's own client picked that builder up and tried to resolve the registry's address through the load balancer, so conversion-svc never registered. Every Spring test runs with Eureka off, so only the smoke run showed it; `EurekaClientWiringIT` now boots with Eureka on against a WireMock registry, and goes red with that builder bean restored.
 - **Currency scales live in conversion-svc's served config as well as in the ledger's currency table.** That is two homes for one fact: conversion-svc has no read access to the ledger's database and the ledger has no currency endpoint yet. If they drift, the ledger refuses the posting (its scale check fails closed) and the conversion stays PENDING until the sweeper voids it.
 - **`ck_conversion_status` was dropped** before release: `ck_conversion_shape` admits only the three states, so the status check could never be the reason a row is refused, and nothing could test it.
 - **The WireMock image is `wiremock/wiremock:3.13.2-3`, not an `-alpine` tag**: checked on Docker Hub, the 3.13.2 alpine tags are published for amd64 only, and this machine is arm64. The test library is `org.wiremock:wiremock-standalone:3.13.2`, the latest stable (4.x is beta).
 
-Proven by tests (`./gradlew :services:conversion-svc:check` and `:services:ledger-svc:check`), each seen red with its control removed:
+Proven by tests (`./gradlew :services:conversion-svc:check` and `:services:ledger-svc:check`), each seen red with its control removed or before its fix:
 
 | Claim | Scenario | Red with the control removed |
 |---|---|---|
@@ -337,6 +340,11 @@ Proven by tests (`./gradlew :services:conversion-svc:check` and `:services:ledge
 | A posting after its deadline is refused and moves nothing | ledger: deadline 1 minute ago | deadline check removed: `expected: 409 but was: 201` |
 | Two sweepers settle each conversion once | conversion-svc: 4 PENDING conversions, two sweeps at once, void calls counted per conversion | `FOR UPDATE OF c SKIP LOCKED` removed: `Expected size: 1 but was: 2` for each |
 | conversion-svc registers with Eureka | `EurekaClientWiringIT` | `@LoadBalanced RestClient.Builder` bean restored: `Expecting actual not to be empty` |
+| A refusal is final: money arriving later cannot post the same conversion | ledger: refused, funded, same id re-posted; conversion-svc: refused, funded while the answer is delayed, same-key retry, then a fresh quote converts once | REFUSED write removed: ledger `expected: 422 but was: 201` (`"status":"POSTED"`); conversion-svc, conversion REJECTED while the ledger holds `[POSTED]`: `expected: false but was: true` |
+| No quote answers 500 on a computed amount the ledger cannot hold | two quotes with a 20-digit fixed side | before the fix: `"status":500 ... "code":"INTERNAL_ERROR"` |
+| A quote's amounts deliver its stated rate | buy 0.000001 USDT with ZAR; sell 0.001 USDT for ZAR | before the fix: 201 with `"sellAmount":"0.01"` |
+| A content refusal by the ledger is final | ledger proxy answers 400 `AMOUNT_TOO_LARGE` | before the fix: 202 `"status":"PENDING"` |
+| The ledger is not reachable from the LAN | `LoopbackOnlyIT` | before the fix: `Expecting code to raise a throwable` |
 
 The first ledger concurrency scenario sent every conversion to one target currency and stayed green with the source lock removed: the lock on the shared target account serialised them first. It now buys a different currency per request, so only the source lock stands between them.
 
@@ -350,13 +358,13 @@ Also proven: the merchant gets exactly the quoted amounts (balances and statemen
 |---|---|---|---|
 | GET | `/api/v1/merchants/{merchantId}/balances` | n/a | 200 list per currency |
 | GET | `/api/v1/merchants/{merchantId}/entries?currency=&from=&to=&limit=&after=` | n/a | 200 statement, each row with `balance_after`, keyset pages; 400 unknown currency or bad parameter |
-| POST | `/api/v1/merchants/{merchantId}/quotes` | not needed (a quote moves no money) | 201; 400 `SAME_CURRENCY`, `UNSUPPORTED_PAIR`, `UNKNOWN_CURRENCY`, amount errors, `AMOUNT_TOO_SMALL`; 502 `RATE_REJECTED` with `reason`; 503 `RATE_UNAVAILABLE` |
-| POST | `/api/v1/merchants/{merchantId}/conversions` | `Idempotency-Key` from the merchant, required; quote is single-use | 201 COMPLETED; 202 PENDING; 404 `QUOTE_NOT_FOUND` (also another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED`; 422 `INSUFFICIENT_FUNDS` or `IDEMPOTENCY_KEY_REUSED` |
+| POST | `/api/v1/merchants/{merchantId}/quotes` | not needed (a quote moves no money) | 201; 400 `SAME_CURRENCY`, `UNSUPPORTED_PAIR`, `UNKNOWN_CURRENCY`, amount errors (`AMOUNT_TOO_LARGE` also for the computed side), `AMOUNT_TOO_SMALL` (rounding moves the rate more than 1%); 502 `RATE_REJECTED` with `reason`; 503 `RATE_UNAVAILABLE` |
+| POST | `/api/v1/merchants/{merchantId}/conversions` | `Idempotency-Key` from the merchant, required; quote is single-use | 201 COMPLETED; 202 PENDING; 404 `QUOTE_NOT_FOUND` (also another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED` (reason `INPUT_REFUSED`, `DEADLINE_PASSED`, `VOIDED`); 422 `INSUFFICIENT_FUNDS`, `BALANCE_LIMIT_EXCEEDED` or `IDEMPOTENCY_KEY_REUSED` |
 | GET | `/api/v1/merchants/{merchantId}/conversions/{conversionId}` | n/a | 200; 404 `CONVERSION_NOT_FOUND` |
 | POST | `/internal/v1/deposits` (not routed; money-in rail only) | `Idempotency-Key` = the rail's transfer reference, required, stored as (`merchantId`, DEPOSIT, key) | 201 created or replayed; 400 bad amount/scale, unknown currency or missing key; 422 key reused with a different body |
-| POST | `/internal/v1/conversion-postings` (not routed) | idempotent on `conversionId`; carries a deadline | 201 posted or replayed; 400 `SAME_CURRENCY`, amount and validation errors; 409 `POSTING_DEADLINE_PASSED` or `CONVERSION_VOIDED`; 422 `INSUFFICIENT_FUNDS`, `IDEMPOTENCY_KEY_REUSED`, `BALANCE_LIMIT_EXCEEDED` |
-| GET | `/internal/v1/conversion-postings/{conversionId}?merchantId=` (not routed; sweeper) | n/a | 200 status POSTED or VOID; 400 without `merchantId`; 404 `NOT_FOUND` |
-| POST | `/internal/v1/conversion-postings/{conversionId}/void` (not routed; sweeper) | identity (`merchantId`, CONVERSION, `conversionId`) | 201 voided or replayed; 409 `CONVERSION_ALREADY_POSTED` |
+| POST | `/internal/v1/conversion-postings` (not routed) | idempotent on `conversionId`; carries a deadline | 201 posted or replayed; 400 `SAME_CURRENCY`, amount and validation errors; 409 `POSTING_DEADLINE_PASSED` or `CONVERSION_VOIDED`; 422 `INSUFFICIENT_FUNDS` or `BALANCE_LIMIT_EXCEEDED` (recorded as REFUSED first, and replayed for that id), `IDEMPOTENCY_KEY_REUSED` |
+| GET | `/internal/v1/conversion-postings/{conversionId}?merchantId=` (not routed; sweeper) | n/a | 200 status POSTED, VOID, or REFUSED with `reason`; 400 without `merchantId`; 404 `NOT_FOUND` |
+| POST | `/internal/v1/conversion-postings/{conversionId}/void` (not routed; sweeper) | identity (`merchantId`, CONVERSION, `conversionId`) | 201 voided, replayed, or the stored REFUSED journal; 409 `CONVERSION_ALREADY_POSTED` |
 
 ## 7. Failure handling
 
@@ -370,6 +378,7 @@ Also proven: the merchant gets exactly the quoted amounts (balances and statemen
 | Rate service slow, down or failing | quote refused in about 2 s with 503 `RATE_UNAVAILABLE`; no cached or default rate | built, tested |
 | Rate service returns a bad rate | quote refused with 502 `RATE_REJECTED` and a `reason`; nothing stored | built, tested (zero, negative, stale, out of band, jump, unreadable) |
 | Ledger slow during accept | conversion stays PENDING (202); a same-key retry posts again only while the quote is live, else returns the state; the sweeper resolves it after the posting deadline, voiding if nothing posted | built, tested (answer never sent, answer lost, retry live, retry expired) |
+| Ledger refuses, then money arrives before a same-key retry | the refusal is recorded as REFUSED before it is answered; the retry gets the same 422; the conversion and the ledger agree | built, tested |
 | Duplicate client request | replayed from the stored journal or conversion; never posted twice | built, tested (deposits: sequential and 20 concurrent; conversions: sequential and 5 concurrent) |
 | Concurrent debits of one account | serialised by the merchant row lock; the losers are refused with `INSUFFICIENT_FUNDS` | built, tested (8 concurrent, exactly floor(balance / amount) succeed) |
 | Two sweepers at once | each claims different rows (`FOR UPDATE SKIP LOCKED`); each conversion voided once | built, tested |
@@ -388,6 +397,9 @@ The rest of 12-factor is followed: config comes from the environment with commit
 - Currency scales are configured in conversion-svc as well as stored in the ledger (section 5, "As built"); a ledger currency endpoint would remove the copy.
 - The sweeper's live run on two replicas is proven in-process (two concurrent sweeps on one database), not with two running conversion-svc instances.
 - Quotes are never deleted: a retention job is needed before volume grows.
+- Rate drift: each quote's rate is checked only against the pair's previous quote, so a slow drift of under 5% per quote is bounded only by the static band.
+- The sweeper holds the claimed row's lock, and so a pooled database connection, while it calls the ledger: correct, but up to about 8 s per row (two ledger calls at 1 s connect and 3 s read each).
+- `/internal/**` has no authentication; locally every service binds loopback (section 5, "As built"), and production needs network policy or mTLS.
 - The platform FX position per currency is visible (`sum(entry.amount)` over `PLATFORM_FX`), but nothing reports or hedges it.
 - Reconciliation is a test assertion and a manual query, not a scheduled job with an alert.
 - No alert on a broken ledger invariant: a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` is logged at error and is visible only as an HTTP 5xx.

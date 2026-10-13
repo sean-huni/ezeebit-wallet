@@ -50,6 +50,32 @@ Feature: A ledger that does not answer leaves the conversion PENDING, never gues
     And the ledger was sent 1 posting
     And the ledger holds exactly 0 conversions for "Acme"
 
+  Scenario: A refused conversion stays refused when money arrives during a same-key retry
+    Given "Acme" has quote "big" to buy "100.000000" USDT with ZAR
+    And the ledger's first answer takes 500 ms and its second 700 ms
+    When "Acme" accepts quote "big" with key "k1", and while that answer is on its way "10000.00" ZAR arrives and "Acme" sends the same request again
+    Then both answers are refused with 422 INSUFFICIENT_FUNDS
+    And the conversion and the ledger agree
+    And the ledger holds exactly 0 conversions for "Acme"
+    And "Acme" holds "11000.00" ZAR
+    Given the ledger answers normally again
+    And "Acme" has quote "fresh" to buy "100.000000" USDT with ZAR
+    When "Acme" accepts quote "fresh" with key "k2"
+    Then the conversion is COMPLETED
+    And the ledger holds exactly 1 conversion for "Acme"
+    And the ledger's books balance
+
+  Scenario: A ledger refusal of the posting's content is final
+    Given the ledger refuses every posting with 400 AMOUNT_TOO_LARGE
+    When "Acme" accepts quote "q1" with key "k1"
+    Then the request is refused with 409 CONVERSION_REJECTED because INPUT_REFUSED
+    And the conversion shows status REJECTED because INPUT_REFUSED
+
+  Scenario: A ledger that says the conversion id is taken leaves the outcome to the sweeper
+    Given the ledger refuses every posting with 422 IDEMPOTENCY_KEY_REUSED
+    When "Acme" accepts quote "q1" with key "k1"
+    Then the conversion is PENDING
+
   Scenario: Two sweepers running at once settle each conversion exactly once
     Given the ledger does not answer in time
     And "Acme" has 4 PENDING conversions of "10.00" ZAR for USDT

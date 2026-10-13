@@ -22,9 +22,16 @@ public class ConversionReplayer {
 		this.journals = journals;
 	}
 
+	// A refusal replays as the same refusal whatever is sent: money that arrived since changes nothing.
 	@Transactional(readOnly = true)
-	public UUID storedPosting(final MerchantId merchant, final UUID conversionId, final String requestHash) {
+	public UUID storedPosting(final MerchantId merchant, final UUID conversionId, final String requestHash,
+			final String sellCurrency, final String buyCurrency) {
 		JournalEntity stored = stored(merchant, conversionId);
+		if (JournalStatus.REFUSED.name().equals(stored.status())) {
+			ErrorCode refusal = ErrorCode.valueOf(stored.reason());
+			throw new LedgerException(refusal, null,
+					refusal == ErrorCode.INSUFFICIENT_FUNDS ? sellCurrency : buyCurrency);
+		}
 		if (JournalStatus.VOID.name().equals(stored.status())) {
 			throw new LedgerException(ErrorCode.CONVERSION_VOIDED, "conversionId", conversionId.toString());
 		}
@@ -34,6 +41,7 @@ public class ConversionReplayer {
 		return stored.id();
 	}
 
+	// VOID or REFUSED: either way no posting can land, so the stored marker is the answer.
 	@Transactional(readOnly = true)
 	public UUID storedVoid(final MerchantId merchant, final UUID conversionId) {
 		JournalEntity stored = stored(merchant, conversionId);

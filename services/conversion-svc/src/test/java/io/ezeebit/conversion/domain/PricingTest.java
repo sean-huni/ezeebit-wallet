@@ -65,6 +65,43 @@ class PricingTest {
 	}
 
 	@Test
+	void aComputedSellAmountTheLedgerCannotHoldIsRefused() {
+		assertThatThrownBy(() -> Pricing.price(Money.parse("99999999999999999999", USDT), Side.BUY,
+				new Currency("NGN", 2), new BigDecimal("0.000645"), 50))
+				.isInstanceOf(ConversionException.class)
+				.extracting("code").isEqualTo(ErrorCode.AMOUNT_TOO_LARGE);
+	}
+
+	@Test
+	void aComputedBuyAmountTheLedgerCannotHoldIsRefused() {
+		assertThatThrownBy(() -> Pricing.price(Money.parse("99999999999999999999", USDT), Side.SELL,
+				new Currency("NGN", 2), new BigDecimal("1550.12"), 50))
+				.isInstanceOf(ConversionException.class)
+				.extracting("code").isEqualTo(ErrorCode.AMOUNT_TOO_LARGE);
+	}
+
+	@Test
+	void aBuyQuoteWhoseRoundedPriceMovesTheRateMoreThanOnePercentIsRefused() {
+		assertThatThrownBy(() -> Pricing.price(Money.parse("0.000001", USDT), Side.BUY, ZAR, new BigDecimal("0.054254"), 50))
+				.isInstanceOf(ConversionException.class)
+				.extracting("code").isEqualTo(ErrorCode.AMOUNT_TOO_SMALL);
+	}
+
+	@Test
+	void aSellQuoteWhoseRoundedProceedsMoveTheRateMoreThanOnePercentIsRefused() {
+		assertThatThrownBy(() -> Pricing.price(Money.parse("0.001", USDT), Side.SELL, ZAR, new BigDecimal("18.4321"), 50))
+				.isInstanceOf(ConversionException.class)
+				.extracting("code").isEqualTo(ErrorCode.AMOUNT_TOO_SMALL);
+	}
+
+	@Test
+	void roundingWithinOnePercentOfTheAppliedRateIsAccepted() {
+		Priced priced = Pricing.price(Money.parse("0.06", USDT), Side.SELL, ZAR, new BigDecimal("18.4321"), 50);
+
+		assertThat(priced.buy().amount()).isEqualTo(new BigDecimal("1.10"));
+	}
+
+	@Test
 	void aZeroSpreadAppliesTheMarketRate() {
 		Priced priced = Pricing.price(Money.parse("10", USDT), Side.SELL, ZAR, new BigDecimal("18.4321"), 0);
 

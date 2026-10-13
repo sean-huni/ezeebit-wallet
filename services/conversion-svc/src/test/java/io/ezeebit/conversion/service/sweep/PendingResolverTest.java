@@ -21,7 +21,6 @@ import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
-import io.ezeebit.conversion.mapper.ConversionMapper;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
 import io.ezeebit.conversion.service.quote.QuoteReader;
@@ -77,8 +76,8 @@ class PendingResolverTest {
 	private PendingResolver resolver(final AbstractPlatformTransactionManager manager) {
 		ConversionProperties properties = new ConversionProperties(null, null, Duration.ofSeconds(30), null, null,
 				null, null);
-		ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class),
-				mock(ConversionMapper.class), clock, metrics);
+		ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class), clock,
+				metrics);
 		return new PendingResolver(new TransactionTemplate(manager), conversions, ledger, settler, properties, clock,
 				metrics);
 	}

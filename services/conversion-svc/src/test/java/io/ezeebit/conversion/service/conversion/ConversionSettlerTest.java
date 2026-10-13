@@ -16,7 +16,6 @@ import io.ezeebit.conversion.common.metrics.ConversionMetrics;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
-import io.ezeebit.conversion.mapper.ConversionMapper;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.quote.QuoteReader;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -30,7 +29,7 @@ class ConversionSettlerTest {
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerClient ledger = mock(LedgerClient.class);
 	private final ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class),
-			mock(ConversionMapper.class), Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry));
+			Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry));
 	private final ConversionEntity pending = new ConversionEntity(UUID.randomUUID(), UUID.randomUUID(),
 			UUID.randomUUID(), "k1", "PENDING", null, NOW.plusSeconds(45), NOW, null, null);
 
@@ -54,7 +53,7 @@ class ConversionSettlerTest {
 	}
 
 	private void givenTheLedgerAnswers(final LedgerAnswer answer, final int rowsMoved) {
-		when(ledger.post(any())).thenReturn(answer);
+		when(ledger.post(any(), any(), any(), any())).thenReturn(answer);
 		when(conversions.settle(any(), anyString(), any(), any())).thenReturn(rowsMoved);
 		when(conversions.find(pending.id(), pending.merchantId())).thenReturn(Optional.of(pending));
 	}

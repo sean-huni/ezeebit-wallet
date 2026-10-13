@@ -9,7 +9,6 @@ import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.domain.RejectionReason;
 import io.ezeebit.conversion.domain.Settlement;
-import io.ezeebit.conversion.mapper.ConversionMapper;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.quote.QuoteReader;
 import org.springframework.stereotype.Service;
@@ -21,16 +20,14 @@ public class ConversionSettler {
 	private final ConversionRepo conversions;
 	private final LedgerClient ledger;
 	private final QuoteReader quotes;
-	private final ConversionMapper mapper;
 	private final Clock clock;
 	private final ConversionMetrics metrics;
 
 	public ConversionSettler(final ConversionRepo conversions, final LedgerClient ledger, final QuoteReader quotes,
-			final ConversionMapper mapper, final Clock clock, final ConversionMetrics metrics) {
+			final Clock clock, final ConversionMetrics metrics) {
 		this.conversions = conversions;
 		this.ledger = ledger;
 		this.quotes = quotes;
-		this.mapper = mapper;
 		this.clock = clock;
 		this.metrics = metrics;
 	}
@@ -39,7 +36,8 @@ public class ConversionSettler {
 	// returns the first outcome, so money moves at most once and never after a recorded refusal.
 	// No transaction is open on this path, so the update has committed by the time it is counted.
 	public ConversionEntity postAndSettle(final ConversionEntity conversion) {
-		LedgerAnswer answer = ledger.post(mapper.toPosting(conversion, quotes.of(conversion.quote())));
+		LedgerAnswer answer = ledger.post(conversion.id(), conversion.merchantId(), quotes.of(conversion.quote()),
+				conversion.deadline());
 		settle(conversion, answer).ifPresent(settled -> metrics.conversion(settled.status(), settled.reason()));
 		return conversions.find(conversion.id(), conversion.merchantId()).orElseThrow();
 	}

@@ -274,8 +274,10 @@ replays while `"100.0"` and `"100.00"` are different requests.
 Amounts are decimal strings; a JSON number is refused, so no binary float reaches the service. Too
 many decimals for the currency is refused (`"10.500"` is fine for ZAR, `"10.001"` is not), as is
 more than 20 digits before the point. Input Postgres cannot store (a NUL in `reference`, a statement
-window outside 1970 to 9999) is 400 at the edge. `ErrorCode` carries its HTTP status, so the
-framework-free domain knows its errors' web statuses: a coupling accepted for the timebox.
+window outside 1970 to 9999) is 400 at the edge. `ErrorCode` carries only the stable wire code and
+its message key; `api/advice/ErrorStatus` is the one table mapping each code to its HTTP status, an
+exhaustive switch (a new code does not compile without a status), and `ErrorStatusTest` pins every
+published status.
 
 ## 5. Conversion design (Task 2)
 

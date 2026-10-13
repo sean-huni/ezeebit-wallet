@@ -1,9 +1,9 @@
 # Solution
 
 Which tasks I chose, the design and its trade-offs, the assumptions I made, how the remaining tasks
-fit, what I would do with more time, what is unfinished, and how I used AI.
+fit, what I would do with more time, what is unfinished, and how I used artificial intelligence (AI).
 [README.md](README.md) explains how to run it; [ARCHITECTURE.md](ARCHITECTURE.md) holds the
-detailed design (data model, flows, API, failure handling).
+detailed design (data model, flows, application programming interface (API), failure handling).
 
 Walkthrough video: link to be added.
 
@@ -11,8 +11,10 @@ Walkthrough video: link to be added.
 
 I spent about 3 hours of my own attention, directing AI agents (Claude Code) that wrote most of the
 code and docs under review gates: tests seen failing before they were trusted, reviews of each
-branch, and a final review of the whole repository. The agents' work ran from 02:44 to about 10:11 on
-13 October 2026 (commit timestamps, UTC+2), well past the brief's two to three hours. The brief says
+branch, and a final review of the whole repository. The agents' work ran from 02:44 into the evening of
+13 October 2026 (commit timestamps in South African Standard Time, Coordinated Universal Time (UTC)
+plus 2 hours; `git log` has the exact times), well past the brief's two to three hours; release
+`0.1.0` was tagged at 10:19 and the rest landed on `dev` after it. The brief says
 to stop and write up the rest; I kept building the extras listed below, which a reviewer can
 ignore. Section 8 says where I accepted, changed or rejected what the agents produced.
 
@@ -24,14 +26,16 @@ of it:
 
 | Addition | Merge on `dev` | Where it is described |
 |---|---|---|
-| Local observability: Grafana LGTM, dashboards, alert rules, optional Slack delivery | `feat-observability`, `feat-business-observability` | [docs/observability.md](docs/observability.md) |
-| SAST and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
-| Supply-chain gate: secrets scanning, Paketo images, SBOMs, trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
+| Local observability: Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image, OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
+| Static application security testing (SAST) and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
+| Supply-chain gate: secrets scanning, Paketo images, software bills of materials (SBOMs), trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
-| OpenAPI: per-service specs with derived problem responses, one Swagger UI on the gateway, snapshots checked in `check` | `feat-openapi` | [README](README.md#api-reference), [ARCHITECTURE.md](ARCHITECTURE.md#openapi) |
+| OpenAPI: per-service specs with derived problem responses, one Swagger user interface (UI) on the gateway, snapshots checked in `check` | `feat-openapi` | [README](README.md#api-reference), [ARCHITECTURE.md](ARCHITECTURE.md#openapi) |
 | Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
+| Use-case packages and a map of every package and class | `refactor-ledger-packages` | [docs/project-layout.md](docs/project-layout.md) |
+| Dependency-injection budget: the build fails on any bean with more than 3 injected dependencies; 8 beans split by job to meet it | `bugfix-di-flooding` | [docs/quality-gates.md](docs/quality-gates.md#architecture-gates) |
 
-Each landed as its own `feat-*` merge on `dev`, so `git show --stat <merge>` shows exactly what it
+Each landed as its own merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means
 resolving conflicts rather than a one-command revert.
 
@@ -51,11 +55,12 @@ What exists:
 - **Task 1, the ledger.** `POST /internal/v1/deposits` (Idempotency-Key required, called by the
   money-in rail, never routed) posts a balanced journal: merchant `+X`, platform deposit clearing
   `-X`, in one transaction, with `balance_after` on the merchant entry. Balances and the statement
-  are served through the gateway. Five currencies (ZAR, NGN, KES at 2 decimals; USDT, USDC at 6); an
-  amount with more decimals than its currency allows is refused, never rounded. A replayed deposit
-  returns the identical answer and credits once; the same key with a different body is 422.
+  are served through the gateway. Five currencies: South African rand (ZAR),
+  Nigerian naira (NGN) and Kenyan shilling (KES) at 2 decimals, Tether (USDT) and USD Coin (USDC)
+  at 6. An amount with more decimals than its currency allows is refused, never rounded. A replayed
+  deposit returns the identical answer and credits once; the same key with a different body is 422.
 - **Task 2, conversion.** A quote calls the exchange-rate service (2 s timeouts, no fallback rate),
-  validates the rate, applies a 50 bps spread, rounds in the platform's favour and lives 15 s.
+  validates the rate, applies a 50 basis-point (bps) spread, rounds in the platform's favour and lives 15 s.
   Accepting it asks the ledger to post four entries in one transaction under row locks, with funds
   and a deadline checked. An answer that never arrives leaves the conversion PENDING (202) for a
   sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
@@ -64,7 +69,7 @@ What exists:
   domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** `./gradlew clean build` on 2026-10-13, counted from the JUnit XML reports:
+**Tests.** `./gradlew clean build` on 2026-10-13, counted from the JUnit Extensible Markup Language (XML) reports:
 **538 tests, 0 failures, 0 skipped.** Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected
 dependencies (`DependencyBudgetTest`, `InjectionCounterTest`; see
@@ -115,10 +120,10 @@ Two domain services, each owning its own database, behind one gateway. Details i
 | Two domain services (ledger, conversion) | One service with two modules | Different invariants, rates of change and failure domains ([ARCHITECTURE.md section 2](ARCHITECTURE.md#2-services)). One modular service would also have been defensible at this volume. |
 | Only the ledger writes money | Conversion posts its own balance changes | One place to audit, one transaction per movement. |
 | Double-entry journal with a cached balance | A balance column updated in place | The brief asks to "trust these balances completely" and explain them "at any later date". An in-place balance cannot explain itself. Cost: more rows and more care on every posting. |
-| Firm quote with a short TTL and a spread | "Last look" (re-price at accept) | The price shown is the price paid, or a clear "quote expired". Last look protects the platform more but makes the price non-firm. I would revisit it if measured slippage exceeded the spread. |
-| PostgreSQL | MySQL (Ezeebit's stack) | The design only uses portable features: exact `NUMERIC`, `SELECT ... FOR UPDATE`, unique and `CHECK` constraints. I picked Postgres for transactional DDL (a failed migration rolls back cleanly) and one identical image (`postgres:18.6-alpine`) in tests and compose. Moving to MySQL 8 is a driver, datasource and dialect change, not a redesign. |
+| Firm quote with a short time to live (TTL) and a spread | "Last look" (re-price at accept) | The price shown is the price paid, or a clear "quote expired". Last look protects the platform more but makes the price non-firm. I would revisit it if measured slippage exceeded the spread. |
+| PostgreSQL | MySQL (Ezeebit's stack) | The design only uses portable features: exact `NUMERIC`, `SELECT ... FOR UPDATE`, unique and `CHECK` constraints. I picked Postgres for transactional data definition language (DDL) (a failed migration rolls back cleanly) and one identical image (`postgres:18.6-alpine`) in tests and compose. Moving to MySQL 8 is a driver, datasource and dialect change, not a redesign. |
 | All services in one repository | One repository per service (12-factor) | The deliverable is one repository that builds and runs with one command. Argued in [ARCHITECTURE.md section 8](ARCHITECTURE.md#8-single-repository-and-the-12-factor-trade-off). |
-| Eureka, Config Server and Gateway for two domain services | Fixed URLs, no gateway | Real overhead: three extra processes, a boot order, registry caches to tune. Kept because the platform will grow into payouts, chain listening and settlement, and the gateway is one route table and one place to keep `/internal/**` unreachable. If the fleet stayed this small, I would drop Eureka and the Config Server first. |
+| Eureka, Config Server and Gateway for two domain services | Fixed Uniform Resource Locators (URLs), no gateway | Real overhead: three extra processes, a boot order, registry caches to tune. Kept because the platform will grow into payouts, chain listening and settlement, and the gateway is one route table and one place to keep `/internal/**` unreachable. If the fleet stayed this small, I would drop Eureka and the Config Server first. |
 | Redis-backed rate limit per merchant at the gateway, failing closed | No limiter; or in-heap buckets per gateway | Not needed by Tasks 1 and 2 (idempotency and concurrency live in the database). Added beyond the brief because a payday burst from one merchant should not starve the rest. In-heap buckets would multiply the limit by the replica count. Failing closed makes Redis part of the edge's critical path: without it no merchant call succeeds, which I prefer to an edge that silently stops limiting. |
 | Merchant identity as a path variable | A token carrying the merchant id | The brief says to assume the merchant is identified by an ID in the request. In production it would come from the verified token, never from the path. |
 
@@ -138,7 +143,7 @@ Two domain services, each owning its own database, behind one gateway. Details i
    delivered rate more than 1% from the stated one.
 6. **Timing.** Posting deadline = quote expiry + 30 s; the sweeper settles 30 s after that.
 7. **Platform accounts may go negative**: deposit clearing while money is owed in from outside; the
-   FX account per currency is the platform's open position. Hedging it is out of scope.
+   foreign exchange (FX) account per currency is the platform's open position. Hedging it is out of scope.
 8. **Deposits arrive pre-confirmed, and only from inside**, keyed on (merchant, the rail's transfer
    reference). Unconfirmed funds belong to Task 4.
 9. **Accounts are opened on first use**, by a deposit or a conversion credit.
@@ -170,7 +175,7 @@ None of these needs a change to the ledger's model. Each one is a new caller tha
 
 The candidates I removed from my first service list map here: fiat and crypto handling become the
 payout and chain-listener paths, settlement becomes Task 5, and a merchant service becomes a
-profile and KYC context once authentication exists.
+profile and know-your-customer (KYC) context once authentication exists.
 
 ## 6. What I would do with more time
 
@@ -178,14 +183,15 @@ In order:
 
 1. **A scheduled reconciliation job** (every merchant balance equals the sum of its entries; every
    journal sums to zero per currency) with an alert on any difference.
-2. **Authentication on `/internal/**`**: network policy admitting only named callers, or mTLS with
+2. **Authentication on `/internal/**`**: network policy admitting only named callers, or mutual Transport Layer Security (mTLS) with
    caller identity.
 3. **The platform FX position per currency** as a metric and a panel.
 4. **A ledger currency endpoint**, so conversion-svc reads scales from the ledger instead of
    keeping its own copy.
 5. **A two-instance run of conversion-svc** to prove the sweeper live across processes.
 6. **A transactional outbox** for ledger events, which Task 5 depends on.
-7. **An OpenAPI contract** per service, and generated client DTOs for the conversion-to-ledger seam.
+7. **Generated client data transfer objects (DTOs)** for the conversion-to-ledger seam, from ledger-svc's committed internal
+   spec (`docs/openapi/ledger-svc-internal.json`); today `PostingDto` and `LedgerReplyDto` are hand-written.
 8. **Quote retention**, and a MySQL 8 run of the same suite to back the portability claim.
 
 ## 7. Known gaps and unfinished work
@@ -198,7 +204,7 @@ This is the single list; the other documents link here.
   network policy or mTLS before these endpoints are deployable. The gateway proof header does not
   cover it.
 - The gateway proof header (`X-Ezeebit-Gateway`) is a shared secret, not authentication: it travels
-  in clear over plain HTTP, every service and anyone who can read config-svc's served files holds
+  in clear over plain Hypertext Transfer Protocol (HTTP), every service and anyone who can read config-svc's served files holds
   it, and the committed default is public. It only stops a direct call to a service that does not
   know it. Production needs network policy or mTLS between the gateway and the services, and the
   secret rotated per environment.
@@ -211,20 +217,20 @@ This is the single list; the other documents link here.
 - Bucket4j refills from each gateway's wall clock: unsynchronised clocks admit extra tokens.
 - The rate-limit key is the merchant id from the path, which the client chooses. With no
   authentication a caller can spread load over many merchant ids; a limit keyed on the verified
-  caller needs the token the brief puts out of scope. Only the shape of the key is bounded (a UUID).
+  caller needs the token the brief puts out of scope. Only the shape of the key is bounded: a universally unique identifier (UUID).
 - One Postgres container hosts both databases: logically separate, one shared failure domain.
 - config-svc and eureka-svc run as single instances.
 - CircleCI has never run: no project reads the config until the repository is pushed and connected
   ([docs/ci.md](docs/ci.md)).
 - Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
-  fixable CVEs; each override must be dropped once Boot catches up, or it will hold a version back.
+  fixable Common Vulnerabilities and Exposures (CVEs); each override must be dropped once Boot catches up, or it will hold a version back.
 - trivy has no compose checks, so the misconfiguration stage reports rather than inspects.
 
 **Money correctness**
 
 - Reconciliation is a test assertion and a manual query, not a scheduled job with an alert.
-- No alert on a broken ledger invariant: a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` is
-  logged at error and visible only as an HTTP 5xx.
+- A broken ledger invariant (a 5xx `CURRENCY_MISMATCH` or `UNBALANCED_POSTING`) pages as
+  LedgerInvariantBroken, proven by promtool only, never by a rehearsed outage.
 - Rate drift: each quote's rate is checked only against the pair's recent quote, so a slow drift of
   under 5% per quote is bounded only by the static band.
 - Currency scales live in the ledger and in conversion-svc's config. Drift fails safe (the
@@ -243,12 +249,14 @@ This is the single list; the other documents link here.
   not with two running conversion-svc instances.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
-- RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither rule has
-  a unit test (no `promtool` in the build), like the other rules.
+- RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests five of the nine rules (ServiceDown,
+  RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken) and is run by hand, not
+  by the Gradle build or the CircleCI pipeline.
 
 **Not built**
 
-- Tasks 3 to 6 (section 5). No OpenAPI schema. Quotes are never deleted.
+- Tasks 3 to 6 (section 5). No generated client DTOs between services. Quotes are never deleted.
 
 ## 8. AI usage notes
 
@@ -290,9 +298,11 @@ the services and tests and drafted the documentation, which I reviewed.
   void, and checks the hash first. It also found the 504 branch untested and no gateway read
   timeout; both are now in place.
 - A "slow rate service" test measured 5 s for a refusal configured at 2. The service was right: the
-  test's own HTTP client silently retried every 503. The test client is now the JDK one.
+  test's own HTTP client silently retried every 503. The test client is now the Java Development Kit (JDK) one.
 - The alerting paged on a plain restart, from a Pending alert Grafana had persisted at shutdown.
   Reproduced with Slack disconnected and fixed by moving Grafana's database to tmpfs.
 
 **Rejected:** an early table of services and datastores that included Redis rate limiting, MongoDB
 for notifications, and read replicas for settlement. Nothing in Tasks 1 and 2 needs any of them.
+Redis rate limiting was later added at the gateway as an extra beyond the brief (section 3); the
+other two stay rejected.

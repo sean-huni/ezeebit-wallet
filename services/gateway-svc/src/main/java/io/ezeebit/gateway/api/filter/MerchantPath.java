@@ -5,7 +5,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // Decided on the raw URI only after it is proven canonical, so the raw path IS the decoded, normalised path the
-// route matcher sees: no %xx, no ;params, no dot segments, no //. Every route lives under /api/ (RouteCoverageIT).
+// route matcher sees: no %xx, no ;params, no dot segments, no //. Every merchant route lives under /api/; the only
+// other routes are the literal spec paths RouteCoverageIT allow-lists, which are uncharged.
 public record MerchantPath(Kind kind, String key) {
 
 	public enum Kind { NOT_MERCHANT, MALFORMED, INVALID_ID, MERCHANT }

@@ -31,6 +31,35 @@ spring:
                 - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
                 - RemoveRequestHeader=X-Ezeebit-Gateway
                 - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+            # The two public specs behind the Swagger UI: not merchant routes, so uncharged by design. Each is one literal
+            # path, GET only, outside /api/ (RouteCoverageIT allow-lists them); the internal spec is never routed.
+            - id: ledger-api-docs
+              uri: lb://ledger-svc
+              predicates:
+                - Path=/v3/api-docs/ledger
+                - Method=GET
+              filters:
+                - SetPath=/v3/api-docs/public
+                - RemoveRequestHeader=X-Ezeebit-Gateway
+                - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+            - id: conversion-api-docs
+              uri: lb://conversion-svc
+              predicates:
+                - Path=/v3/api-docs/conversion
+                - Method=GET
+              filters:
+                - SetPath=/v3/api-docs/public
+                - RemoveRequestHeader=X-Ezeebit-Gateway
+                - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+springdoc:
+  swagger-ui:
+    # One UI over the services' public specs, fetched through the routes above. The gateway documents nothing itself.
+    urls:
+      - name: ledger
+        url: /v3/api-docs/ledger
+      - name: conversion
+        url: /v3/api-docs/conversion
+    urls-primary-name: ledger
 ezeebit:
   gateway:
     rate-limit:

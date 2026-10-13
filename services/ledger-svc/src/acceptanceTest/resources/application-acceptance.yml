@@ -1,0 +1,6 @@
+# Profile for the integration and acceptance tiers. The datasource comes from Testcontainers
+# (@ServiceConnection); config server, registry and OTLP are switched off by the root build's
+# test-task convention, which every service's tests share.
+server:
+  # A test server binds the address its client dials (macOS shares wildcard ports with loopback listeners).
+  address: 127.0.0.1

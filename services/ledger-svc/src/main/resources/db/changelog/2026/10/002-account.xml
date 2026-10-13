@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-account-table" author="ledger-svc">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="account"/></not></preConditions>
+        <createTable tableName="account">
+            <column name="id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_account"/></column>
+            <column name="merchant_id" type="UUID"/>
+            <column name="currency" type="VARCHAR(5)">
+                <constraints nullable="false" foreignKeyName="fk_account_currency" referencedTableName="currency" referencedColumnNames="code"/>
+            </column>
+            <column name="type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="balance" type="NUMERIC(38,18)"/>
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+        </createTable>
+        <addUniqueConstraint tableName="account" columnNames="merchant_id, currency, type" constraintName="uq_account_merchant_currency_type"/>
+        <!-- Target of the entry composite FK: an entry's currency must be its account's currency. -->
+        <addUniqueConstraint tableName="account" columnNames="id, currency" constraintName="uq_account_id_currency"/>
+        <rollback><dropTable tableName="account"/></rollback>
+    </changeSet>
+
+    <changeSet id="002-account-platform-unique" author="ledger-svc">
+        <!-- LIQUIBASE-SQL-EXCEPTION: createIndex has no WHERE clause; NULL merchant_id escapes the unique constraint -->
+        <sql>CREATE UNIQUE INDEX uq_account_platform_currency_type ON account (currency, type) WHERE merchant_id IS NULL;</sql>
+        <rollback><dropIndex tableName="account" indexName="uq_account_platform_currency_type"/></rollback>
+    </changeSet>
+
+    <changeSet id="002-account-checks" author="ledger-svc">
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE account ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING'));
+ALTER TABLE account ADD CONSTRAINT ck_account_shape CHECK (
+    (type = 'MERCHANT' AND merchant_id IS NOT NULL AND balance IS NOT NULL AND balance &gt;= 0)
+    OR (type &lt;&gt; 'MERCHANT' AND merchant_id IS NULL AND balance IS NULL));</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE account DROP CONSTRAINT ck_account_type, DROP CONSTRAINT ck_account_shape;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-account-seed-clearing" author="ledger-svc">
+        <comment>One deposit clearing account per currency, with fixed ids so every environment agrees.</comment>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0001-000000000001"/><column name="currency" value="ZAR"/><column name="type" value="PLATFORM_DEPOSIT_CLEARING"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0001-000000000002"/><column name="currency" value="NGN"/><column name="type" value="PLATFORM_DEPOSIT_CLEARING"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0001-000000000003"/><column name="currency" value="KES"/><column name="type" value="PLATFORM_DEPOSIT_CLEARING"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0001-000000000004"/><column name="currency" value="USDT"/><column name="type" value="PLATFORM_DEPOSIT_CLEARING"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0001-000000000005"/><column name="currency" value="USDC"/><column name="type" value="PLATFORM_DEPOSIT_CLEARING"/></insert>
+        <rollback><delete tableName="account"><where>type = 'PLATFORM_DEPOSIT_CLEARING'</where></delete></rollback>
+    </changeSet>
+
+</databaseChangeLog>

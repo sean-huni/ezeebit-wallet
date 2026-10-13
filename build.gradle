@@ -43,7 +43,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}
 
-	tasks.named('test') {
+	tasks.withType(Test).configureEach {
 		useJUnitPlatform()
 		// Tests boot each service alone: no config server, no registry.
 		systemProperty 'spring.cloud.config.enabled', 'false'
@@ -60,5 +60,58 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 
 	tasks.named('jar') {
 		enabled = false
+	}
+}
+
+// Three test tiers for the services listed here; a service opts in by being added to the list.
+//   test            unit tests in src/test: no Spring context, no Docker
+//   integrationTest JUnit tests in src/acceptanceTest: Spring Boot on Testcontainers Postgres
+//   acceptanceTest  Cucumber features in src/acceptanceTest: business scenarios over real HTTP
+def tieredServices = ['ledger-svc']
+configure(subprojects.findAll { it.name in tieredServices }) {
+	sourceSets {
+		acceptanceTest {
+			compileClasspath += sourceSets.main.output
+			runtimeClasspath += sourceSets.main.output
+		}
+	}
+
+	configurations {
+		acceptanceTestImplementation.extendsFrom testImplementation
+		acceptanceTestRuntimeOnly.extendsFrom testRuntimeOnly
+	}
+
+	dependencies {
+		acceptanceTestImplementation platform("io.cucumber:cucumber-bom:${cucumberVersion}")
+		acceptanceTestImplementation 'io.cucumber:cucumber-java'
+		acceptanceTestImplementation 'io.cucumber:cucumber-spring'
+		acceptanceTestImplementation 'io.cucumber:cucumber-junit-platform-engine'
+		acceptanceTestImplementation 'org.junit.platform:junit-platform-suite'
+		acceptanceTestImplementation 'org.springframework.boot:spring-boot-testcontainers'
+		acceptanceTestImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+		acceptanceTestImplementation 'org.testcontainers:testcontainers-postgresql'
+	}
+
+	def integrationTest = tasks.register('integrationTest', Test) {
+		description = 'Spring Boot integration tests on Testcontainers Postgres.'
+		group = 'verification'
+		testClassesDirs = sourceSets.acceptanceTest.output.classesDirs
+		classpath = sourceSets.acceptanceTest.runtimeClasspath
+		useJUnitPlatform { includeEngines 'junit-jupiter' }
+		shouldRunAfter tasks.named('test')
+	}
+
+	def acceptanceTest = tasks.register('acceptanceTest', Test) {
+		description = 'Cucumber acceptance scenarios over HTTP on Testcontainers Postgres.'
+		group = 'verification'
+		testClassesDirs = sourceSets.acceptanceTest.output.classesDirs
+		classpath = sourceSets.acceptanceTest.runtimeClasspath
+		// The suite class launches the Cucumber engine; Gradle reports each scenario in JUnit XML.
+		useJUnitPlatform { includeEngines 'junit-platform-suite' }
+		shouldRunAfter integrationTest
+	}
+
+	tasks.named('check') {
+		dependsOn integrationTest, acceptanceTest
 	}
 }

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="004-entry-table" author="ledger-svc">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="entry"/></not></preConditions>
+        <createTable tableName="entry">
+            <column name="id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_entry"/></column>
+            <!-- Assigned at insert, under the account lock: the order in which balance_after was computed. -->
+            <column name="seq" type="BIGINT" autoIncrement="true"><constraints nullable="false" unique="true" uniqueConstraintName="uq_entry_seq"/></column>
+            <column name="journal_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_entry_journal" referencedTableName="journal" referencedColumnNames="id"/>
+            </column>
+            <column name="account_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="currency" type="VARCHAR(5)"><constraints nullable="false"/></column>
+            <column name="amount" type="NUMERIC(38,18)"><constraints nullable="false"/></column>
+            <column name="balance_after" type="NUMERIC(38,18)"/>
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_entry_account_currency"
+                baseTableName="entry" baseColumnNames="account_id, currency"
+                referencedTableName="account" referencedColumnNames="id, currency"/>
+        <createIndex tableName="entry" indexName="ix_entry_account_seq">
+            <column name="account_id"/>
+            <column name="seq"/>
+        </createIndex>
+        <createIndex tableName="entry" indexName="ix_entry_journal">
+            <column name="journal_id"/>
+        </createIndex>
+        <rollback><dropTable tableName="entry"/></rollback>
+    </changeSet>
+
+    <changeSet id="004-entry-checks" author="ledger-svc">
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE entry ADD CONSTRAINT ck_entry_amount_nonzero CHECK (amount &lt;&gt; 0);</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE entry DROP CONSTRAINT ck_entry_amount_nonzero;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

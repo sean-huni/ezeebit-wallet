@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="001-currency-table" author="ledger-svc">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="currency"/></not></preConditions>
+        <createTable tableName="currency">
+            <column name="code" type="VARCHAR(5)"><constraints primaryKey="true" primaryKeyName="pk_currency"/></column>
+            <column name="kind" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="scale" type="SMALLINT"><constraints nullable="false"/></column>
+        </createTable>
+        <rollback><dropTable tableName="currency"/></rollback>
+    </changeSet>
+
+    <changeSet id="001-currency-checks" author="ledger-svc">
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE currency ADD CONSTRAINT ck_currency_kind CHECK (kind IN ('FIAT', 'STABLECOIN'));
+ALTER TABLE currency ADD CONSTRAINT ck_currency_scale CHECK (scale BETWEEN 0 AND 18);</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE currency DROP CONSTRAINT ck_currency_kind, DROP CONSTRAINT ck_currency_scale;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="001-currency-seed" author="ledger-svc">
+        <insert tableName="currency"><column name="code" value="ZAR"/><column name="kind" value="FIAT"/><column name="scale" valueNumeric="2"/></insert>
+        <insert tableName="currency"><column name="code" value="NGN"/><column name="kind" value="FIAT"/><column name="scale" valueNumeric="2"/></insert>
+        <insert tableName="currency"><column name="code" value="KES"/><column name="kind" value="FIAT"/><column name="scale" valueNumeric="2"/></insert>
+        <insert tableName="currency"><column name="code" value="USDT"/><column name="kind" value="STABLECOIN"/><column name="scale" valueNumeric="6"/></insert>
+        <insert tableName="currency"><column name="code" value="USDC"/><column name="kind" value="STABLECOIN"/><column name="scale" valueNumeric="6"/></insert>
+        <rollback><delete tableName="currency"/></rollback>
+    </changeSet>
+
+</databaseChangeLog>

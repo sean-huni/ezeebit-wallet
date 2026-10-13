@@ -41,8 +41,8 @@ up() {
     kill -0 $(<$f) 2>/dev/null && { print -u2 "fleet already running ($f); ./fleet.sh down first"; return 1; }
   done
   [[ -f .env ]] && { set -a; source ./.env; set +a; }
-  print "postgres"
-  docker compose up -d --wait postgres || return 1
+  print "postgres, wiremock (the exchange-rate service)"
+  docker compose up -d --wait postgres wiremock || return 1
   print "build"
   ./gradlew -q bootJar || return 1
   # Control plane first: every other service fetches config and registers on boot.

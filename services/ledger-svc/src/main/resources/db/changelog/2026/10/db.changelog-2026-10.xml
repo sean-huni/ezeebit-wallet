@@ -9,5 +9,6 @@
     <include file="db/changelog/2026/10/002-account.xml"/>
     <include file="db/changelog/2026/10/003-journal.xml"/>
     <include file="db/changelog/2026/10/004-entry.xml"/>
+    <include file="db/changelog/2026/10/005-conversion.xml"/>
 
 </databaseChangeLog>

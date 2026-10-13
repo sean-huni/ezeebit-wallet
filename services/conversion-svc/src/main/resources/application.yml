@@ -7,3 +7,6 @@ spring:
     import: "${CONFIG_IMPORT_OPTIONALITY:}configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
+  messages:
+    basename: i18n/messages
+    fallback-to-system-locale: false

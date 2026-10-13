@@ -68,4 +68,21 @@ class PostingTest {
 				.extracting("code").isEqualTo(ErrorCode.UNBALANCED_POSTING);
 	}
 
+	@Test
+	void conversionMovesTheSellAmountIntoFxAndTheBuyAmountOutOfFx() {
+		UUID source = UUID.randomUUID();
+		UUID target = UUID.randomUUID();
+		UUID fxSource = UUID.randomUUID();
+		UUID fxTarget = UUID.randomUUID();
+
+		Posting posting = Posting.conversion(new ConversionLegs(source, fxSource, Money.parse("184.32", ZAR)),
+				new ConversionLegs(target, fxTarget, Money.parse("10.000000", USDT)));
+
+		assertThat(posting.lines()).containsExactly(
+				new PostingLine(source, Money.parse("184.32", ZAR).negate()),
+				new PostingLine(fxSource, Money.parse("184.32", ZAR)),
+				new PostingLine(fxTarget, Money.parse("10.000000", USDT).negate()),
+				new PostingLine(target, Money.parse("10.000000", USDT)));
+	}
+
 }

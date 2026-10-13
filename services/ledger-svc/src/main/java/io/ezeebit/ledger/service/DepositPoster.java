@@ -42,7 +42,7 @@ public class DepositPoster {
 		UUID merchantId = command.merchant().value();
 		String currency = command.amount().currency().value();
 		journals.insert(new JournalEntity(journalId, merchantId, JournalType.DEPOSIT.name(), POSTED,
-				command.idempotencyKey(), command.requestHash(), command.reference()));
+				command.idempotencyKey(), command.requestHash(), command.reference(), null));
 		accounts.openMerchant(UUID.randomUUID(), merchantId, currency);
 		AccountEntity account = accounts.lockMerchant(merchantId, currency);
 		UUID clearing = accounts.platformAccount(currency, AccountType.PLATFORM_DEPOSIT_CLEARING.name());

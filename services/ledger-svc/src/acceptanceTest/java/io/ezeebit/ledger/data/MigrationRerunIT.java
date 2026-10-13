@@ -20,7 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
 class MigrationRerunIT {
 
 	private static final List<String> RAW_SQL_CHANGESETS = List.of("001-currency-checks", "002-account-platform-unique",
-			"002-account-checks", "003-journal-checks", "004-entry-checks");
+			"002-account-checks", "003-journal-checks", "004-entry-checks", "005-account-type-fx",
+			"005-journal-checks-conversion");
 
 	@Autowired
 	private JdbcClient jdbc;
@@ -37,7 +38,8 @@ class MigrationRerunIT {
 		assertThat(jdbc.sql("SELECT id || ':' || exectype FROM databasechangelog WHERE id IN (:ids) ORDER BY id")
 				.param("ids", RAW_SQL_CHANGESETS).query(String.class).list())
 				.containsExactly("001-currency-checks:MARK_RAN", "002-account-checks:MARK_RAN",
-						"002-account-platform-unique:MARK_RAN", "003-journal-checks:MARK_RAN", "004-entry-checks:MARK_RAN");
+						"002-account-platform-unique:MARK_RAN", "003-journal-checks:MARK_RAN", "004-entry-checks:MARK_RAN",
+						"005-account-type-fx:MARK_RAN", "005-journal-checks-conversion:MARK_RAN");
 	}
 
 }

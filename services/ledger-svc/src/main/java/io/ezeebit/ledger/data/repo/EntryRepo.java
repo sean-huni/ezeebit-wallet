@@ -46,6 +46,13 @@ public class EntryRepo {
 				.single();
 	}
 
+	public List<StatementLineEntity> merchantLines(final UUID journalId) {
+		return jdbc.sql("%s WHERE e.journal_id = :journalId ORDER BY e.seq".formatted(LINES))
+				.param("journalId", journalId)
+				.query(EntryRepo::line)
+				.list();
+	}
+
 	public List<StatementLineEntity> statement(final StatementFilter filter) {
 		StringBuilder sql = new StringBuilder(LINES).append("WHERE a.merchant_id = :merchantId AND e.seq > :after");
 		Map<String, Object> params = new HashMap<>();

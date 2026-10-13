@@ -12,8 +12,10 @@ import java.util.stream.Stream;
 
 import io.ezeebit.ledger.api.advice.ViolationReader;
 import io.ezeebit.ledger.ctl.DepositCtrl;
+import io.ezeebit.ledger.dto.req.ConversionPostingReq;
 import io.ezeebit.ledger.dto.req.DepositReq;
 import io.ezeebit.ledger.dto.req.StatementReq;
+import io.ezeebit.ledger.dto.req.VoidReq;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -39,12 +41,12 @@ class MessagesBundleTest {
 	@Test
 	void everyValidationKeyUsedOnTheApiHasText() {
 		// Constraint annotations do not target RECORD_COMPONENT: they land on the generated fields.
-		Stream<Annotation> onRecords = Stream.of(DepositReq.class, StatementReq.class)
+		Stream<Annotation> onRecords = Stream.of(DepositReq.class, StatementReq.class, ConversionPostingReq.class, VoidReq.class)
 				.flatMap(type -> Arrays.stream(type.getDeclaredFields()))
 				.flatMap(field -> Arrays.stream(field.getAnnotations()));
 		Stream<Annotation> onParameters = Arrays.stream(DepositCtrl.class.getDeclaredMethods())
 				.flatMap(method -> Arrays.stream(method.getParameterAnnotations()).flatMap(Arrays::stream));
-		Stream<Annotation> onTypes = Stream.of(DepositReq.class, StatementReq.class)
+		Stream<Annotation> onTypes = Stream.of(DepositReq.class, StatementReq.class, ConversionPostingReq.class, VoidReq.class)
 				.flatMap(type -> Arrays.stream(type.getAnnotations()));
 		var keys = Stream.of(onRecords, onParameters, onTypes).flatMap(stream -> stream)
 				.map(MessagesBundleTest::messageKey)

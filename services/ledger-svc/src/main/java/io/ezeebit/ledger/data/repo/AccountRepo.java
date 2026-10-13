@@ -2,6 +2,7 @@ package io.ezeebit.ledger.data.repo;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import io.ezeebit.ledger.data.model.AccountEntity;
@@ -37,6 +38,21 @@ public class AccountRepo {
 				.formatted(COLUMNS))
 				.param("merchantId", merchantId)
 				.param("currency", currency)
+				.query(AccountEntity.class)
+				.single();
+	}
+
+	public Optional<UUID> merchantAccountId(final UUID merchantId, final String currency) {
+		return jdbc.sql("SELECT id FROM account WHERE merchant_id = :merchantId AND currency = :currency AND type = 'MERCHANT'")
+				.param("merchantId", merchantId)
+				.param("currency", currency)
+				.query(UUID.class)
+				.optional();
+	}
+
+	public AccountEntity lockById(final UUID id) {
+		return jdbc.sql("SELECT %s FROM account WHERE id = :id FOR UPDATE".formatted(COLUMNS))
+				.param("id", id)
 				.query(AccountEntity.class)
 				.single();
 	}

@@ -89,7 +89,7 @@ public class ConcurrencySteps {
 
 	// Scenario-scoped state is bound to the step thread, so workers only see values resolved before.
 	// All requests wait on one gate and are released together, so they genuinely overlap.
-	private static List<Reply> atOnce(final int count, final IntFunction<Reply> request) {
+	static List<Reply> atOnce(final int count, final IntFunction<Reply> request) {
 		CountDownLatch gate = new CountDownLatch(1);
 		try (ExecutorService pool = Executors.newFixedThreadPool(count)) {
 			List<Future<Reply>> futures = new ArrayList<>();

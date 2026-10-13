@@ -1,5 +1,8 @@
 package io.ezeebit.ledger.data.repo;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,13 +30,20 @@ public class JournalRepo {
 
 	public Optional<JournalEntity> findByIdentity(final UUID merchantId, final String type, final String key) {
 		return jdbc.sql("""
-				SELECT id, merchant_id, type, status, idempotency_key, request_hash, reference FROM journal
+				SELECT id, merchant_id, type, status, idempotency_key, request_hash, reference, created FROM journal
 				WHERE merchant_id = :merchantId AND type = :type AND idempotency_key = :key""")
 				.param("merchantId", merchantId)
 				.param("type", type)
 				.param("key", key)
-				.query(JournalEntity.class)
+				.query(JournalRepo::journal)
 				.optional();
+	}
+
+	private static JournalEntity journal(final ResultSet rs, final int row) throws SQLException {
+		return new JournalEntity(rs.getObject("id", UUID.class), rs.getObject("merchant_id", UUID.class),
+				rs.getString("type"), rs.getString("status"), rs.getString("idempotency_key"),
+				rs.getString("request_hash"), rs.getString("reference"),
+				rs.getObject("created", OffsetDateTime.class).toInstant());
 	}
 
 }

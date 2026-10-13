@@ -1,5 +1,5 @@
 package io.ezeebit.ledger.domain;
 
 public enum AccountType {
-	MERCHANT, PLATFORM_DEPOSIT_CLEARING
+	MERCHANT, PLATFORM_DEPOSIT_CLEARING, PLATFORM_FX
 }

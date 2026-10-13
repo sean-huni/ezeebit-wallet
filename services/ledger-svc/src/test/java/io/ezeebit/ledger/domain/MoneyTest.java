@@ -97,4 +97,26 @@ class MoneyTest {
 		assertThat(negated).isEqualTo(new Money(new BigDecimal("-7.25"), ZAR.code()));
 	}
 
+	@Test
+	void debitLeavesTheRemainder() {
+		assertThat(Money.parse("100.00", ZAR).debit(Money.parse("100.00", ZAR)).isZero()).isTrue();
+		assertThat(Money.parse("100.00", ZAR).debit(Money.parse("0.01", ZAR)).amount()).isEqualByComparingTo("99.99");
+	}
+
+	@Test
+	void debitBeyondTheBalanceIsInsufficientFunds() {
+		Money balance = Money.parse("100.00", ZAR);
+
+		assertThatThrownBy(() -> balance.debit(Money.parse("100.01", ZAR)))
+				.isInstanceOf(LedgerException.class)
+				.extracting("code").isEqualTo(ErrorCode.INSUFFICIENT_FUNDS);
+	}
+
+	@Test
+	void debitInAnotherCurrencyIsAMismatch() {
+		assertThatThrownBy(() -> Money.parse("100.00", ZAR).debit(Money.parse("1.000000", USDT)))
+				.isInstanceOf(LedgerException.class)
+				.extracting("code").isEqualTo(ErrorCode.CURRENCY_MISMATCH);
+	}
+
 }

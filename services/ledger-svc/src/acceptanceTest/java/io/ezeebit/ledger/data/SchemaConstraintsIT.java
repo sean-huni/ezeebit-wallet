@@ -92,6 +92,32 @@ class SchemaConstraintsIT {
 				.hasMessageContaining("ck_entry_amount_nonzero");
 	}
 
+	@Test
+	void voidMarkerOnADepositIsRefused() {
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference)
+				VALUES (:id, :merchant, 'DEPOSIT', 'VOID', 'k', 'h', 'r')""")
+				.param("id", UUID.randomUUID()).param("merchant", UUID.randomUUID()).update())
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_journal_status");
+	}
+
+	@Test
+	void voidMarkerHoldsTheConversionIdentityAgainstALatePosting() {
+		UUID merchant = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference)
+				VALUES (:id, :merchant, 'CONVERSION', 'VOID', 'c-1', 'h', 'r')""")
+				.param("id", UUID.randomUUID()).param("merchant", merchant).update();
+
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO journal (id, merchant_id, type, status, idempotency_key, request_hash, reference)
+				VALUES (:id, :merchant, 'CONVERSION', 'POSTED', 'c-1', 'h', 'r')""")
+				.param("id", UUID.randomUUID()).param("merchant", merchant).update())
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("uq_journal_idempotency");
+	}
+
 	private int insertEntry(final UUID account, final String currency) {
 		return jdbc.sql("""
 				INSERT INTO entry (id, journal_id, account_id, currency, amount)

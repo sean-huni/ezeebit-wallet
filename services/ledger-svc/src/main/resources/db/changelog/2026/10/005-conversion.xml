@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Task 2. Widens the CHECKs of 002 and 003 in a new changeset: applied changesets are never edited. -->
+    <changeSet id="005-account-type-fx" author="ledger-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'ck_account_type' AND pg_get_constraintdef(oid) LIKE '%PLATFORM_FX%'</sqlCheck>
+        </preConditions>
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE account DROP CONSTRAINT ck_account_type;
+ALTER TABLE account ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING', 'PLATFORM_FX'));</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE account DROP CONSTRAINT ck_account_type;
+ALTER TABLE account ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING'));</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="005-journal-checks-conversion" author="ledger-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'ck_journal_type' AND pg_get_constraintdef(oid) LIKE '%CONVERSION%'</sqlCheck>
+        </preConditions>
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE journal DROP CONSTRAINT ck_journal_type, DROP CONSTRAINT ck_journal_status;
+ALTER TABLE journal ADD CONSTRAINT ck_journal_type CHECK (type IN ('DEPOSIT', 'CONVERSION'));
+ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED', 'VOID') AND (status = 'POSTED' OR type = 'CONVERSION'));</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE journal DROP CONSTRAINT ck_journal_type, DROP CONSTRAINT ck_journal_status;
+ALTER TABLE journal ADD CONSTRAINT ck_journal_type CHECK (type IN ('DEPOSIT'));
+ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED'));</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="005-account-seed-fx" author="ledger-svc">
+        <comment>One platform FX account per currency, with fixed ids: the platform's open position per currency.</comment>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000001"/><column name="currency" value="ZAR"/><column name="type" value="PLATFORM_FX"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000002"/><column name="currency" value="NGN"/><column name="type" value="PLATFORM_FX"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000003"/><column name="currency" value="KES"/><column name="type" value="PLATFORM_FX"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000004"/><column name="currency" value="USDT"/><column name="type" value="PLATFORM_FX"/></insert>
+        <insert tableName="account"><column name="id" value="00000000-0000-0000-0002-000000000005"/><column name="currency" value="USDC"/><column name="type" value="PLATFORM_FX"/></insert>
+        <rollback><delete tableName="account"><where>type = 'PLATFORM_FX'</where></delete></rollback>
+    </changeSet>
+
+</databaseChangeLog>

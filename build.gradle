@@ -168,7 +168,7 @@ tasks.register('generateOpenApiSnapshots') {
 	dependsOn openApiServices.collect { ":services:${it}:generateOpenApiSnapshots" }
 }
 
-// Quality gates, one convention for every service. README "Quality gates" says what each reads and fails on.
+// Quality gates, one convention for every service. docs/quality-gates.md says what each reads and fails on.
 // Floors sit a few points under a measured run; checkCoverageFloors fails when one drifts more than
 // coverageBand below it, so they ratchet up. A service with no branches declares no BRANCH floor.
 def coverageFloors = [
@@ -420,7 +420,7 @@ tasks.register('sonarAll') {
 	}
 }
 
-// Supply chain. README "Supply-chain gate" says what each stage reads and what fails the verdict.
+// Supply chain. docs/supply-chain.md says what each stage reads and what fails the verdict.
 // Paketo is the only image path: no Dockerfile exists to drift from it.
 configure(services) {
 	tasks.named('bootBuildImage') {

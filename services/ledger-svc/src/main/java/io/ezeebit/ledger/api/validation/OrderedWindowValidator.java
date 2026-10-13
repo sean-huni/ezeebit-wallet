@@ -1,5 +1,7 @@
 package io.ezeebit.ledger.api.validation;
 
+import java.time.Instant;
+
 import io.ezeebit.ledger.dto.req.StatementReq;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -9,7 +11,12 @@ public class OrderedWindowValidator implements ConstraintValidator<OrderedWindow
 
 	@Override
 	public boolean isValid(final StatementReq request, final ConstraintValidatorContext context) {
-		if (request == null || request.from() == null || request.to() == null || request.from().isBefore(request.to())) {
+		if (request == null) {
+			return true;
+		}
+		Instant from = request.from();
+		Instant to = request.to();
+		if (from == null || to == null || from.isBefore(to)) {
 			return true;
 		}
 		context.disableDefaultConstraintViolation();

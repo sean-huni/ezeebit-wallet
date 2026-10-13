@@ -2,6 +2,7 @@ package io.ezeebit.ledger.service;
 
 import java.util.UUID;
 
+import io.ezeebit.ledger.common.RequestFingerprint;
 import io.ezeebit.ledger.data.model.JournalEntity;
 import io.ezeebit.ledger.data.repo.JournalRepo;
 import io.ezeebit.ledger.domain.JournalStatus;
@@ -35,7 +36,7 @@ public class ConversionReplayer {
 		if (JournalStatus.VOID.name().equals(stored.status())) {
 			throw new LedgerException(ErrorCode.CONVERSION_VOIDED, "conversionId", conversionId.toString());
 		}
-		if (!stored.requestHash().equals(requestHash)) {
+		if (!RequestFingerprint.sameHash(stored.requestHash(), requestHash)) {
 			throw new LedgerException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "conversionId", conversionId.toString());
 		}
 		return stored.id();

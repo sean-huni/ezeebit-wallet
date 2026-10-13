@@ -3,6 +3,7 @@ package io.ezeebit.conversion.outbound.ledger;
 import java.util.Map;
 import java.util.UUID;
 
+import io.ezeebit.conversion.common.LogText;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,7 @@ public class LedgerClient {
 			return request.get().exchange((req, resp) -> mapper.toDomain(resp.getStatusCode().value(), read(resp)));
 		}
 		catch (RestClientException ex) {
-			LOG.warn("ledger outcome unknown: {}", ex.getMessage());
+			LOG.warn("ledger outcome unknown: {}", LogText.oneLine(ex.getMessage()));
 			return LedgerAnswer.UNKNOWN;
 		}
 	}

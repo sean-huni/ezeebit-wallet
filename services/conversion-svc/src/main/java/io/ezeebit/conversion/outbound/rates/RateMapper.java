@@ -17,16 +17,20 @@ public class RateMapper {
 	private static final int MAX_RATE_DECIMALS = 14;
 
 	public MarketRate toDomain(final RateDto dto, final String base, final String quote) {
-		if (dto == null || !base.equals(dto.base()) || !quote.equals(dto.quote()) || dto.rate() == null
-				|| dto.timestamp() == null) {
+		if (dto == null) {
+			throw RateValidator.rejected(RateRejection.RATE_MALFORMED);
+		}
+		String rateText = dto.rate();
+		String timestamp = dto.timestamp();
+		if (!base.equals(dto.base()) || !quote.equals(dto.quote()) || rateText == null || timestamp == null) {
 			throw RateValidator.rejected(RateRejection.RATE_MALFORMED);
 		}
 		try {
-			BigDecimal rate = new BigDecimal(dto.rate());
+			BigDecimal rate = new BigDecimal(rateText);
 			if (rate.stripTrailingZeros().scale() > MAX_RATE_DECIMALS) {
 				throw RateValidator.rejected(RateRejection.RATE_MALFORMED);
 			}
-			return new MarketRate(base, quote, rate, Instant.parse(dto.timestamp()));
+			return new MarketRate(base, quote, rate, Instant.parse(timestamp));
 		}
 		catch (NumberFormatException | DateTimeParseException ex) {
 			throw RateValidator.rejected(RateRejection.RATE_MALFORMED);

@@ -19,6 +19,11 @@ public class RequestFingerprint {
 		return HexFormat.of().formatHex(sha256().digest(framed.toString().getBytes(StandardCharsets.UTF_8)));
 	}
 
+	// Constant time, so response timing does not reveal how much of a stored fingerprint a guess matched.
+	public static boolean sameHash(final String stored, final String candidate) {
+		return MessageDigest.isEqual(stored.getBytes(StandardCharsets.UTF_8), candidate.getBytes(StandardCharsets.UTF_8));
+	}
+
 	private static MessageDigest sha256() {
 		try {
 			return MessageDigest.getInstance("SHA-256");

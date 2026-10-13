@@ -2,6 +2,7 @@ package io.ezeebit.conversion.service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import io.ezeebit.conversion.common.ConversionMetrics;
@@ -72,8 +73,11 @@ public class QuoteService {
 		Currency sell = catalog.require(request.sell(), "sell");
 		Currency buy = catalog.require(request.buy(), "buy");
 		PairPolicy policy = catalog.policy(sell, buy);
-		boolean bySell = request.sellAmount() != null;
-		Money fixed = bySell ? Money.parse(request.sellAmount(), sell) : Money.parse(request.buyAmount(), buy);
+		String sellAmount = request.sellAmount();
+		boolean bySell = sellAmount != null;
+		// @ExactlyOneAmount guarantees buyAmount is present whenever sellAmount is not.
+		Money fixed = bySell ? Money.parse(sellAmount, sell)
+				: Money.parse(Objects.requireNonNull(request.buyAmount(), "buyAmount"), buy);
 		MarketRate rate = rates.fetch(sell.code(), buy.code());
 		Instant now = clock.instant();
 		validator.check(rate, policy,

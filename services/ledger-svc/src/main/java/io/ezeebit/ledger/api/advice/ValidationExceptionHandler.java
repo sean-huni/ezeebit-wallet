@@ -50,7 +50,7 @@ public class ValidationExceptionHandler {
 
 	@ExceptionHandler(MissingRequestHeaderException.class)
 	ProblemDetail missingHeader(final MissingRequestHeaderException ex) {
-		if (IDEMPOTENCY_KEY.equalsIgnoreCase(ex.getHeaderName())) {
+		if (IDEMPOTENCY_KEY.equals(ex.getHeaderName())) {
 			return problems.of(ErrorCode.IDEMPOTENCY_KEY_MISSING);
 		}
 		return problems.invalid(List.of(violations.typeMismatch(ex.getHeaderName())));

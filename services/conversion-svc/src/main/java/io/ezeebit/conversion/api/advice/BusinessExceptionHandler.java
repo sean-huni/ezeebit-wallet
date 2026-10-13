@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.api.advice;
 
+import io.ezeebit.conversion.common.LogText;
 import io.ezeebit.conversion.exception.ConversionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ public class BusinessExceptionHandler {
 	@ExceptionHandler(ConversionException.class)
 	ProblemDetail business(final ConversionException ex) {
 		if (ex.code().status() >= SERVER_ERROR) {
-			LOG.warn("conversion refused: {} {}", ex.getMessage(), ex.properties());
+			LOG.warn("conversion refused: {} {}", LogText.oneLine(ex.getMessage()), LogText.oneLine(ex.properties()));
 		}
 		ProblemDetail problem = problems.of(ex.code(), ex.args());
 		if (ex.field() != null) {

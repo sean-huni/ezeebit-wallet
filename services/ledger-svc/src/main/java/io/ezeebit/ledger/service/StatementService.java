@@ -27,9 +27,12 @@ public class StatementService {
 	}
 
 	public StatementResp statement(final UUID merchantId, final StatementReq request) {
-		String currency = request.currency() == null ? null : catalog.require(request.currency()).code().value();
-		int limit = request.limit() == null ? StatementReq.DEFAULT_LIMIT : request.limit();
-		long after = request.after() == null ? 0L : request.after();
+		String requested = request.currency();
+		String currency = requested == null ? null : catalog.require(requested).code().value();
+		Integer requestedLimit = request.limit();
+		int limit = requestedLimit == null ? StatementReq.DEFAULT_LIMIT : requestedLimit;
+		Long requestedAfter = request.after();
+		long after = requestedAfter == null ? 0L : requestedAfter;
 		List<StatementLineEntity> lines = entries.statement(
 				new StatementFilter(merchantId, currency, request.from(), request.to(), after, limit));
 		Map<String, Currency> currencies = catalog.all();

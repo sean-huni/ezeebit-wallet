@@ -41,13 +41,16 @@ class RateLimitPropertiesTest {
 		assertThat(limits.refillPeriod()).isEqualTo(Duration.ofSeconds(1));
 		assertThat(limits.store().host()).isEqualTo("localhost");
 		assertThat(limits.store().port()).isEqualTo(6379);
+		assertThat(limits.maxRetries()).isEqualTo(5);
 		assertThat(limits.store().timeout()).isEqualTo(Duration.ofMillis(250));
+		assertThat(limits.store().probeInterval()).isEqualTo(Duration.ofSeconds(10));
 	}
 
 	@Test
 	void aZeroCapacityFailsTheBind() {
-		Map<String, String> values = Map.of("capacity", "0", "refill-tokens", "1", "refill-period", "1s", "store.host", "h",
-				"store.port", "1", "store.password", "p", "store.timeout", "1s").entrySet().stream()
+		Map<String, String> values = Map.of("capacity", "0", "refill-tokens", "1", "refill-period", "1s", "max-retries", "1",
+				"store.host", "h", "store.port", "1", "store.password", "p", "store.timeout", "1s",
+				"store.probe-interval", "10s").entrySet().stream()
 				.collect(Collectors.toMap(entry -> "%s.%s".formatted(PREFIX, entry.getKey()), Map.Entry::getValue));
 		LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
 		validator.afterPropertiesSet();
@@ -60,7 +63,7 @@ class RateLimitPropertiesTest {
 
 	@Test
 	void thePasswordNeverReachesToString() {
-		RateLimitProperties.Store store = new RateLimitProperties.Store("h", 1, "s3cret", Duration.ofMillis(1));
+		RateLimitProperties.Store store = new RateLimitProperties.Store("h", 1, "s3cret", Duration.ofMillis(1), Duration.ofSeconds(1));
 
 		assertThat(store.toString()).doesNotContain("s3cret").contains("****");
 	}

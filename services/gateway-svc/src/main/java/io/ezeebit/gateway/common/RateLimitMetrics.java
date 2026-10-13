@@ -4,6 +4,7 @@ import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
 
+import io.ezeebit.gateway.domain.LimitOutcome;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -13,20 +14,18 @@ public final class RateLimitMetrics {
 
 	public static final String NAME = "ezeebit.gateway.ratelimit";
 
-	public enum Outcome { ALLOWED, LIMITED, UNAVAILABLE }
-
-	private final Map<Outcome, Counter> counters = new EnumMap<>(Outcome.class);
+	private final Map<LimitOutcome, Counter> counters = new EnumMap<>(LimitOutcome.class);
 
 	public RateLimitMetrics(final MeterRegistry registry) {
-		for (Outcome outcome : Outcome.values()) {
+		for (LimitOutcome outcome : LimitOutcome.values()) {
 			counters.put(outcome, Counter.builder(NAME)
-					.description("Merchant requests the edge rate limiter admitted, limited, or refused because Redis did not answer")
+					.description("Edge limiter decisions: admitted, limited, contended, refused for the store, or refused for the path")
 					.tag("outcome", outcome.name().toLowerCase(Locale.ROOT))
 					.register(registry));
 		}
 	}
 
-	public void record(final Outcome outcome) {
+	public void record(final LimitOutcome outcome) {
 		counters.get(outcome).increment();
 	}
 

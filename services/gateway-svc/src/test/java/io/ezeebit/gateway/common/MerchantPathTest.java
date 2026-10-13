@@ -43,7 +43,10 @@ class MerchantPathTest {
 	@ParameterizedTest
 	@ValueSource(strings = { "/api/v1/merchants;x=1/%s/balances", "/api/v1/merchants/%s;x=1/balances",
 		"/api/v1/merchants/%%37f9c2a1e-3b4d-4c5e-8f6a-0b1c2d3e4f5a/balances", "/api/v1/merchants/%s/../other/balances",
-		"/api/v1//merchants/%s/balances", "/api/v1/merchants/%s/./balances", "/api/v1/%%6derchants/%s/balances" })
+		"/api/v1//merchants/%s/balances", "/api/v1/merchants/%s/./balances", "/api/v1/%%6derchants/%s/balances",
+		"/%%61pi/v1/merchants/%s/balances", "/ap%%69/v1/merchants/%s/balances", "/api;x/v1/merchants/%s/balances",
+		"/api/v1/merchants/%%2e%%2e/%s/balances", "//api/v1/merchants/%s/balances", "/x/../api/v1/merchants/%s/balances",
+		"/actuator/health;x=%s", "/actuator/%%68ealth/%s" })
 	void aPathNotInCanonicalFormIsMalformed(final String template) {
 		assertThat(MerchantPath.of(template.formatted(ID)).kind()).isEqualTo(Kind.MALFORMED);
 	}

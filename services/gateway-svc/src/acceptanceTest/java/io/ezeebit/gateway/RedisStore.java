@@ -1,6 +1,7 @@
 package io.ezeebit.gateway;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,41 @@ final class RedisStore {
 		RedisStore store = new RedisStore();
 		store.container.start();
 		return store;
+	}
+
+	// Bound to a fixed host port and NOT started: the gateway can boot against an address that later answers.
+	static RedisStore onFixedPort() {
+		RedisStore store = new RedisStore();
+		store.container.setPortBindings(List.of("%d:%d".formatted(freePort(), REDIS_PORT)));
+		return store;
+	}
+
+	static int freePort() {
+		try (ServerSocket probe = new ServerSocket(0)) {
+			return probe.getLocalPort();
+		}
+		catch (IOException ex) {
+			throw new IllegalStateException(ex);
+		}
+	}
+
+	int fixedPort() {
+		return Integer.parseInt(container.getPortBindings().getFirst().split(":")[0]);
+	}
+
+	List<String> fixedArgs() {
+		return List.of("--ezeebit.gateway.rate-limit.store.host=127.0.0.1",
+				"--ezeebit.gateway.rate-limit.store.port=%d".formatted(fixedPort()),
+				"--ezeebit.gateway.rate-limit.store.password=%s".formatted(password));
+	}
+
+	void start() {
+		if (container.getContainerId() == null) {
+			container.start();
+		}
+		else {
+			container.getDockerClient().startContainerCmd(container.getContainerId()).exec();
+		}
 	}
 
 	Map<String, String> properties() {

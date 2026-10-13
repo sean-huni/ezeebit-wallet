@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import io.ezeebit.gateway.api.filter.RateLimitFilter;
 import io.ezeebit.gateway.common.RateLimitMetrics;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
+import io.ezeebit.gateway.scheduler.StorePingScheduler;
 import io.ezeebit.gateway.service.MerchantBuckets;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisClient;
@@ -24,10 +25,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(RateLimitProperties.class)
+@EnableScheduling
 class RateLimitConfig {
 
 	// After Boot's RequestContextFilter (-105), so the refusal's text follows Accept-Language.
@@ -61,6 +64,11 @@ class RateLimitConfig {
 		RedisURI uri = RedisURI.builder().withHost(store.host()).withPort(store.port())
 				.withPassword(store.password().toCharArray()).withTimeout(store.timeout()).build();
 		return new MerchantBuckets(() -> rateLimitRedis.connect(CODEC, uri), properties, System::nanoTime);
+	}
+
+	@Bean
+	StorePingScheduler storePingScheduler(final MerchantBuckets merchantBuckets, final MeterRegistry registry) {
+		return new StorePingScheduler(merchantBuckets, registry);
 	}
 
 	@Bean

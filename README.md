@@ -30,7 +30,7 @@ Boot 4.1.1, Spring Cloud 2025.1.3.
 ```
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
-HTTP), the static analysis and coverage gates, and a secrets scan (about 160 s on an 18-core laptop with dependencies and images cached; the
+HTTP), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached; the
 first run also downloads them).
 Test counts are in [SOLUTION.md](SOLUTION.md#1-tasks-chosen-and-status); the tiers and gates are
 described in [docs/quality-gates.md](docs/quality-gates.md).
@@ -214,13 +214,19 @@ served from `gateway-svc.yml` and overridable by the variables below.
 |---|---|
 | 200 with `X-RateLimit-Remaining` | admitted and forwarded |
 | **429 `RATE_LIMITED`**, `Retry-After` in whole seconds | the merchant's bucket is empty; nothing was forwarded |
-| **503 `RATE_LIMITER_UNAVAILABLE`**, `Retry-After: 1` | Redis did not answer within 250 ms (down, unreachable or stalled). The limiter fails closed: nothing is forwarded unlimited |
-| **400 `INVALID_MERCHANT_ID`** | the merchant id in the path is not a UUID, checked before Redis is touched |
-| **400 `MALFORMED_PATH`** | a path under `/api/` that is not in canonical form (`;params`, `%xx`, dot segments, `//`), which could otherwise route while being charged to another bucket |
+| **429 `RATE_LIMITED`**, `Retry-After: 1` | contention: requests for one merchant raced on its bucket and lost more than `RATE_LIMIT_MAX_RETRIES` times on a healthy Redis |
+| **503 `RATE_LIMITER_UNAVAILABLE`**, `Retry-After: 1` | Redis did not answer within 250 ms (down, unreachable, stalled, refused the password) or the limiter failed in a way nobody classified. The limiter fails closed: nothing is forwarded unlimited |
+| **400 `INVALID_MERCHANT_ID`** | the merchant id in a `/api/v1/merchants/{id}` path is not a UUID, checked before Redis is touched |
+| **400 `MALFORMED_PATH`** | ANY request path, on any route or none, that is not canonical: a `%xx` escape, a `;param`, a `.` or `..` segment, `//`, or a character outside letters, digits, `_`, `.`, `-`. The route matcher decodes and normalises paths, so such a path could reach a route uncharged |
 
-A refusal (429 or 503) is never forwarded. The `ezeebit_gateway_ratelimit_total{outcome}` counter
-counts allowed, limited and unavailable decisions, and the RateLimiterUnavailable alert pages on any
-unavailable one ([docs/observability.md](docs/observability.md#alert-rules)).
+Coverage is total by construction: once a path is canonical it is exactly the path the route matcher
+sees, every published route lives under `/api/v1/merchants/{id}/` (a test enumerates the route table
+and fails on any route outside it), and every request under `/api/v1/merchants/` is charged or refused.
+A refusal is never forwarded. `ezeebit_gateway_ratelimit_total{outcome}` counts `allowed`, `limited`,
+`contention`, `unavailable` and `refused_path`; RateLimiterUnavailable pages on any `unavailable`, and
+RateLimiterStoreDown pages when a gateway's own PING to Redis fails or no gateway reports
+([docs/observability.md](docs/observability.md#alert-rules)). A changed limit applies to every
+merchant at once: the limits are part of the bucket key, so the new value starts a new bucket.
 
 ## Configuration
 
@@ -247,6 +253,8 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 | `REDIS_PASSWORD` | redis-local | Redis `requirepass` in compose and the gateway's credential. Override outside local runs |
 | `REDIS_TIMEOUT` | 250ms | Connect and command timeout for the limiter; past it the request is 503 |
 | `RATE_LIMIT_CAPACITY`, `RATE_LIMIT_REFILL_TOKENS`, `RATE_LIMIT_REFILL_PERIOD` | 100, 20, 1s | Per-merchant burst, and the tokens refilled per period |
+| `RATE_LIMIT_MAX_RETRIES` | 5 | Compare-and-swap retries on one merchant's bucket before the request is 429 contention (at least 1) |
+| `REDIS_PROBE_INTERVAL` | 10s | How often each gateway PINGs Redis for `ezeebit_gateway_ratelimit_store_up` |
 | `GATEWAY_SHARED_SECRET` | local-gateway-proof | The `X-Ezeebit-Gateway` value the gateway adds and the services require. Override outside local runs |
 | `SLACK_WEBHOOK_URL` | empty (no Slack) | Slack incoming webhook for alerts. A secret: `.env` only |
 

@@ -1,28 +1,31 @@
 package io.ezeebit.gateway.api.filter;
 
 import java.io.IOException;
-import java.time.Duration;
 
 import io.ezeebit.gateway.common.MerchantPath;
 import io.ezeebit.gateway.common.MerchantPath.Kind;
 import io.ezeebit.gateway.common.RateLimitMetrics;
-import io.ezeebit.gateway.common.RateLimitMetrics.Outcome;
+import io.ezeebit.gateway.domain.Admission;
+import io.ezeebit.gateway.domain.LimitOutcome;
 import io.ezeebit.gateway.exception.EdgeRefusalException;
 import io.ezeebit.gateway.exception.ErrorCode;
 import io.ezeebit.gateway.service.MerchantBuckets;
-import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-// Runs before routing on every merchant path. Fails CLOSED: a store that cannot answer refuses the request,
+// Runs before routing on every request. Fails CLOSED: a store that cannot answer refuses the request,
 // because admitting it would switch the limit off exactly when Redis is the thing under strain.
 public final class RateLimitFilter extends OncePerRequestFilter {
 
 	public static final String REMAINING = "X-RateLimit-Remaining";
+
+	private static final Logger LOG = LoggerFactory.getLogger(RateLimitFilter.class);
 
 	private final MerchantBuckets buckets;
 	private final RateLimitMetrics metrics;
@@ -41,32 +44,39 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 		switch (path.kind()) {
 			case NOT_MERCHANT -> chain.doFilter(request, response);
 			case MERCHANT -> limit(path.key(), request, response, chain);
-			// Any other kind is refused, so a kind added later fails closed.
-			default -> refuse(request, response, EdgeRefusalException.of(
-					path.kind() == Kind.MALFORMED ? ErrorCode.MALFORMED_PATH : ErrorCode.INVALID_MERCHANT_ID));
+			// Any other kind is refused and counted, so probing leaves a trace and a kind added later fails closed.
+			default -> {
+				metrics.record(LimitOutcome.REFUSED_PATH);
+				refuse(request, response, EdgeRefusalException.of(
+						path.kind() == Kind.MALFORMED ? ErrorCode.MALFORMED_PATH : ErrorCode.INVALID_MERCHANT_ID));
+			}
 		}
 	}
 
 	private void limit(final String key, final HttpServletRequest request, final HttpServletResponse response,
 			final FilterChain chain) throws ServletException, IOException {
-		ConsumptionProbe probe;
+		Admission admission = admit(key);
+		metrics.record(admission.outcome());
+		switch (admission.outcome()) {
+			case ALLOWED -> {
+				response.setHeader(REMAINING, Long.toString(admission.remaining()));
+				chain.doFilter(request, response);
+			}
+			case UNAVAILABLE -> refuse(request, response,
+					new EdgeRefusalException(ErrorCode.RATE_LIMITER_UNAVAILABLE, admission.retryAfter(), null));
+			default -> refuse(request, response, new EdgeRefusalException(ErrorCode.RATE_LIMITED, admission.retryAfter(), null));
+		}
+	}
+
+	// The last line of fail-closed: a failure nobody classified is still a counted 503, never a 500 or a pass-through.
+	private Admission admit(final String key) {
 		try {
-			probe = buckets.tryConsume(key);
+			return buckets.tryConsume(key);
 		}
-		catch (EdgeRefusalException unavailable) {
-			metrics.record(Outcome.UNAVAILABLE);
-			refuse(request, response, unavailable);
-			return;
+		catch (RuntimeException unexpected) {
+			LOG.error("rate limiter failed unexpectedly; the request is refused with 503", unexpected);
+			return Admission.unavailable(MerchantBuckets.RETRY_AFTER);
 		}
-		if (!probe.isConsumed()) {
-			metrics.record(Outcome.LIMITED);
-			refuse(request, response, new EdgeRefusalException(ErrorCode.RATE_LIMITED,
-					Duration.ofNanos(probe.getNanosToWaitForRefill()), null));
-			return;
-		}
-		metrics.record(Outcome.ALLOWED);
-		response.setHeader(REMAINING, Long.toString(probe.getRemainingTokens()));
-		chain.doFilter(request, response);
 	}
 
 	private void refuse(final HttpServletRequest request, final HttpServletResponse response, final EdgeRefusalException refusal) {

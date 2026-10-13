@@ -64,13 +64,13 @@ What exists:
   container stands in for the rate service.
 
 **Tests.** `./gradlew clean build --rerun-tasks` on 2026-10-13, counted from the JUnit XML reports:
-**386 tests, 0 failures, 0 skipped.**
+**412 tests, 0 failures, 0 skipped.**
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
 | ledger-svc | 67 | 23 | 61 |
 | conversion-svc | 111 | 17 | 44 |
-| gateway-svc | 39 | 22 | |
+| gateway-svc | 49 | 38 | |
 | config-svc | 1 | | |
 | eureka-svc | 1 | | |
 
@@ -201,6 +201,10 @@ This is the single list; the other documents link here.
 - Redis runs as one unreplicated container with no persistence; it holds only rate-limit buckets,
   so a restart resets every merchant's bucket to full. Because the limiter fails closed, Redis being
   down stops every merchant call (paged as RateLimiterUnavailable).
+- A changed rate limit starts a new bucket per merchant (the limits are part of the key), so each
+  active merchant gets one full bucket at the change, and two buckets while a rolling deploy runs
+  old and new limits side by side.
+- Bucket4j refills from each gateway's wall clock: unsynchronised clocks admit extra tokens.
 - The rate-limit key is the merchant id from the path, which the client chooses. With no
   authentication a caller can spread load over many merchant ids; a limit keyed on the verified
   caller needs the token the brief puts out of scope. Only the shape of the key is bounded (a UUID).
@@ -235,8 +239,8 @@ This is the single list; the other documents link here.
   not with two running conversion-svc instances.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
-- RateLimiterUnavailable was rehearsed once locally; its rule has no unit test (no `promtool` in the
-  build), like the other rules.
+- RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither rule has
+  a unit test (no `promtool` in the build), like the other rules.
 
 **Not built**
 

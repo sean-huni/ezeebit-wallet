@@ -39,9 +39,13 @@ ezeebit:
       capacity: ${RATE_LIMIT_CAPACITY:100}
       refill-tokens: ${RATE_LIMIT_REFILL_TOKENS:20}
       refill-period: ${RATE_LIMIT_REFILL_PERIOD:1s}
+      # Compare-and-swap retries on one hot key before the request is answered 429 as contention, not 503.
+      max-retries: ${RATE_LIMIT_MAX_RETRIES:5}
       store:
         host: ${REDIS_HOST:localhost}
         port: ${REDIS_PORT:6379}
         password: ${REDIS_PASSWORD:redis-local}
         # Per command and per connect: past it the request is refused with 503, never waited on.
         timeout: ${REDIS_TIMEOUT:250ms}
+        # How often each gateway PINGs Redis for ezeebit_gateway_ratelimit_store_up.
+        probe-interval: ${REDIS_PROBE_INTERVAL:10s}

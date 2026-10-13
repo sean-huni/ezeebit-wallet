@@ -106,13 +106,29 @@ bucket in Redis (Lettuce, compare-and-swap). The design follows from three const
   makes the real limit capacity x replicas, and an autoscaler adds replicas exactly when traffic
   spikes, loosening the limit when it matters. `SharedBucketIT` runs two gateway contexts on one
   Redis: a burst split across both admits exactly the capacity, and goes red (8 admitted of a
-  capacity of 4) when the store is swapped for an in-heap bucket.
-- *Bounded keys.* The key is `gateway:ratelimit:merchant:<uuid>`, lower-cased, built only from a
-  strict UUID; anything else is 400 before Redis is touched, so a client cannot write arbitrary keys.
-  The limiter reads the raw request URI and refuses any `/api/` path that is not canonical
-  (`;params`, `%xx`, dot segments, `//`) with 400 `MALFORMED_PATH`: the route matcher ignores
-  `;params` and decodes `%xx`, so such a path could reach a service while charged to another bucket.
-  Keys expire 10 s after their bucket would be full again, so Redis forgets merchants who stopped.
+  capacity of 4) when the store is swapped for an in-heap bucket. Bucket4j computes refill from each
+  replica's wall clock, so NTP is a dependency: replicas skewed by d admit up to d x refill rate extra
+  per bucket.
+- *Every route is charged.* The limiter decides on the raw request URI only after proving it
+  canonical, on EVERY request: a `%xx` escape, a `;param`, a `.` or `..` segment, `//`, or any
+  character outside letters, digits, `_`, `.`, `-` is 400 `MALFORMED_PATH`. A canonical raw path is
+  exactly the decoded, normalised path the route matcher sees, so `/%61pi/...` or `/api;x=1/...`
+  cannot reach a route uncharged (a review measured both reaching the ledger before this rule).
+  Every published route lives under `/api/v1/merchants/{id}/`, and `RouteCoverageIT` enumerates the
+  served route table and fails on any route the limiter would not charge.
+- *Bounded keys.* The key is `gateway:ratelimit:<capacity>-<refill>-<period ms>:merchant:<uuid>`,
+  lower-cased, built only from a strict UUID; anything else is 400 before Redis is touched, so a
+  client cannot write arbitrary keys. Keys expire 10 s after their bucket would be full again.
+  The limits are in the key because Bucket4j replaces a stored configuration only for a higher
+  version, which a value derived from the limits cannot promise (lowering a limit could hash lower).
+  A changed limit therefore starts a fresh bucket at the new capacity for every merchant at once; the
+  cost is one full bucket granted at the change, and two buckets per merchant while a rolling deploy
+  runs both configurations.
+- *Contention is not an outage.* Concurrent requests for one merchant race on a compare-and-swap. A
+  request that loses more than `max-retries` (default 5) times on a healthy Redis is 429
+  `RATE_LIMITED`, counted as `contention`, and never pages. Only a Redis error (refused, reset, a
+  command past 250 ms, a bad password) is `unavailable`. `ContentionIT` hammers one key through two
+  gateways and requires 200 or 429, never 503.
 - *Fail closed.* Redis that is down, unreachable or stalled answers **503
   `RATE_LIMITER_UNAVAILABLE`** with `Retry-After: 1`, and the request is never forwarded. Admitting
   would switch the limit off exactly when the store is under strain, which is when abuse is most
@@ -125,7 +141,10 @@ bucket in Redis (Lettuce, compare-and-swap). The design follows from three const
 
 Limits are per merchant: 100 burst, 20 a second sustained, from served config. 429
 `RATE_LIMITED` carries `Retry-After` rounded up to whole seconds. Outcomes are counted in
-`ezeebit_gateway_ratelimit_total{outcome}` (allowed, limited, unavailable; no merchant tag).
+`ezeebit_gateway_ratelimit_total{outcome}` (allowed, limited, contention, unavailable, refused_path;
+no merchant tag). Any failure in the limiter path nobody classified is a counted 503, never a 500.
+Each gateway also PINGs Redis every 10 s and publishes `ezeebit_gateway_ratelimit_store_up` (1 or
+0), read with `min()` across replicas, so RateLimiterStoreDown pages without needing traffic.
 
 **Gateway proof header (defence in depth only).** Every route removes any client-sent
 `X-Ezeebit-Gateway` header and adds its own, whose value is `GATEWAY_SHARED_SECRET`, served by
@@ -424,7 +443,9 @@ publishes v1 only.
 |---|---|---|
 | A domain service down, unregistered or refusing | gateway 503 `UPSTREAM_UNAVAILABLE` | yes |
 | Upstream resets, or silent for 10 s | gateway 504 `UPSTREAM_OUTCOME_UNKNOWN` | yes |
-| Redis down, unreachable, stalled, or away at the gateway's boot | merchant routes 503 `RATE_LIMITER_UNAVAILABLE` within the 250 ms timeout, nothing forwarded; health stays UP; admitted again once Redis answers | yes: stopped mid-run, paused, absent at boot; recovery only in a live run (admitted within a second of `docker compose start redis`) |
+| Redis down, unreachable, stalled, or away at the gateway's boot | merchant routes 503 `RATE_LIMITER_UNAVAILABLE` within the 250 ms timeout, nothing forwarded; health stays UP; admitted again once Redis answers; RateLimiterStoreDown pages | yes: stopped mid-run, paused, absent at boot; recovery within 2.5 s after a late start and after a kill and restart (red with a 10 s connect back-off, and with Lettuce's default reconnect delay) |
+| Many concurrent requests for one merchant | compare-and-swap losers past `max-retries` are 429 contention, never 503 | yes: one key through two gateways |
+| A non-canonical path (`%xx`, `;param`, dot segment, `//`) | 400 `MALFORMED_PATH` on any path, counted `refused_path` | yes: encoded spellings of an exhausted route are 400 or 404, never 200 |
 | A merchant over its limit | 429 `RATE_LIMITED` with `Retry-After`, nothing forwarded | yes: burst of capacity + 1, and split across two gateways |
 | config-svc or eureka-svc down | running services keep their config and last registry; a restarting service cannot boot | no (framework behaviour) |
 | Postgres down | the affected service fails its requests; nothing is half-written, every posting is one transaction | no (by design) |

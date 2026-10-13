@@ -13,6 +13,8 @@ import io.ezeebit.gateway.api.filter.RateLimitFilter;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -107,9 +109,40 @@ class RateLimitIT {
 		UUID merchant = UUID.randomUUID();
 		get(gateway, "/api/v1/merchants/%s/balances".formatted(merchant));
 
-		long ttl = Long.parseLong(store.cli("PTTL", "gateway:ratelimit:merchant:%s".formatted(merchant)));
+		List<String> keys = List.of(store.cli("--scan", "--pattern", "gateway:ratelimit:*merchant:%s".formatted(merchant)).split("\\s+"));
+		assertThat(keys).hasSize(1);
+		long ttl = Long.parseLong(store.cli("PTTL", keys.getFirst()));
 
 		assertThat(ttl).as("-1 is no expiry, -2 is no key").isPositive();
+	}
+
+	// The route matcher decodes %xx and drops ;params, so each of these would reach the same route uncharged.
+	@ParameterizedTest
+	@ValueSource(strings = { "/%%61pi/v1/merchants/%s/balances", "/ap%%69/v1/merchants/%s/balances", "/api;x=1/v1/merchants/%s/balances",
+		"/api/v1/merchants;x=1/%s/balances", "/api/v1/merchants/%s/%%62alances", "//api/v1/merchants/%s/balances",
+		"/api/v1/merchants/%%2e%%2e/merchants/%s/balances", "/x/../api/v1/merchants/%s/balances", "/API/v1/merchants/%s/balances" })
+	void noSpellingOfAnExhaustedRouteIsAdmitted(final String variant) {
+		UUID merchant = UUID.randomUUID();
+		for (int i = 0; i <= CAPACITY; i++) {
+			get(gateway, "/api/v1/merchants/%s/balances".formatted(merchant));
+		}
+		assertThat(get(gateway, "/api/v1/merchants/%s/balances".formatted(merchant)).getStatusCode().value()).isEqualTo(429);
+		int forwarded = upstream.hits();
+
+		ResponseEntity<String> reply = get(gateway, variant.formatted(merchant));
+
+		assertThat(reply.getStatusCode().value()).as(reply.getBody()).isIn(400, 404, 429);
+		assertThat(upstream.hits()).as("forwarded uncharged").isEqualTo(forwarded);
+	}
+
+	@Test
+	void aRefusedPathIsCounted() {
+		double before = Gateways.outcomes(gateway).getOrDefault("refused_path", 0.0);
+
+		get(gateway, "/api/v1/merchants/not-a-uuid/balances");
+		get(gateway, "/%61pi/v1/merchants/x/balances");
+
+		assertThat(Gateways.outcomes(gateway)).containsEntry("refused_path", before + 2);
 	}
 
 	@Test

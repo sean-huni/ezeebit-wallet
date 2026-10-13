@@ -32,6 +32,12 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		}
 	}
 
+	// Property names from spring-boot-dependencies-4.1.1.pom; gradle.properties names the CVEs each one clears.
+	ext['tomcat.version'] = tomcatVersion
+	ext['jackson-bom.version'] = jackson3Version
+	ext['jackson-2-bom.version'] = jackson2Version
+	ext['freemarker.version'] = freemarkerVersion
+
 	// One copy of the OTLP wiring compiled into each service jar; see observability/.
 	sourceSets {
 		main {

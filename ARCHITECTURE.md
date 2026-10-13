@@ -452,7 +452,7 @@ The rest of 12-factor is followed: config comes from the environment with commit
 - Alerts reach one Slack channel and there is no on-call rota: a 3am alert reaches a channel, not a person.
 - Nothing watches the monitoring stack: rules are evaluated inside the same lgtm container, so if it dies nothing pages.
 - HighErrorRate has no minimum-traffic guard: one 500 in a quiet minute reads as 100%. It was seen firing once, in a local forced-5xx run with Slack disconnected (ledger-svc stopped, gateway answering 503): Pending t+20s, Alerting t+140s on gateway-svc.
-- `checkSupplyChain` fails at this commit on nine fixable HIGH or CRITICAL CVEs in Boot-managed jars: `tomcat-embed-core` 11.0.24, `jackson-core`/`jackson-databind` 3.1.5 and 2.21.5, and `freemarker` 2.3.34 in eureka-svc. The fix is a version override or the next Boot patch, and nothing is suppressed.
+- Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear fixable CVEs (`gradle.properties`); each override must be dropped once Boot catches up, or it will hold a version back.
 - trivy has no compose checks, so the misconfiguration stage reads `compose.yaml` and `docker/` and recognises none of them: it reports, it does not yet inspect.
 - No OpenAPI schema.
 - One Postgres container hosts both databases: logically separate, but one shared failure domain.

@@ -67,8 +67,9 @@ What exists and is verified:
 - A supply-chain gate (README "Supply-chain gate"): `checkSecrets` runs gitleaks over every ref's
   history and gitleaks plus trivy over the tree on every build; `checkSupplyChain` builds one Paketo
   image per service, writes a CycloneDX SBOM for each and fails on a HIGH or CRITICAL finding with a
-  published fix in a layer this repository builds. On 2026-10-13 it fails on nine such CVEs in jars
-  Spring Boot 4.1.1 manages (Tomcat, Jackson, FreeMarker); they are recorded, not suppressed.
+  published fix in a layer this repository builds. Its first run failed on nine such CVEs in jars
+  Spring Boot 4.1.1 manages; patch overrides (Tomcat 11.0.26, Jackson 3.1.7 and 2.21.7, FreeMarker
+  2.3.35) cleared them, and it passes with nothing suppressed.
 - `./gradlew clean build` passes: 303 tests, 0 failures. The ledger runs three tiers: 63 unit tests
   (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
   real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 106 unit tests

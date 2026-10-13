@@ -133,14 +133,15 @@ CRITICAL **and** has a published fix **and** sits in a SERVICE layer. Everything
 `security/trivy-ignore.yaml` starts with no vulnerability entries; an entry without an
 `expired_at` and a `statement` fails the gate.
 
-**State at 2026-10-13 (trivy DB of that day): FAILED, on real findings, nothing suppressed.** Nine
-CVEs meet all three clauses, all in jars that Spring Boot 4.1.1 manages:
-`tomcat-embed-core` 11.0.24 (three CRITICAL, fixed in 11.0.25), `freemarker` 2.3.34 (one CRITICAL,
-eureka-svc only, fixed in 2.3.35), and `jackson-core`/`jackson-databind` 3.1.5 and 2.21.5 (five HIGH,
-fixed in 3.1.7 and 2.21.7). Spring Boot 4.1.1 was the newest 4.1.x on Maven Central that day. The
-fix is a dependency-version change, a separate decision from adding the gate. The SHARED HIGH
-findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers) belong to the
-builder pin. The misconfiguration stage ran, and trivy recognised none of the 11 files as a format
+**State at 2026-10-13 (trivy DB of that day): PASSED, nothing suppressed.** The first run failed
+on nine CVEs in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides of Boot's own
+properties in the root `build.gradle` (`tomcat.version`, `jackson-bom.version`,
+`jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties` with the CVEs it
+clears: Tomcat 11.0.26, Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders
+with it, so it is overridden, not excluded). Drop each override once Boot manages that version or
+newer. One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka
+client, in three images. The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net`
+in buildpack helpers) belong to the builder pin. The misconfiguration stage ran, and trivy recognised none of the 11 files as a format
 it checks (it has no compose checks), so it reports zero checks rather than a clean bill.
 
 ### SAST and SCA read different things

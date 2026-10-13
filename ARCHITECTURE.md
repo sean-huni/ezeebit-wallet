@@ -2,7 +2,7 @@
 
 How the system is shaped and why. README.md covers running it; SOLUTION.md covers task choice, trade-offs and how tasks 3 to 6 slot in.
 
-**Built vs designed.** At this commit the repository contains the running skeleton only: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service, with Liquibase wired and no changesets yet. Every business endpoint, table and flow in sections 4 to 7 is **designed, not yet implemented**. Where a sentence describes something that exists, it says so.
+**Built vs designed.** At this commit the repository contains the running skeleton only: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service, with Liquibase wired and no changesets yet; local observability and alerting (section 3). Every business endpoint, table and flow in sections 4 to 7 is **designed, not yet implemented**. Where a sentence describes something that exists, it says so.
 
 ## 1. How the design was derived
 
@@ -59,7 +59,6 @@ A context earns its own service only if it passes all three tests:
 
 - Identity and authentication: out of scope per the brief. `merchantId` is a path variable.
 - A notification service and Redis: nothing in tasks 1 and 2 needs them (Redis would only back gateway rate limiting, which is not requested).
-- Observability: next on the list (OTLP export to a Grafana LGTM stack with dashboards and alerting). Nothing is wired yet.
 
 ## 3. Runtime topology
 
@@ -87,6 +86,9 @@ A context earns its own service only if it passes all three tests:
      config-svc :8888  (Spring Cloud Config, native backend, serves served/*.yml)
      eureka-svc :8761  (service registry)
    ledger, conversion and gateway fetch config from config-svc and register with eureka-svc on boot.
+
+   observability: lgtm :3000 Grafana, :4317/:4318 OTLP (grafana/otel-lgtm:0.36.0)
+     every service pushes metrics, traces and logs to :4318 over OTLP/HTTP.
 ```
 
 | Service | Port | Role | Exists today |
@@ -96,8 +98,9 @@ A context earns its own service only if it passes all three tests:
 | conversion-svc | 8082 | Task 2: quotes and conversions | skeleton: as above |
 | config-svc | 8888 | Spring Cloud Config Server, native backend | yes |
 | eureka-svc | 8761 | Eureka service registry | yes |
+| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Tempo, Loki, OTLP collector (one container) | yes |
 
-Each port lives only in that service's own `application.yml` as `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there.
+Each service port lives only in that service's own `application.yml` as `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there. The lgtm ports are fixed in `compose.yaml`.
 
 Published route table (`services/config-svc/src/main/resources/served/gateway-svc.yml`). Only these paths reach a service:
 
@@ -119,6 +122,28 @@ Without it all three reached the client as 500, which reads as a gateway bug. Tw
 **Registry timings, built.** Eureka's server response cache is 5s (default 30s), clients fetch the registry every 5s (default 30s), and the gateway's load-balancer instance cache is disabled. With defaults, a fresh fleet could not route for up to about a minute, and a dead instance stayed routable for longer.
 
 **Database per service, built.** `docker/postgres/initdb/01-databases.sql` creates role `ledger` owning database `ledger` and role `conversion` owning database `conversion`, and revokes `CONNECT` on each database from `PUBLIC`. Neither role can even connect to the other's database. The only path from conversion to ledger data is the ledger's HTTP API. There are no cross-database foreign keys: conversion stores merchant and account references as plain UUIDs.
+
+**Observability, built.** One `grafana/otel-lgtm:0.36.0` container runs Grafana, Prometheus, Tempo, Loki and an OTLP collector. Every service exports over OTLP/HTTP to :4318: metrics on a 10 s step, traces sampled at 100%, and logs, where a line logged inside a request carries its `trace_id`. Each JVM is its own series: `service.instance.id` is `host:port`, so two instances of one service never write into one Prometheus series. Dashboards and alert rules are provisioned from files in `docker/lgtm/`.
+
+### Alerting
+
+| Rule | Condition | Fires |
+|---|---|---|
+| ServiceDown | `absent_over_time` over a pushed JVM metric, 30 s window, one term per service (`absent()` would wait out the 5 min lookback, because a pushed series gets no staleness marker) | after 1 min; one alert per service |
+| HighErrorRate | a service's 5xx share of requests above 5% | after 2 min |
+
+The Slack contact point is installed only when `SLACK_WEBHOOK_URL` is set: Grafana refuses to start on a Slack contact point with an empty URL. Grafana's own database lives on tmpfs, because everything in it is provisioned from files and a Pending alert persisted at shutdown fired the instant the next boot evaluated a still-booting fleet. Before that fix a restart produced 4 false pages (reproduced with Slack disconnected); after it the same script produced 0, and a boot produces 0 notifications.
+
+Rehearsed outage, measured once with Slack live on a local run (counts from Grafana's `grafana_alerting_notifications_total` counters):
+
+| Event | Time |
+|---|---|
+| conversion-svc stopped | t+0s |
+| ServiceDown Pending | t+46s |
+| Alerting | t+104s |
+| Delivered to Slack (sent=1, failed=0); service restored | t+115s |
+| Normal | t+146s |
+| RESOLVED delivered (sent=2, failed=0) | t+175s |
 
 ## 4. Ledger design (Task 1)
 
@@ -194,7 +219,7 @@ The stored identity is (`merchant_id`, `type`, key), never the key alone, so two
 **Quote.** `POST /api/v1/merchants/{id}/quotes` with `{sell, buy, sellAmount | buyAmount}`:
 
 1. Call the exchange-rate service with a short timeout (about 2s).
-2. Validate the rate: positive; fresh (source timestamp within N seconds); inside the pair's configured sanity band (min/max, served by config-svc). If the most recent quote for the pair is younger than N minutes (about 5), also within X% of its market `rate`, read from the `quote` table (no separate store). Otherwise band and freshness alone apply, so one refused rate cannot lock a pair out for ever. Repeated refusals for a pair are a future alert (observability is not built yet).
+2. Validate the rate: positive; fresh (source timestamp within N seconds); inside the pair's configured sanity band (min/max, served by config-svc). If the most recent quote for the pair is younger than N minutes (about 5), also within X% of its market `rate`, read from the `quote` table (no separate store). Otherwise band and freshness alone apply, so one refused rate cannot lock a pair out for ever. Repeated refusals for a pair are a future alert: the alerting path now exists, the rule is not written.
 3. Apply the spread in the platform's favour.
 4. Round in the platform's favour, by at most one minor unit: for a `sellAmount` quote, the buy amount the merchant receives rounds **down** to the buy currency's scale; for a `buyAmount` quote, the sell amount the merchant pays rounds **up** to the sell currency's scale.
 5. Persist with a short TTL (about 15s) and return `quoteId`, `appliedRate`, both amounts and `expiresAt`.
@@ -280,7 +305,7 @@ No saga and no compensation are needed because the only money movement is one at
 
 ## 8. Single repository and the 12-factor trade-off
 
-All five services live in one repository with one Gradle build root. That departs from 12-factor's "one codebase per app" (https://12factor.net/codebase). It was chosen because the deliverable is a single repository that must build and run with one command. The cost is contained: services share no code, no database and no runtime, and each ships as its own jar. The root `build.gradle` holds shared build conventions only; each `services/<svc>/build.gradle` lists only its dependencies. Splitting into one repository per service later is a mechanical move.
+All five services live in one repository with one Gradle build root. That departs from 12-factor's "one codebase per app" (https://12factor.net/codebase). It was chosen because the deliverable is a single repository that must build and run with one command. The cost is contained: services share no business code, no database and no runtime, and each ships as its own jar. The one shared code is `observability/` (a logback-to-OpenTelemetry bridge class and its config), compiled into each jar rather than published as a library. The root `build.gradle` holds shared build conventions only; each `services/<svc>/build.gradle` lists only its dependencies. Splitting into one repository per service later is a mechanical move.
 
 The rest of 12-factor is followed: config comes from the environment with committed working defaults (a clean clone runs with no `.env`), backing services are attached by URL (`DB_URL`, `CONFIG_SERVER_URL`, `EUREKA_URL`), and processes hold no state of their own (quotes live in the database, not in memory).
 
@@ -291,7 +316,10 @@ The rest of 12-factor is followed: config comes from the environment with commit
 - No business endpoints, tables or domain code: the Liquibase changelogs are empty.
 - No concurrency, idempotency or reconciliation tests yet; the 6 existing tests cover boot and gateway routing.
 - No exchange-rate client or local stub for the rate feed.
-- No observability (metrics, traces, dashboards, alerting).
+- Alerts reach one Slack channel and there is no on-call rota: a 3am alert reaches a channel, not a person.
+- Nothing watches the monitoring stack: rules are evaluated inside the same lgtm container, so if it dies nothing pages.
+- No business metrics yet (postings, quotes, rate refusals): only HTTP and JVM metrics.
+- HighErrorRate has no minimum-traffic guard: one 500 in a quiet minute reads as 100%. It was seen firing once, in a local forced-5xx run with Slack disconnected (ledger-svc stopped, gateway answering 503): Pending t+20s, Alerting t+140s on gateway-svc.
 - No OpenAPI schema.
 - One Postgres container hosts both databases: logically separate, but one shared failure domain.
 - config-svc and eureka-svc run as single instances.

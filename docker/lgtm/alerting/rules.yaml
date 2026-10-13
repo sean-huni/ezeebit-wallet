@@ -1,0 +1,71 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: ezeebit
+    folder: Ezeebit alerts
+    interval: 10s
+    rules:
+      - uid: ezeebit-service-down
+        title: ServiceDown
+        condition: B
+        # 30s = 3 export steps. One term per service, so each down service is its own alert;
+        # a fleet that never booted pages too. absent() would wait out the 5m lookback.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 60, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                absent_over_time(jvm_threads_live{job="config-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="eureka-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="ledger-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="conversion-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="gateway-svc"}[30s])
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # Every service exporting returns no series: that is the healthy state.
+        noDataState: OK
+        execErrState: Error
+        # Longer than a fleet boot (about 30s from Grafana ready to the last first sample).
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.job }} has exported no metrics for 30s'
+      - uid: ezeebit-high-error-rate
+        title: HighErrorRate
+        condition: B
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 120, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (job) (rate(http_server_requests_milliseconds_count{status=~"5.."}[1m]))
+                / sum by (job) (rate(http_server_requests_milliseconds_count[1m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0.05]}
+        # No 5xx anywhere returns no series.
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.job }} answers more than 5% of requests with 5xx'

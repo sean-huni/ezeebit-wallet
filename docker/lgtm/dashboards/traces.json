@@ -1,0 +1,21 @@
+{
+  "uid": "ezeebit-traces",
+  "title": "Traces",
+  "tags": ["ezeebit"],
+  "schemaVersion": 41,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "links": [{"type": "link", "title": "Explore traces", "url": "/explore?left=%7B%22datasource%22:%22tempo%22%7D", "targetBlank": true}],
+  "templating": {"list": [
+    {"name": "service", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "query": {"query": "label_values(jvm_threads_live, job)", "refId": "service"},
+     "refresh": 2, "multi": true, "includeAll": true, "current": {"text": "All", "value": "$__all"}}
+  ]},
+  "panels": [
+    {"id": 1, "type": "table", "title": "Recent traces", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 16},
+     "description": "Latest traces whose spans come from the selected services. Click a trace ID to open it.",
+     "datasource": {"type": "tempo", "uid": "tempo"},
+     "targets": [{"refId": "A", "queryType": "traceql", "limit": 50, "tableType": "traces",
+       "query": "{resource.service.name=~\"${service:regex}\"}"}]}
+  ]
+}

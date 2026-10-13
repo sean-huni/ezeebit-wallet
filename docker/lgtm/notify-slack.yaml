@@ -1,0 +1,18 @@
+# Grafana expands ${SLACK_WEBHOOK_URL} from its own environment: the URL never lands in a file.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: ezeebit-slack
+    receivers:
+      - uid: ezeebit-slack
+        type: slack
+        settings:
+          url: ${SLACK_WEBHOOK_URL}
+policies:
+  - orgId: 1
+    receiver: ezeebit-slack
+    group_by: [grafana_folder, alertname, job]
+    group_wait: 10s
+    # Also gates the RESOLVED message; the 5m default reports a recovered service as down for minutes.
+    group_interval: 1m
+    repeat_interval: 4h

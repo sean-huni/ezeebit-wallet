@@ -36,6 +36,8 @@ What exists and is verified:
 - Upstream failures are mapped by the gateway, not left as 500: no instance or a refused
   connection is 503 (covered by two tests); any other I/O failure (reset, timeout) is 504
   "outcome unknown: retry with the same Idempotency-Key" (not tested yet). Details name no service.
+- Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
+  service, four provisioned dashboards, two alert rules with optional Slack delivery.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
 - `./gradlew clean build` passes: 5 test suites, 6 tests, 0 failures. The ledger and conversion
   tests boot against a real Postgres via Testcontainers, so Docker is required for the build.
@@ -100,7 +102,7 @@ The data model, endpoint contracts, and failure tables are in `ARCHITECTURE.md`.
 | Double-entry journal with a cached balance | A balance column updated in place | The brief asks to "trust these balances completely" and explain them "at any later date". An in-place balance cannot explain itself. The journal can, and the cached balance keeps reads cheap and is checked against the entries. Cost: more rows and more care on every posting. |
 | Firm quote with a short TTL and a spread | "Last look" (re-price at accept and reject if the market moved) | A firm quote is easier for a merchant to understand: the price shown is the price paid, or a clear "quote expired". The spread and short TTL bound the platform's exposure during the window. Last look protects the platform more but makes the merchant's price non-firm. I would revisit it if measured slippage on accepted quotes exceeded the spread. |
 | PostgreSQL | MySQL (Ezeebit's stack) | The design only uses portable features: exact `NUMERIC`, row locks with `SELECT ... FOR UPDATE`, unique and `CHECK` constraints. MySQL 8 would work equally well. I picked Postgres for transactional DDL (a failed migration rolls back cleanly) and one identical image in tests and in compose. Moving to MySQL is a driver, datasource and dialect change, not a redesign. |
-| All services in one repository with one build | One repository per service (12-factor "one codebase per app", https://12factor.net/codebase) | The deliverable is one repository that must build and run with one command. The services still share no code and no database, and each ships as its own jar, so splitting them later is mechanical. This is a deliberate departure from 12-factor and I would split for a real team. |
+| All services in one repository with one build | One repository per service (12-factor "one codebase per app", https://12factor.net/codebase) | The deliverable is one repository that must build and run with one command. The services share no business code and no database, and each ships as its own jar, so splitting them later is mechanical. The only shared code is `observability/` (one logback-to-OpenTelemetry bridge class and its config), compiled into each service jar on purpose rather than published as a library: a library would need versioning and publishing for a few lines. This is a deliberate departure from 12-factor and I would split for a real team. |
 | Eureka, Config Server and Gateway for two domain services | Fixed URLs in each service's config, no gateway | This is real overhead for two services: three extra processes, a boot order, and registry caches I had to tune (see section 7). I kept them because the brief describes a platform that will grow into payouts, chain listening and settlement, and the gateway gives one published route table and a single place to keep `/internal/**` unreachable. If the fleet stayed this small, I would drop Eureka and the Config Server first. |
 | No Redis and no rate limiting | Redis-backed rate limiting at the gateway | Nothing in Tasks 1 and 2 requires it. Idempotency and concurrency are enforced in the database, which is the only state that has to agree across replicas. Rate limiting is the first reason I would add Redis, and it would have to be shared across gateway replicas, not per instance. |
 | Merchant identity as a path variable | A token carrying the merchant id | The brief says to assume the merchant is already identified by an ID in the request, with no real authentication. In production the merchant id would come from the verified token, never from the path. |
@@ -120,7 +122,7 @@ The brief leaves these open. I made a choice for each so the design is concrete.
    pair's most recent quote is younger than about 5 minutes, the rate must also be within a set
    percentage of its market rate, read from the quote table; otherwise band and freshness alone
    apply, so a run of refusals cannot lock a pair out for ever. Repeated refusals for a pair are a
-   future alert, once observability exists.
+   future alert; observability and alerting now exist, the rule is not written.
 4. **Rate service failure.** The call has a short timeout (around 2 seconds). On timeout or a bad
    rate the quote request fails with 503 or 502 and a reason. There is never a fallback to a
    cached or default rate.
@@ -200,7 +202,8 @@ In order:
    entries (platform balances are derived on read, so there is nothing to reconcile) and that every
    journal sums to zero per currency, and alerts on any difference.
 7. **A transactional outbox** for ledger events, which Task 5 depends on.
-8. **Observability:** OTLP export, Grafana dashboards and alerting. This is the planned next step.
+8. **Observability: done.** OTLP export to a local Grafana LGTM stack, four dashboards, ServiceDown
+   and HighErrorRate alerts to Slack; gaps are listed in `ARCHITECTURE.md` section 9.
 9. **An OpenAPI contract** published by each service.
 10. **A gateway upstream read timeout.** None is set yet, so a hung upstream hangs the request
     rather than answering 504.
@@ -234,6 +237,11 @@ unrouted control stayed 404 from the gateway. The fixes were 5-second registry a
 intervals and a 503 mapping for unavailable upstreams (later split: 504 when the outcome is unknown). The 503 mapping is covered by two gateway
 tests that I saw fail (at 500) before the fix; the shorter intervals were verified with the same
 live probe, not by an automated test.
+
+**Changed, because the alerting paged falsely:** the AI-built alerting sent Slack a page on a plain
+restart, from a Pending alert Grafana had persisted at shutdown. It was caught by reading Grafana's
+own notification counter before the planned outage rehearsal, reproduced red with Slack
+disconnected, fixed by moving Grafana's database to tmpfs, and green on the same script.
 
 **Rejected:** an early table of services and datastores that included Redis rate limiting, MongoDB
 for notifications, and read replicas for settlement. Nothing in Tasks 1 and 2 needs any of them,

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres in Docker, every service as a JVM.
+# Runs the whole fleet on this host: Postgres and Grafana LGTM in Docker, every service as a JVM.
 # Usage: ./fleet.sh up | down | status
 set -u
 cd "${0:A:h}"
@@ -51,11 +51,16 @@ up() {
   local svc
   for svc in ledger-svc conversion-svc gateway-svc; do start $svc; done
   for svc in ledger-svc conversion-svc gateway-svc; do await_healthy $svc || return 1; done
-  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc)"
+  # Last, so neither a slow boot nor a failed up can page: ServiceDown only ever sees a healthy fleet.
+  print "lgtm"
+  docker compose up -d --wait lgtm || return 1
+  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc), grafana http://localhost:3000"
 }
 
 down() {
   local svc pid
+  # Monitoring first, so a deliberate stop never pages.
+  docker compose stop lgtm
   for svc in ${(Oa)SERVICES}; do
     [[ -f $RUN/$svc.pid ]] || continue
     pid=$(<$RUN/$svc.pid)

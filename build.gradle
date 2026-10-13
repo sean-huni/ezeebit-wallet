@@ -382,7 +382,8 @@ tasks.register('sonarAll') {
 // Paketo is the only image path: no Dockerfile exists to drift from it.
 configure(services) {
 	tasks.named('bootBuildImage') {
-		builder = "paketobuildpacks/builder-noble-java-tiny:${paketoBuilderVersion}"
+		builder = paketoBuilder
+		runImage = paketoRunImage
 		imageName = "ezeebit/${project.name}:${project.version}"
 		// The Paketo default JVM line is not 25, so leaving this out ships an older runtime.
 		environment = ['BP_JVM_VERSION': '25']

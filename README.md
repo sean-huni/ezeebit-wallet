@@ -93,17 +93,18 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
 
-Images come from Spring Boot's `bootBuildImage` with the Paketo builder
-`paketobuildpacks/builder-noble-java-tiny` pinned in `gradle.properties` and `BP_JVM_VERSION=25`;
+Images come from Spring Boot's `bootBuildImage` with `BP_JVM_VERSION=25`. The Paketo builder and
+its run image are both pinned by tag and digest in `gradle.properties` (`paketoBuilder`,
+`paketoRunImage`), which `bootBuildImage` reads;
 the repository has no Dockerfile. They are built for the Docker daemon's architecture.
 
 ### What each stage does
 
 | Stage | Instrument | Universe |
 |---|---|---|
-| secrets | gitleaks 8.30.1 `git --log-opts=--all` | every non-merge commit reachable from any ref; the console prints the count gitleaks scanned beside the count git reports, and a mismatch fails |
+| secrets | gitleaks `git --log-opts="--all --diff-merges=first-parent"` | every commit reachable from any ref, merges included as their diff against the first parent, so a secret added while resolving a merge is read; the console prints the commits gitleaks scanned beside the commits with changes git counts, and a mismatch fails |
 | secrets | gitleaks `dir`, then trivy `fs --scanners secret` | tracked files plus untracked files that `.gitignore` does not exclude, copied out first, so `.env` never reaches a scanner |
-| images | trivy 0.74.0 `image --input` on a `docker save` tarball | the OS packages, JRE, buildpack helpers and jars in each image; the scanner gets no Docker socket |
+| images | trivy `image --input` on a `docker save` tarball | the OS packages, JRE, buildpack helpers and jars in each image; the scanner gets no Docker socket |
 | sbom | trivy `--format cyclonedx` from the same tarball | one CycloneDX document per image in `build/supply-chain/sbom/` |
 | config | trivy `config` | `compose.yaml`, `docker/` and any tracked `Dockerfile*`; reported, never gating |
 
@@ -114,24 +115,32 @@ that differs per image and so made it look like this repository's code.
 ### Reading the console
 
 1. **Stages required by this run.** One line per stage: scanners that recorded a completing exit
-   code, and report files present and non-empty. Anything short of full is `MISSING` and fails the
+   code, and report files present, non-empty and parseable. Anything short of full is `MISSING` and fails the
    gate: a scanner that never ran must not read as one that found nothing.
 2. **Secrets.** Findings per instrument, as rule, file and line. Values are redacted (`--redact`
    for gitleaks; trivy masks them) and the console never prints one. Any finding fails.
 3. **Images.** `N images, M layers carried by all N`, then per service the distinct findings in
-   SERVICE layers and in SHARED layers, and how many of them gate. A SHARED layer is one every
-   image carries: the run image, the JRE and the buildpack helpers. Those findings move when the
-   builder pin moves, so they are reported, not gated. A SERVICE layer is one this repository builds
-   (the application and its jars), and only those findings are ours to fix.
-4. **SBOM.** Component count per image.
+   SERVICE layers and in SHARED layers, and how many of them gate. Layers are attributed by who
+   BUILT them, read from each image's `io.buildpacks.lifecycle.metadata` label. SHARED is the run
+   image's layers and the buildpack and launcher layers: their findings move when the builder or
+   run-image pin moves, so they are reported, not gated. SERVICE is every `app` layer (the
+   application and its jars), even when all five images carry an identical one, plus any layer the
+   label does not name, so an unattributed layer fails safe. Only SERVICE findings are ours to fix.
+   The `layers carried by all N` count is context, not the classification.
+4. **SBOM.** Component count per image; 0 components fails.
 5. **Misconfiguration.** Its own universe: checks against files, never vulnerabilities in an image,
    so its totals must not be added to the image totals.
 6. **Suppressions**, then the verdict.
 
 **The verdict is a three-clause test.** `checkSupplyChain` fails only on a finding that is HIGH or
 CRITICAL **and** has a published fix **and** sits in a SERVICE layer. Everything else is reported.
-`security/trivy-ignore.yaml` starts with no vulnerability entries; an entry without an
-`expired_at` and a `statement` fails the gate.
+`security/trivy-ignore.yaml` starts with no vulnerability entries. It is read in block form only
+(`- id:`, `statement:`, `expired_at:` and nothing else); flow style, an empty `statement`, a
+non-ISO date or an expired date fails the gate. trivy itself stops applying an expired entry.
+
+**Evidence goes stale on every new commit.** The history count, the tree and the images describe
+the commit they were scanned at; re-run `checkSupplyChain` after any change rather than quoting an
+older console.
 
 **State at 2026-10-13 (trivy DB of that day): PASSED, nothing suppressed.** The first run failed
 on nine CVEs in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides of Boot's own
@@ -141,7 +150,7 @@ clears: Tomcat 11.0.26, Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka 
 with it, so it is overridden, not excluded). Drop each override once Boot manages that version or
 newer. One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka
 client, in three images. The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net`
-in buildpack helpers) belong to the builder pin. The misconfiguration stage ran, and trivy recognised none of the 11 files as a format
+in buildpack helpers) belong to the builder and run-image pins. The misconfiguration stage ran, and trivy recognised none of the 11 files as a format
 it checks (it has no compose checks), so it reports zero checks rather than a clean bill.
 
 ### SAST and SCA read different things

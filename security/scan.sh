@@ -39,6 +39,12 @@ JAVA_DB_REPO="$(lock_value TRIVY_JAVA_DB_REPOSITORY)" || exit 2
 
 record() { printf '%s exit=%s\n' "$1" "$2" >> "$OUT/status.txt"; }
 
+cleanup() { rm -rf "$OUT/stage-tree" "$OUT/stage-config"; rm -f "$OUT"/images/*.tar; }
+
+preflight() {
+  docker info > /dev/null 2>&1 || die "Docker unavailable: every scanner runs as a container, so nothing was scanned."
+}
+
 # Scanners see only /out (reports and staged inputs) and /sec (policy), never the repository root,
 # so a gitignored file such as .env cannot reach a tree scan by any path.
 trivy() {
@@ -49,13 +55,20 @@ trivy() {
     --cache-dir /cache ${db[@]+"${db[@]}"} --skip-version-check "$@"
 }
 
-# Copies the files a NUL-separated git listing names into $1 and prints how many arrived.
+# Copies the files a NUL-separated git listing names into $1 and prints how many arrived; the
+# count must equal the listing's, so a copy that silently dropped files cannot pass as a clean tree.
 stage_files() {
-  local dest="$1"; shift
+  local dest="$1" list="$1.list" listed staged
+  shift
   mkdir -p "$dest"
-  ( cd "$ROOT" && "$@" | while IFS= read -r -d '' f; do if [ -f "$f" ]; then printf '%s\0' "$f"; fi; done ) \
-    | ( cd "$ROOT" && tar --null -T - -cf - ) | tar -xf - -C "$dest" || die "staging into $dest failed."
-  find "$dest" -type f | awk 'END {print NR}'
+  ( cd "$ROOT" && "$@" | while IFS= read -r -d '' f; do if [ -f "$f" ]; then printf '%s\0' "$f"; fi; done ) > "$list"
+  listed="$(tr -cd '\0' < "$list" | wc -c | tr -d ' ')"
+  ( cd "$ROOT" && tar --null -T - -cf - < "$list" ) | tar -xf - -C "$dest" || die "staging into $dest failed."
+  rm -f "$list"
+  staged="$(find "$dest" -type f | awk 'END {print NR}')"
+  [ "$listed" -gt 0 ] || die "the listing for $dest named 0 files."
+  [ "$staged" = "$listed" ] || die "staged $staged of $listed listed files into $dest."
+  printf '%s\n' "$staged"
 }
 
 cmd_secrets() {
@@ -63,7 +76,7 @@ cmd_secrets() {
   rm -f "$OUT"/gitleaks-*.json "$OUT"/gitleaks-*.log "$OUT"/trivy-secrets.* "$OUT/tree-files.txt"
   docker run --rm -v "$ROOT/.git:/repo/.git:ro" -v "$OUT:/out" \
     -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
-    "$GITLEAKS_IMAGE" git /repo --log-opts=--all --redact --no-banner \
+    "$GITLEAKS_IMAGE" git /repo "--log-opts=--all --diff-merges=first-parent" --redact --no-banner \
     --report-format json --report-path /out/gitleaks-history.json > "$OUT/gitleaks-history.log" 2>&1
   rc=$?; record gitleaks-history "$rc"
 
@@ -99,6 +112,9 @@ cmd_images() {
   done
   shared_layers > "$OUT/images/shared-layers.txt"
   for s in "${SVC[@]}"; do
+    docker image inspect "ezeebit/$s:$IMAGE_VERSION" > "$OUT/images/$s.inspect.json"
+  done
+  for s in "${SVC[@]}"; do
     tar="$OUT/images/$s.tar"
     docker save -o "$tar" "ezeebit/$s:$IMAGE_VERSION" || die "docker save of ezeebit/$s failed."
     # layers/sbom holds Paketo's SBOM documents, which restate packages scanned in their real layers;
@@ -130,7 +146,7 @@ gate() {
   python3 "$SEC/report.py" --out "$OUT" --services "$SERVICES" --require "$1" --console "$CONSOLE_FILE"
 }
 
-start() { mkdir -p "$OUT"; : > "$OUT/status.txt"; }
+start() { preflight; mkdir -p "$OUT"; : > "$OUT/status.txt"; trap cleanup EXIT; }
 
 case "${1:-}" in
   secretgate) start; cmd_secrets; gate secrets ;;

@@ -124,7 +124,7 @@ What `up` and `down` guarantee:
 
 `FLEET_SETTLE_SECONDS` (default 90) is how long `up` waits for lgtm's backends after the container
 reports healthy. The sweep test [docs/fleet/verification/](docs/fleet/verification/) drives every one
-of these outcomes against a real fleet and asserts each on its exit code and its words: 75 checks
+of these outcomes against a real fleet and asserts each on its exit code and its words: 94 checks
 passed, 0 failed, on 2026-10-13
 ([run log](docs/fleet/verification/2026-10-13-fleet-sweep-run.log)).
 

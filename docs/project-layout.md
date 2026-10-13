@@ -157,7 +157,7 @@ io.ezeebit.conversion  ConversionApplication
 │   └── resp/          ApiResponse, ConversionResp, QuoteResp
 ├── service/           CurrencyCatalog (shared by the use cases)
 │   ├── conversion/    ConversionAcceptance, ConversionFirstPoster, ConversionLedgerPoster, ConversionOpener, ConversionReader, ConversionReplayer, ConversionService, ConversionSettler, ConversionStarter
-│   ├── quote/         QuotePricer, QuoteReader, QuoteRedeemer, QuoteService, QuoteWriter, RateCheck, RateHistory
+│   ├── quote/         QuoteLookup, QuotePricer, QuoteReader, QuoteService, QuoteWriter, RateCheck, RateHistory
 │   └── sweep/         DueCutoff, PendingClaimer, PendingLedgerCheck, PendingOverdueGauge, PendingResolver (resolves overdue PENDING conversions)
 ├── scheduler/         PendingConversionSweeper
 ├── mapper/            ConversionMapper, QuoteMapper
@@ -209,7 +209,7 @@ service.sweep      -> common.metrics(1), config.properties(1), data.model(1), da
 | `api.validation` | exactly one of sell or buy amount | `ExactlyOneAmount`, `ExactlyOneAmountValidator` |
 | `dto.req`, `dto.resp` | wire contract | `QuoteReq`, `ConversionReq`; `ApiResponse`, `QuoteResp`, `ConversionResp` |
 | `service` | currencies and pair policies from served configuration | `CurrencyCatalog` |
-| `service.quote` | price and store a firm quote; read it back; redeem it for a conversion | `QuoteService` (span, counter, log), `QuotePricer`, `RateCheck` (fetch and validate), `RateHistory` (recent rate and the clock read), `QuoteWriter`, `QuoteReader` (incl. the live check), `QuoteRedeemer` |
+| `service.quote` | price and store a firm quote; read it back; look one up for a conversion with its posting deadline | `QuoteService` (span, counter, log), `QuotePricer`, `RateCheck` (fetch and validate), `RateHistory` (recent rate and the clock read), `QuoteWriter`, `QuoteReader` (incl. the live check), `QuoteLookup` |
 | `service.conversion` | accept a quote, post to the ledger, settle the outcome | `ConversionService` (span, log), `ConversionAcceptance`, `ConversionOpener`, `ConversionStarter`, `ConversionFirstPoster`, `ConversionReplayer`, `ConversionReader`, `ConversionLedgerPoster`, `ConversionSettler` |
 | `service.sweep` | resolve PENDING conversions past their deadline, and report how many are overdue | `PendingResolver` (transaction, counting), `PendingClaimer`, `PendingLedgerCheck`, `DueCutoff` (the one definition of due), `PendingOverdueGauge` |
 | `scheduler` | trigger the sweep on every replica | `PendingConversionSweeper` |
@@ -393,10 +393,10 @@ it a status, because the switch has no default.
 
 ## Dependency injection budget
 
-No bean and no `@Bean` method takes more than 3 injected dependencies (constructor parameters,
-`@Autowired` or `@Inject` fields and setters, `@Value`). `DependencyBudgetTest`, under
+No bean and no `@Bean` method takes more than 3 injected dependencies. `DependencyBudgetTest`, under
 `architecture/src/test/java` and compiled into every service's `test` task, fails `./gradlew build`
-and lists each offender with its count ([quality-gates.md](quality-gates.md#static-analysis-and-coverage)).
+and lists each offender with its count; what it counts is in
+[quality-gates.md](quality-gates.md#architecture-gates).
 
 Measured on 2026-10-13 at `103e5cf` (BEFORE) and at the split (AFTER). The 8 offenders were split by
 job, with the same calls in the same order, the same transactions, counters and spans:
@@ -416,20 +416,22 @@ What the package graph says about it (same commands as [Measuring it](#measuring
 
 - Classes: ledger 84 to 94, conversion 74 to 88. Largest `service.*` package: 10 (ledger
   `service.conversion`, the write path only, after its answer side moved to `service.conversion.answer`).
-- Coupling that fell: conversion `service.conversion -> config.properties` 1 to 0 (the grace period
-  moved to `QuoteRedeemer`), `service.sweep -> config.properties` 2 to 1 (`DueCutoff` now holds the
-  rule `PendingResolver` and `PendingOverdueGauge` each restated); ledger `service.conversion -> mapper`
-  2 to 0 and `service.deposit -> mapper` 2 to 1 (mapping sits in `EntryWriter` and the assembler).
-- Coupling that rose, and why it is accepted: `service.* -> dto.resp` (conversion-svc 2 to 9, ledger-svc
-  5 to 10), because more classes now pass the response record along; the trade-off below covers it. `ctl -> service.*` rose by one edge per controller
-  that now reads through its reader.
+- Coupling that moved: conversion-svc `service.* -> config.properties` stays at 5 in total, but
+  `service.conversion` 1 to 0 (the posting grace moved to `QuoteLookup`), `service.sweep` 2 to 1
+  (`DueCutoff` now holds the rule `PendingResolver` and `PendingOverdueGauge` each restated) and
+  `service.quote` 1 to 3 (`QuoteLookup`, `QuoteWriter` and `RateHistory` each read one setting).
+- Coupling that fell: ledger `service.conversion -> mapper` 2 to 0 and `service.deposit -> mapper`
+  2 to 1 (mapping sits in `EntryWriter` and the assembler).
+- Coupling that rose, and why it is accepted: `service.* -> dto.resp` (conversion-svc 2 to 9,
+  ledger-svc 5 to 10), because more classes now pass the response record along; the trade-off below
+  covers it. `ctl -> service.*` rose by one edge per controller that now reads through its reader.
 - No cycle: `service.conversion.answer` imports nothing from `service.conversion`; `service.posting`
   imports no use case.
 
 ## The deliberate trade-off: services return `dto.resp`
 
-`service.* -> dto.resp` stays (ledger 10 imports, conversion 9, after the dependency-injection split). The layering standard keeps
-controllers lean and puts mapping in the service layer, so a use case returns the response record
+`service.* -> dto.resp` stays (ledger 10 imports, conversion 9, after the dependency-injection
+split). The layering standard keeps controllers lean and puts mapping in the service layer, so a use case returns the response record
 and the controller only wraps it. The cost: a second delivery mechanism (a message consumer, a gRPC
 endpoint) would have to take the HTTP response shape or add its own mapping. It is accepted because
 both services have exactly one delivery mechanism, and the mapping itself lives in `mapper/`, so

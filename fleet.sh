@@ -91,9 +91,52 @@ down() {
   docker compose down
 }
 
+CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 lgtm:3000)
+# Grafana's datasource uids; each health check runs a real query against that backend.
+BACKENDS=(prometheus loki tempo pyroscope)
+
+container_health() {
+  # The compose healthcheck verdict: postgres runs SELECT 1 per database, redis an authenticated PING.
+  local h=$(docker compose ps --format '{{.Health}}' $1 2>/dev/null)
+  print ${h:-down}
+}
+
+backend_health() {
+  local body=$(curl -s --max-time 5 "http://localhost:3000/api/datasources/uid/$1/health")
+  [[ $body == *'"status":"OK"'* ]] && print OK || print FAIL
+}
+
 fleet_status() {
-  local svc
-  for svc in $SERVICES; do printf '%-15s :%-5s %s\n' $svc $(port_of $svc) $(health_of $svc); done
+  local svc entry name port state bad=0
+  print "services"
+  for svc in $SERVICES; do
+    state=$(health_of $svc); [[ $state == 200 ]] || bad=1
+    printf '  %-15s :%-5s %s\n' $svc $(port_of $svc) $state
+  done
+  print "supporting containers"
+  for entry in $CONTAINERS; do
+    name=${entry%%:*}
+    port=$(docker compose port $name ${entry##*:} 2>/dev/null); port=${port##*:}
+    state=$(container_health $name); [[ $state == healthy ]] || bad=1
+    printf '  %-15s :%-5s %s\n' $name ${port:--} $state
+  done
+  print "observability (inside lgtm)"
+  state=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health)
+  printf '  %-15s :%-5s %s\n' grafana 3000 $state
+  if [[ $state == 200 ]]; then
+    for name in $BACKENDS; do
+      state=$(backend_health $name); [[ $state == OK ]] || bad=1
+      printf '  %-15s %-6s %s\n' $name '' $state
+    done
+  else
+    bad=1
+  fi
+  # An empty export is the cheapest request only a live collector answers with 200.
+  state=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 -X POST -H 'Content-Type: application/json' \
+    -d '{}' http://localhost:4318/v1/metrics)
+  [[ $state == 200 ]] || bad=1
+  printf '  %-15s :%-5s %s\n' otlp-collector 4318 $state
+  return $bad
 }
 
 case ${1:-} in

@@ -37,7 +37,8 @@ Feature: conversion-svc counts quotes, conversions and sweeps
       | REJECTED  | INSUFFICIENT_FUNDS | 1     |
 
   Scenario: A conversion left PENDING is counted, shows as overdue, and the sweeper's action is counted
-    Given "Acme" has quote "q1" to sell "100.00" ZAR for USDT
+    Given no earlier conversion can fall due for the sweeper
+    And "Acme" has quote "q1" to sell "100.00" ZAR for USDT
     And the ledger does not answer in time
     When "Acme" accepts quote "q1" with key "k1"
     Then the conversion is PENDING

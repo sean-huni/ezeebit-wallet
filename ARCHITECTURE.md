@@ -171,6 +171,8 @@ Rehearsed once with Slack disconnected (lgtm started with `SLACK_WEBHOOK_URL` em
 
 Three stale-rate refusals for ZAR/USDC in a few seconds took that pair to Pending and back to Normal without firing, which is the 2 min hold doing its job.
 
+The posting sent while the ledger was frozen was never counted, as expected: it never reached the ledger's code. Its caller had timed out and closed the connection, and on resume Tomcat failed to set socket options on each of the 28 queued connections (`SocketException: Invalid argument` from `setSoLinger`, macOS) and dropped them unread. With no answer to count, the sweeper voided the conversion. A server that did read such a request would answer `POSTING_DEADLINE_PASSED` or `CONVERSION_VOIDED`, and `ConversionPostingService` counts both as refused.
+
 The Slack contact point is installed only when `SLACK_WEBHOOK_URL` is set: Grafana refuses to start on a Slack contact point with an empty URL. Grafana's own database lives on tmpfs, because everything in it is provisioned from files and a Pending alert persisted at shutdown fired the instant the next boot evaluated a still-booting fleet. Before that fix a restart produced 4 false pages (reproduced with Slack disconnected); after it the same script produced 0, and a boot produces 0 notifications.
 
 Rehearsed outage, measured once with Slack live on a local run (counts from Grafana's `grafana_alerting_notifications_total` counters):

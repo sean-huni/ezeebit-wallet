@@ -77,7 +77,7 @@ public class LedgerSteps {
 	public void raceWithDeposit(final String merchant, final String quote, final String key, final String amount,
 			final String currency, final String sameMerchant) {
 		UUID merchantId = state.merchant(merchant);
-		String path = "/api/v1/merchants/%s/conversions".formatted(merchantId);
+		String path = "/v1/merchants/%s/conversions".formatted(merchantId);
 		String body = "{\"quoteId\":\"%s\"}".formatted(state.quoteId(quote));
 		String deposit = """
 				{"merchantId":"%s","currency":"%s","amount":"%s","reference":"late"}""".formatted(merchantId, currency, amount);
@@ -108,7 +108,7 @@ public class LedgerSteps {
 	@Then("the conversion and the ledger agree")
 	public void conversionAndLedgerAgree() {
 		String conversionId = state.conversion();
-		Reply conversion = http.conversion("GET", "/api/v1/merchants/%s/conversions/%s"
+		Reply conversion = http.conversion("GET", "/v1/merchants/%s/conversions/%s"
 				.formatted(state.merchantOf(conversionId), conversionId), null, null);
 		List<String> ledger = Externals.get().ledgerDb().sql("""
 				SELECT status FROM journal WHERE type = 'CONVERSION' AND idempotency_key = :id""")
@@ -128,9 +128,9 @@ public class LedgerSteps {
 			final String buy) {
 		UUID id = state.merchant(merchant);
 		for (int i = 0; i < count; i++) {
-			Reply quote = http.conversion("POST", "/api/v1/merchants/%s/quotes".formatted(id), null, """
+			Reply quote = http.conversion("POST", "/v1/merchants/%s/quotes".formatted(id), null, """
 					{"sell":"%s","buy":"%s","sellAmount":"%s"}""".formatted(sell, buy, amount));
-			Reply accepted = http.conversion("POST", "/api/v1/merchants/%s/conversions".formatted(id), "pending-" + i,
+			Reply accepted = http.conversion("POST", "/v1/merchants/%s/conversions".formatted(id), "pending-" + i,
 					"{\"quoteId\":\"%s\"}".formatted(quote.<String>read("$.data.quoteId")));
 			assertThat(accepted.status()).as(accepted.body()).isEqualTo(202);
 			state.converted(accepted.read("$.data.conversionId"), id);

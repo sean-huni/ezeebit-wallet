@@ -30,11 +30,13 @@ final class LedgerProcess {
 		String jar = System.getProperty("ledger.jar");
 		String java = ProcessHandle.current().info().command().orElse("java");
 		ProcessBuilder builder = new ProcessBuilder(List.of(java, "-jar", jar,
-				"--server.port=" + port, "--server.address=127.0.0.1",
-				"--spring.datasource.url=" + database.getJdbcUrl(),
-				"--spring.datasource.username=" + database.getUsername(),
-				"--spring.datasource.password=" + database.getPassword(),
+				"--server.port=%d".formatted(port), "--server.address=127.0.0.1",
+				"--spring.datasource.url=%s".formatted(database.getJdbcUrl()),
+				"--spring.datasource.username=%s".formatted(database.getUsername()),
+				"--spring.datasource.password=%s".formatted(database.getPassword()),
 				"--spring.cloud.config.enabled=false", "--eureka.client.enabled=false",
+				// The gateway proof secret, from the file config-svc serves to every service.
+				"--spring.config.import=file:%s".formatted(System.getProperty("served.shared")),
 				"--management.otlp.metrics.export.enabled=false", "--management.tracing.export.otlp.enabled=false",
 				"--management.logging.export.otlp.enabled=false"))
 				.redirectErrorStream(true)
@@ -69,7 +71,7 @@ final class LedgerProcess {
 						.formatted(process.exitValue()));
 			}
 			try {
-				HttpResponse<Void> health = client.send(HttpRequest.newBuilder(URI.create(url() + "/actuator/health"))
+				HttpResponse<Void> health = client.send(HttpRequest.newBuilder(URI.create("%s/actuator/health".formatted(url())))
 						.build(), HttpResponse.BodyHandlers.discarding());
 				if (health.statusCode() == 200) {
 					return;

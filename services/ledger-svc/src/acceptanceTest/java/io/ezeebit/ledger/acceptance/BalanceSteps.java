@@ -36,16 +36,16 @@ public class BalanceSteps {
 
 	@When("anyone reads the balances of {string} through API version {string}")
 	public void readsThroughVersion(final String merchant, final String version) {
-		state.record(ledger.get("/api/%s/merchants/%s/balances".formatted(version, state.merchant(merchant))));
+		state.record(ledger.get("/%s/merchants/%s/balances".formatted(version, state.merchant(merchant))));
 	}
 
 	@When("anyone reads the balances of merchant id {string}")
 	public void readsByRawId(final String rawId) {
-		state.record(ledger.get("/api/v1/merchants/%s/balances".formatted(rawId)));
+		state.record(ledger.get("/v1/merchants/%s/balances".formatted(rawId)));
 	}
 
 	private List<Map<String, String>> balances(final String merchant) {
-		Reply reply = ledger.get("/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
+		Reply reply = ledger.get("/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
 		assertThat(reply.status()).as(reply.body()).isEqualTo(200);
 		return reply.read("$.data");
 	}

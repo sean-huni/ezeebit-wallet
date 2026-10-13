@@ -12,12 +12,40 @@ spring:
     gateway:
       server:
         webmvc:
+          # Clients see /api/v1/...; services serve /v1/... and 404 anything under /api/. A client-sent proof header
+          # is removed before the gateway's own is added, so only a request that came through here carries it.
           routes:
             - id: ledger
               uri: lb://ledger-svc
               predicates:
                 - Path=/api/v1/merchants/*/balances/**,/api/v1/merchants/*/entries/**
+              filters:
+                - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
+                - RemoveRequestHeader=X-Ezeebit-Gateway
+                - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
             - id: conversion
               uri: lb://conversion-svc
               predicates:
                 - Path=/api/v1/merchants/*/quotes/**,/api/v1/merchants/*/conversions/**
+              filters:
+                - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
+                - RemoveRequestHeader=X-Ezeebit-Gateway
+                - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+ezeebit:
+  gateway:
+    rate-limit:
+      # Per merchant, shared by every gateway replica. A payday burst of 100 requests is admitted at once, then
+      # 20 a second are sustained (1200 a minute); past that, 429 with Retry-After.
+      capacity: ${RATE_LIMIT_CAPACITY:100}
+      refill-tokens: ${RATE_LIMIT_REFILL_TOKENS:20}
+      refill-period: ${RATE_LIMIT_REFILL_PERIOD:1s}
+      # Compare-and-swap retries on one hot key before the request is answered 429 as contention, not 503.
+      max-retries: ${RATE_LIMIT_MAX_RETRIES:5}
+      store:
+        host: ${REDIS_HOST:localhost}
+        port: ${REDIS_PORT:6379}
+        password: ${REDIS_PASSWORD:redis-local}
+        # Per command and per connect: past it the request is refused with 503, never waited on.
+        timeout: ${REDIS_TIMEOUT:250ms}
+        # How often each gateway PINGs Redis for ezeebit_gateway_ratelimit_store_up.
+        probe-interval: ${REDIS_PROBE_INTERVAL:10s}

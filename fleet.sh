@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres and Grafana LGTM in Docker, every service as a JVM.
+# Runs the whole fleet on this host: Postgres, Redis and Grafana LGTM in Docker, every service as a JVM.
 # Usage: ./fleet.sh up | down | status
 set -u
 cd "${0:A:h}"
@@ -29,8 +29,10 @@ await_healthy() {
 
 await_routed() {
   # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
-  local m=00000000-0000-0000-0000-000000000000 deadline=$(( SECONDS + 60 )) b q
+  local m deadline=$(( SECONDS + 60 )) b q
   while (( SECONDS < deadline )); do
+    # A fresh merchant per attempt: the limiter charges these probes, and one fixed id drains its bucket.
+    m=$(uuidgen | tr 'A-Z' 'a-z')
     b=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/balances")
     q=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/conversions/$m")
     [[ $b == 200 && $q == 404 ]] && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }
@@ -54,8 +56,8 @@ up() {
     kill -0 $(<$f) 2>/dev/null && { print -u2 "fleet already running ($f); ./fleet.sh down first"; return 1; }
   done
   [[ -f .env ]] && { set -a; source ./.env; set +a; }
-  print "postgres, wiremock (the exchange-rate service)"
-  docker compose up -d --wait postgres wiremock || return 1
+  print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter)"
+  docker compose up -d --wait postgres wiremock redis || return 1
   print "build"
   ./gradlew -q bootJar || return 1
   # Control plane first: every other service fetches config and registers on boot.

@@ -136,3 +136,64 @@ groups:
           severity: critical
         annotations:
           summary: '{{ $values.A.Value }} PENDING conversions are past their deadline and the sweeper has not resolved them for 5m'
+      - uid: ezeebit-rate-limiter-unavailable
+        title: RateLimiterUnavailable
+        condition: B
+        # The gateway refuses merchant requests with 503 while Redis does not answer (fail closed), so any
+        # unavailable outcome is an edge outage. Every outcome is registered at zero when the gateway starts,
+        # so increase() always has a series to start from.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 120, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: sum(increase(ezeebit_gateway_ratelimit_total{outcome="unavailable"}[1m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No gateway exporting returns no series; ServiceDown pages for that.
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'The gateway refused {{ $values.A.Value }} merchant requests in the last minute because Redis did not answer'
+      - uid: ezeebit-rate-limiter-store-down
+        title: RateLimiterStoreDown
+        condition: B
+        # 1 when any gateway's PING to Redis fails (min across replicas of the 1/0 gauge), or when no gateway has
+        # published it for 30s (3 export steps). last_over_time, not a bare selector: a pushed gauge has no staleness
+        # marker, so min() alone read a dead gateway's last 1 for the 5m lookback (measured). Needs no traffic.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 60, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (1 - min(last_over_time(ezeebit_gateway_ratelimit_store_up[30s])))
+                or absent_over_time(ezeebit_gateway_ratelimit_store_up[30s])
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'A gateway cannot reach Redis, or no gateway reports it: merchant requests are refused with 503'

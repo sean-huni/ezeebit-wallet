@@ -9,10 +9,11 @@ dependencies {
 	acceptanceTestImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
 }
 
-// Spring tests read the same file config-svc serves, so pairs, bands and timeouts have one home.
-def served = rootProject.file('services/config-svc/src/main/resources/served/conversion-svc.yml')
+// Spring tests read the same files config-svc serves, so pairs, bands, timeouts and the gateway secret have one home.
+def served = rootProject.file('services/config-svc/src/main/resources/served')
 tasks.withType(Test).configureEach {
-	systemProperty 'spring.config.import', "file:${served}"
+	systemProperty 'spring.config.import', "file:${served}/application.yml,file:${served}/conversion-svc.yml"
+	systemProperty 'served.shared', "${served}/application.yml"
 }
 
 // The acceptance tier runs the real ledger-svc jar as a separate process: real HTTP, its own database.

@@ -29,7 +29,7 @@ Folder **Ezeebit** holds four provisioned, read-only dashboards (`docker/lgtm/da
 | Fleet Overview | UP/DOWN tile per service, request rate, 5xx ratio, p95 latency, JVM heap; a **Money** row |
 | Traces | latest traces for the selected services; click a trace ID to open it |
 | Logs | logs by service and level |
-| Alerts | the four alert rules, in every state |
+| Alerts | the six alert rules, in every state |
 
 The Money row shows deposits per minute by currency and outcome, conversions by outcome (and those
 left PENDING by their first ledger answer), quote refusals by reason, rate-service p95 latency,
@@ -50,6 +50,8 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 | `ezeebit_conversion_left_pending_total` | counter | none | when a conversion's first ledger answer left it PENDING |
 | `ezeebit_conversion_sweeps_total` | counter | `action` completed, voided, refused, unresolved | `PendingResolver`, once per claimed row, after the sweep's transaction commits |
 | `ezeebit_conversion_pending_overdue` | gauge | none | `PendingOverdueGauge`: `count(*)` of PENDING rows past deadline plus max transaction time |
+| `ezeebit_gateway_ratelimit_total` | counter | `outcome` allowed, limited, contention, unavailable, refused_path | gateway `RateLimitFilter`, once per merchant request or refused path; every outcome registered at zero on start |
+| `ezeebit_gateway_ratelimit_store_up` | gauge | none | gateway `StorePingScheduler`: 1 while Redis answers PING within 250 ms, else 0, every 10 s. One view per replica: read with `min()` |
 
 Requests refused before the service layer (malformed JSON, a missing field) are counted only by the
 HTTP metrics.
@@ -72,8 +74,11 @@ Grafana-managed, in `docker/lgtm/alerting/rules.yaml`:
 | HighErrorRate | a service's 5xx share of requests above 5% over 1 min | after 2 min |
 | RateFeedRefusing | per pair, quotes refused with `RATE_UNAVAILABLE` or `RATE_REJECTED` in the last minute: more than 2, or at least 1 that is half or more of the pair's quotes. Each count is `clamp_min(X - X offset 1m, 0) or (X unless X offset 1m)` summed by pair, so a series first created inside the window counts whole and a restarted JVM's drop is clamped to 0 | after 2 min; one alert per pair |
 | ConversionsStuckPending | `max(ezeebit_conversion_pending_overdue) > 0`; the sweeper runs every 10 s, so a due row normally lives seconds | after 5 min |
+| RateLimiterUnavailable (critical) | `sum(increase(ezeebit_gateway_ratelimit_total{outcome="unavailable"}[1m])) > 0`: the gateway refused merchant requests because Redis did not answer. The limiter fails closed, so this is an edge outage for every merchant | after 1 min |
 
-No data is OK for all four, by design: no refusal series means no refusals, and a conversion-svc
+| RateLimiterStoreDown (critical) | `(1 - min(last_over_time(ezeebit_gateway_ratelimit_store_up[30s]))) or absent_over_time(ezeebit_gateway_ratelimit_store_up[30s])`: a gateway cannot PING Redis, or no gateway has reported for 30 s. `last_over_time` because a bare selector read a stopped gateway's last 1 for the 5 min lookback (measured) | after 1 min; needs no traffic |
+
+No data is OK for all six, by design: no refusal series means no refusals, and a conversion-svc
 that exports nothing is ServiceDown's to page, so one silent service never pages twice. An
 evaluation error is Error, never OK.
 
@@ -127,5 +132,28 @@ Invalid argument` from `setSoLinger`, macOS). With no answer, the sweeper voided
 
 **HighErrorRate, Slack disconnected.** ledger-svc stopped, gateway answering 503: Pending t+20s,
 Alerting t+140s on gateway-svc.
+
+**RateLimiterUnavailable, Slack disconnected (2026-10-13).** Redis stopped with the fleet up and a
+merchant request every 2 s through the gateway, each answered 503 `RATE_LIMITER_UNAVAILABLE` while
+the gateway's health stayed 200:
+
+| Event | Time |
+|---|---|
+| redis stopped | t+0s |
+| RateLimiterUnavailable Pending | t+14s |
+| Alerting | t+74s |
+| redis started; the next request admitted (200) | t+74s |
+| Normal | t+144s |
+
+**RateLimiterStoreDown, Slack disconnected (2026-10-13), no traffic.** RateLimiterUnavailable stayed
+Normal throughout, because nothing was refused:
+
+| Event | Redis stopped | Gateway stopped (absence arm) |
+|---|---|---|
+| fault | t+0s | t+0s |
+| Pending | t+15s | t+39s |
+| Alerting | t+74s | t+98s |
+| restored (Redis started, gateway restarted) | t+74s | about t+100s |
+| Normal | t+95s | 29 s after the restart |
 
 What these rehearsals do not prove: alerts reach one Slack channel, not an on-call rota.

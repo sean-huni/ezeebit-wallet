@@ -53,8 +53,8 @@ reasons, ledger rules almost never); and a distinct failure domain (a slow rate 
 stop deposits or balance reads, which a shared thread pool would).
 
 **Deliberately not built:** identity and authentication (out of scope per the brief; `merchantId`
-is a path variable), a notification service, and Redis (it would only back gateway rate limiting,
-which is not requested).
+is a path variable) and a notification service. Redis exists only as the gateway's rate-limit store,
+which is beyond the brief (section 3, "Rate limiting").
 
 ## 3. Runtime topology
 
@@ -63,8 +63,10 @@ which is not requested).
                                     |
                                     v
                         +-----------------------+
-                        |  gateway-svc :8080    |  route table, 503/504 on upstream failure
-                        +-----------------------+
+                        |  gateway-svc :8080    |  route table, per-merchant rate limit,    +----------------+
+                        |                       |  /api/v1 -> /v1, proof header,  -------->| redis :6379    |
+                        +-----------------------+  503/504 on upstream failure             | (rate buckets) |
+                                                                                           +----------------+
                           |                   |
              lb://ledger-svc            lb://conversion-svc
                           v                   v
@@ -91,6 +93,71 @@ balances and entries go to the ledger, quotes and conversions to conversion-svc,
 reaches a service. `/internal/**` is never routed, so deposits come only from the money-in rail: a
 merchant cannot credit itself.
 
+**Path rewrite.** Clients call `/api/v1/merchants/{id}/...`; each route rewrites
+`/api/v1/(?<rest>.*)` to `/v1/${rest}`, and the services map only `/{version}/merchants/...` with the
+version constrained to `v<digits>`. A request sent straight to a service under `/api/...` matches no
+mapping and is 404, so the public prefix exists in one place. `/internal/v1/**` is unchanged.
+
+**Rate limiting (beyond the brief).** A servlet filter in front of the route table takes the
+merchant id from the path of every merchant route and spends one token from that merchant's Bucket4j
+bucket in Redis (Lettuce, compare-and-swap). The design follows from three constraints:
+
+- *Replica-safe.* The bucket lives in Redis, not in a gateway's heap. An in-heap bucket per replica
+  makes the real limit capacity x replicas, and an autoscaler adds replicas exactly when traffic
+  spikes, loosening the limit when it matters. `SharedBucketIT` runs two gateway contexts on one
+  Redis: a burst split across both admits exactly the capacity, and goes red (8 admitted of a
+  capacity of 4) when the store is swapped for an in-heap bucket. Bucket4j computes refill from each
+  replica's wall clock, so NTP is a dependency: replicas skewed by d admit up to d x refill rate extra
+  per bucket.
+- *Every route is charged.* The limiter decides on the raw request URI only after proving it
+  canonical, on EVERY request: a `%xx` escape, a `;param`, a `.` or `..` segment, `//`, or any
+  character outside letters, digits, `_`, `.`, `-` is 400 `MALFORMED_PATH`. A canonical raw path is
+  exactly the decoded, normalised path the route matcher sees, so `/%61pi/...` or `/api;x=1/...`
+  cannot reach a route uncharged (a review measured both reaching the ledger before this rule).
+  Every published route lives under `/api/v1/merchants/{id}/`, and `RouteCoverageIT` enumerates the
+  served route table and fails on any route the limiter would not charge.
+- *Bounded keys.* The key is `gateway:ratelimit:<capacity>-<refill>-<period ms>:merchant:<uuid>`,
+  lower-cased, built only from a strict UUID; anything else is 400 before Redis is touched, so a
+  client cannot write arbitrary keys. Keys expire 10 s after their bucket would be full again.
+  The limits are in the key because Bucket4j replaces a stored configuration only for a higher
+  version, which a value derived from the limits cannot promise (lowering a limit could hash lower).
+  A changed limit therefore starts a fresh bucket at the new capacity for every merchant at once; the
+  cost is one full bucket granted at the change, and two buckets per merchant while a rolling deploy
+  runs both configurations.
+- *Contention is not an outage.* Concurrent requests for one merchant race on a compare-and-swap. A
+  request that loses more than `max-retries` (default 5) times on a healthy Redis is 429
+  `RATE_LIMITED`, counted as `contention`, and never pages. Only a Redis error (refused, reset, a
+  command past 250 ms, a bad password) is `unavailable`. `ContentionIT` hammers one key through two
+  gateways and requires 200 or 429, never 503.
+- *Fail closed.* Redis that is down, unreachable or stalled answers **503
+  `RATE_LIMITER_UNAVAILABLE`** with `Retry-After: 1`, and the request is never forwarded. Admitting
+  would switch the limit off exactly when the store is under strain, which is when abuse is most
+  likely. Connect and command timeouts are 250 ms, so a stalled Redis costs a request a quarter of a
+  second, not a client default. The gateway boots without Redis (it connects on first use and
+  retries at most once a second), and its health endpoint stays UP: the refusal is the
+  application's, so a Redis outage does not empty the gateway out of rotation and hide the cause.
+  The cost is real: without Redis no merchant call succeeds, so Redis is on the edge's critical path
+  and RateLimiterUnavailable pages critical.
+
+Limits are per merchant: 100 burst, 20 a second sustained, from served config. 429
+`RATE_LIMITED` carries `Retry-After` rounded up to whole seconds. Outcomes are counted in
+`ezeebit_gateway_ratelimit_total{outcome}` (allowed, limited, contention, unavailable, refused_path;
+no merchant tag). Any failure in the limiter path nobody classified is a counted 503, never a 500.
+Each gateway also PINGs Redis every 10 s and publishes `ezeebit_gateway_ratelimit_store_up` (1 or
+0), read with `min()` across replicas, so RateLimiterStoreDown pages without needing traffic.
+
+**Gateway proof header (defence in depth only).** Every route removes any client-sent
+`X-Ezeebit-Gateway` header and adds its own, whose value is `GATEWAY_SHARED_SECRET`, served by
+config-svc to every service. ledger-svc and conversion-svc refuse their public merchant routes
+(`/{version}/merchants/**`, matched on the container's normalised servlet path, so `;params` and dot
+segments cannot step around it) with **403 `GATEWAY_REQUIRED`** unless the header matches, compared
+in constant time. A service with a blank secret refuses to start. This is not authentication: anyone
+who can read the served configuration or the gateway's environment holds the value, and it is sent
+in clear over plain HTTP. It stops a mistaken or casual direct call to a service; the real control is
+network policy or mTLS. `/internal/**` is not covered: it is service-to-service, bound to loopback
+locally, and needs a network policy or mTLS in production
+([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)).
+
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into
 an RFC 9457 problem detail with a stable `code` and i18n text that names no service:
 
@@ -101,7 +168,7 @@ an RFC 9457 problem detail with a stable `code` and i18n text that names no serv
   have been processed. The text tells the caller to check the resource's state before retrying.
 
 Without the advice all three reached the client as 500, which reads as a gateway bug. All three
-branches are tested in `GatewayApplicationTests`; the 504 one against an upstream that accepts the
+branches are tested in `UpstreamFailureIT`; the 504 one against an upstream that accepts the
 connection and never answers.
 
 **Registry timings.** Eureka's response cache and the clients' registry fetch are 5 s (default
@@ -346,12 +413,16 @@ Each was seen red with its control removed, or before its fix:
 
 ## 6. API summary
 
-The `/internal/v1/...` rows are never routed: the gateway answers 404 for them. Success bodies are
-`{"data": ...}`; errors are problem details with a stable `code`.
+The `/internal/v1/...` rows are never routed: the gateway answers 404 for them. The `/api/v1/...`
+rows are the gateway's paths; each service serves the same row under `/v1/...` and requires the
+gateway proof header there (403 `GATEWAY_REQUIRED` without it). Every `/api/v1/merchants/...` row can
+also answer, from the gateway, 400 `INVALID_MERCHANT_ID` or `MALFORMED_PATH`, 429 `RATE_LIMITED` and
+503 `RATE_LIMITER_UNAVAILABLE` (section 3). Success bodies are `{"data": ...}`; errors are problem
+details with a stable `code`.
 
 | Method | Path | Idempotency | Status codes |
 |---|---|---|---|
-| GET | `/api/v1/merchants/{merchantId}/balances` | n/a | 200 list per currency; 400 `VALIDATION_FAILED` (id not a UUID) |
+| GET | `/api/v1/merchants/{merchantId}/balances` | n/a | 200 list per currency; 400 `VALIDATION_FAILED` on a service for an id that is not a UUID (the gateway answers `INVALID_MERCHANT_ID` first) |
 | GET | `/api/v1/merchants/{merchantId}/entries?currency=&from=&to=&limit=&after=` | n/a | 200 statement, each row with `balanceAfter`, keyset pages (`limit` 1 to 500, default 100; `from` inclusive, `to` exclusive); 400 `UNKNOWN_CURRENCY`, `VALIDATION_FAILED` |
 | POST | `/api/v1/merchants/{merchantId}/quotes` | not needed | 201; 400 `SAME_CURRENCY`, `UNSUPPORTED_PAIR`, `UNKNOWN_CURRENCY`, amount errors (including `AMOUNT_TOO_SMALL`), `VALIDATION_FAILED`; 502 `RATE_REJECTED` with `reason`; 503 `RATE_UNAVAILABLE` |
 | POST | `/api/v1/merchants/{merchantId}/conversions` | `Idempotency-Key`, required; quote single-use | 201 COMPLETED; 202 PENDING; 400 `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED`; 404 `QUOTE_NOT_FOUND` (also another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED` (reason `INPUT_REFUSED`, `DEADLINE_PASSED`, `VOIDED`); 422 `INSUFFICIENT_FUNDS`, `BALANCE_LIMIT_EXCEEDED` (with `conversionId`), `IDEMPOTENCY_KEY_REUSED` |
@@ -361,9 +432,10 @@ The `/internal/v1/...` rows are never routed: the gateway answers 404 for them. 
 | GET | `/internal/v1/conversion-postings/{conversionId}?merchantId=` (sweeper) | n/a | 200 `status` POSTED, VOID, or REFUSED with `reason`; 400 without `merchantId`; 404 `POSTING_NOT_FOUND` |
 | POST | `/internal/v1/conversion-postings/{conversionId}/void` (sweeper) | identity (`merchantId`, CONVERSION, `conversionId`) | 201 voided, replayed, or the stored REFUSED journal; 409 `CONVERSION_ALREADY_POSTED` |
 
-A path no controller maps answers 404 `NOT_FOUND`, distinct from `POSTING_NOT_FOUND`. An
-unsupported version on a service itself (`/api/v2/...`) is 400 `UNSUPPORTED_API_VERSION`; through
-the gateway it is 404, because the route table publishes v1 only.
+A path no controller maps answers 404 `NOT_FOUND`, distinct from `POSTING_NOT_FOUND`; that includes
+any `/api/...` path sent straight to a service. An unsupported version on a service itself
+(`/v2/...`) is 400 `UNSUPPORTED_API_VERSION`; through the gateway it is 404, because the route table
+publishes v1 only.
 
 ## 7. Failure handling
 
@@ -371,6 +443,10 @@ the gateway it is 404, because the route table publishes v1 only.
 |---|---|---|
 | A domain service down, unregistered or refusing | gateway 503 `UPSTREAM_UNAVAILABLE` | yes |
 | Upstream resets, or silent for 10 s | gateway 504 `UPSTREAM_OUTCOME_UNKNOWN` | yes |
+| Redis down, unreachable, stalled, or away at the gateway's boot | merchant routes 503 `RATE_LIMITER_UNAVAILABLE` within the 250 ms timeout, nothing forwarded; health stays UP; admitted again once Redis answers; RateLimiterStoreDown pages | yes: stopped mid-run, paused, absent at boot; recovery within 2.5 s after a late start and after a kill and restart (red with a 10 s connect back-off, and with Lettuce's default reconnect delay) |
+| Many concurrent requests for one merchant | compare-and-swap losers past `max-retries` are 429 contention, never 503 | yes: one key through two gateways |
+| A non-canonical path (`%xx`, `;param`, dot segment, `//`) | 400 `MALFORMED_PATH` on any path, counted `refused_path` | yes: encoded spellings of an exhausted route are 400 or 404, never 200 |
+| A merchant over its limit | 429 `RATE_LIMITED` with `Retry-After`, nothing forwarded | yes: burst of capacity + 1, and split across two gateways |
 | config-svc or eureka-svc down | running services keep their config and last registry; a restarting service cannot boot | no (framework behaviour) |
 | Postgres down | the affected service fails its requests; nothing is half-written, every posting is one transaction | no (by design) |
 | Rate service slow, down or wrong | quote refused in about 2 s, at most about 4 s (2 s connect plus 2 s read) (503) or with the broken rule (502); nothing stored, no default rate | yes: slow, 500, zero, negative, stale, out of band, jump, unreadable |

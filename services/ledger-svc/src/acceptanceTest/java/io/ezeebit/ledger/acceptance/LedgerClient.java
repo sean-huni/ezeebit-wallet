@@ -41,8 +41,10 @@ public class LedgerClient {
 
 	private synchronized RestClient client() {
 		if (client == null) {
+			// Every call arrives as if through the gateway; GatewayProofIT covers the calls that do not.
 			client = RestClient.builder()
 					.baseUrl("http://127.0.0.1:%s".formatted(port()))
+					.defaultHeader("X-Ezeebit-Gateway", environment.getRequiredProperty("ezeebit.gateway.shared-secret"))
 					.defaultStatusHandler(HttpStatusCode::isError, (request, response) -> { })
 					.build();
 		}

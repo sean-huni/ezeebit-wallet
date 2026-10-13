@@ -7,3 +7,9 @@ dependencies {
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
 	runtimeOnly 'org.postgresql:postgresql'
 }
+
+// Spring tests read the shared file config-svc serves, so the gateway secret has one home.
+def served = rootProject.file('services/config-svc/src/main/resources/served')
+tasks.withType(Test).configureEach {
+	systemProperty 'spring.config.import', "file:${served}/application.yml"
+}

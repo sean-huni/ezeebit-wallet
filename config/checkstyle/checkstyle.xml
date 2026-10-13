@@ -13,6 +13,11 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]src[\\/](test|acceptanceTest)[\\/]"/>
 	</module>
+	<!-- The edge limiter's last fail-closed line: an unclassified failure must become a counted 503, never a 500. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]gateway[\\/]api[\\/]filter[\\/]RateLimitFilter\.java$"/>
+	</module>
 	<module name="SuppressionSingleFilter">
 		<property name="id" value="illegalCatchTest"/>
 		<property name="files" value="[\\/]src[\\/]main[\\/]"/>

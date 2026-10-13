@@ -53,4 +53,15 @@
 		<Method name="policy"/>
 	</Match>
 
+	<!-- The proof header is read only to compare it, in constant time, against the served secret; the value is never
+	     used as data. It is defence in depth by design (ARCHITECTURE.md section 3), which is what SERVLET_HEADER flags. -->
+	<Match>
+		<Bug pattern="SERVLET_HEADER"/>
+		<Or>
+			<Class name="io.ezeebit.ledger.api.filter.GatewayProofFilter"/>
+			<Class name="io.ezeebit.conversion.api.filter.GatewayProofFilter"/>
+		</Or>
+		<Method name="doFilterInternal"/>
+	</Match>
+
 </FindBugsFilter>

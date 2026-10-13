@@ -29,7 +29,7 @@ Walkthrough video: link to be added.
 
 **This README**
 
-[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting)
+[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Databases, schemas and tables](#databases-schemas-and-tables) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting)
 
 ## Find your way around
 
@@ -174,6 +174,21 @@ browsable in the Swagger user interface (UI) below.
 
 ## API reference
 
+What the gateway exposes, on http://localhost:8080 and in its Swagger UI at
+http://localhost:8080/swagger-ui.html:
+
+| Call | Gateway route | Served by |
+|---|---|---|
+| Balances | `GET /api/v1/merchants/{merchantId}/balances` | ledger-svc |
+| Statement (entries) | `GET /api/v1/merchants/{merchantId}/entries` | ledger-svc |
+| Quote | `POST /api/v1/merchants/{merchantId}/quotes` | conversion-svc |
+| Convert | `POST /api/v1/merchants/{merchantId}/conversions` | conversion-svc |
+| Read a conversion | `GET /api/v1/merchants/{merchantId}/conversions/{conversionId}` | conversion-svc |
+
+Deposits have no gateway route: they arrive on ledger-svc's `/internal/v1/deposits` from the
+money-in rail only. Every status code each call can answer is in
+[ARCHITECTURE.md section 6](ARCHITECTURE.md#6-api-summary).
+
 With the fleet up, **http://localhost:8080/swagger-ui.html** is one Swagger UI over both public
 specs, picked from "Select a definition": `ledger` (balances, entries) and `conversion` (quotes,
 conversions). Its server is the gateway, so "Try it out" goes through the route table, the rate
@@ -213,6 +228,39 @@ Without that, `OpenApiContractIT` fails `./gradlew build` and names the file tha
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
 `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there.
+
+## Databases, schemas and tables
+
+One PostgreSQL server, one database per domain service, each owned by that service's own role.
+`docker/postgres/initdb/01-databases.sql` creates the two databases and revokes CONNECT from PUBLIC,
+so neither role can open the other's database. Every table is created by that service's Liquibase
+changesets (`services/<svc>/src/main/resources/db/changelog/`), so the service's role owns it. All
+tables sit in the `public` schema, which PostgreSQL 15 and later gives to `pg_database_owner`: the
+database's owner role.
+
+| Database | Owner role | Schema | Table | Owned by | Written by | What it holds |
+|---|---|---|---|---|---|---|
+| `ledger` | `ledger` | `public` | `currency` | `ledger` | ledger-svc | The five currencies, their kind and scale; seeded |
+| `ledger` | `ledger` | `public` | `account` | `ledger` | ledger-svc | Merchant and platform accounts per currency, with the merchant balance |
+| `ledger` | `ledger` | `public` | `journal` | `ledger` | ledger-svc | One row per money movement (deposit or conversion), its status and idempotency key |
+| `ledger` | `ledger` | `public` | `entry` | `ledger` | ledger-svc | The signed debit and credit lines of each journal, insert-only, with `balance_after` (sequence `entry_seq_seq`) |
+| `ledger` | `ledger` | `public` | `databasechangelog`, `databasechangeloglock` | `ledger` | Liquibase | Which changesets ran, and the migration lock |
+| `conversion` | `conversion` | `public` | `quote` | `conversion` | conversion-svc | Firm prices: pair, amounts, market and applied rate, spread, expiry |
+| `conversion` | `conversion` | `public` | `conversion` | `conversion` | conversion-svc | Accepted quotes: idempotency key, status (COMPLETED, PENDING, REJECTED), deadline |
+| `conversion` | `conversion` | `public` | `databasechangelog`, `databasechangeloglock` | `conversion` | Liquibase | Which changesets ran, and the migration lock |
+
+Read on a running fleet on 2026-10-13 (the `postgres` superuser only creates the databases and roles):
+
+```sh
+docker compose exec postgres psql -U postgres -d ledger -c '\dt+'          # tables and their owner
+docker compose exec postgres psql -U postgres -c '\l'                      # databases and their owner
+docker compose exec postgres psql -U postgres -Atc "select has_database_privilege('conversion','ledger','CONNECT')"   # f
+```
+
+The gateway keeps no database: its rate-limit buckets, one per merchant, live in Redis, and
+config-svc and eureka-svc keep no database either. Column-level detail and constraints are in
+[ARCHITECTURE.md section 4](ARCHITECTURE.md#4-ledger-design-task-1) and
+[section 5](ARCHITECTURE.md#5-conversion-design-task-2).
 
 ## Repository layout
 

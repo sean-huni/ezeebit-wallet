@@ -2,7 +2,7 @@ apiVersion: 1
 groups:
   - orgId: 1
     name: ezeebit
-    folder: Ezeebit
+    folder: Ezeebit alerts
     interval: 10s
     rules:
       - uid: ezeebit-service-down

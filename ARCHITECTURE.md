@@ -317,8 +317,9 @@ The rest of 12-factor is followed: config comes from the environment with commit
 - No concurrency, idempotency or reconciliation tests yet; the 6 existing tests cover boot and gateway routing.
 - No exchange-rate client or local stub for the rate feed.
 - Alerts reach one Slack channel and there is no on-call rota: a 3am alert reaches a channel, not a person.
+- Nothing watches the monitoring stack: rules are evaluated inside the same lgtm container, so if it dies nothing pages.
 - No business metrics yet (postings, quotes, rate refusals): only HTTP and JVM metrics.
-- HighErrorRate is loaded but has never been seen firing: no 5xx traffic was generated.
+- HighErrorRate has no minimum-traffic guard: one 500 in a quiet minute reads as 100%. It was seen firing once, in a local forced-5xx run with Slack disconnected (ledger-svc stopped, gateway answering 503): Pending t+20s, Alerting t+140s on gateway-svc.
 - No OpenAPI schema.
 - One Postgres container hosts both databases: logically separate, but one shared failure domain.
 - config-svc and eureka-svc run as single instances.

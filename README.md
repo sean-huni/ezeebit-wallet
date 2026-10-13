@@ -41,9 +41,9 @@ is needed).
 ./fleet.sh down     # stop the JVMs, then docker compose down (the data volumes are kept)
 ```
 
-`up` starts Postgres (`docker compose up -d --wait postgres`), builds the jars, starts Grafana
-LGTM (`docker compose up -d --wait lgtm`), then starts the control plane first (config-svc, then eureka-svc), then ledger-svc, conversion-svc and
-gateway-svc. Each service is waited on for up to 90 s (a real deadline) to report healthy.
+`up` starts Postgres (`docker compose up -d --wait postgres`), builds the jars, starts the control
+plane first (config-svc, then eureka-svc), then ledger-svc, conversion-svc and gateway-svc, and
+finally Grafana LGTM (`docker compose up -d --wait lgtm`). Each service is waited on for up to 90 s (a real deadline) to report healthy.
 `up` refuses to start when a fleet from `.fleet/*.pid` is still running. Expected tail of `up`:
 
 ```
@@ -135,11 +135,11 @@ Alert rules (`docker/lgtm/alerting/rules.yaml`, Grafana-managed):
 | ServiceDown | a service has exported no metrics for 30 s, for 1 min; one alert per service |
 | HighErrorRate | more than 5% of a service's requests answer 5xx over 1 min, for 2 min |
 
-On `up`, ServiceDown is briefly Pending while the JVMs boot (about 30 s, measured) and clears once
-each service exports; it fires only after 1 min. Notifications go to Slack only when
+`fleet.sh` starts lgtm only after every service is healthy and stops it first on `down`, so
+neither booting nor a deliberate stop can page. Notifications go to Slack only when
 `SLACK_WEBHOOK_URL` is set in the root `.env` (gitignored, never committed). The container installs the Slack contact point at
 start only in that case, because Grafana refuses to start on a Slack contact point with an empty
-URL; without it the route is removed again and alerts stay visible in Grafana only. The URL is
+URL; without it no contact point exists and alerts stay visible in Grafana only. The URL is
 expanded by Grafana from its environment and is never written to a file.
 
 ## Configuration

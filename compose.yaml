@@ -5,7 +5,7 @@ services:
       - 'POSTGRES_USER=${POSTGRES_USER:-postgres}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}'
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       # Runs only on an empty data volume; after editing it, `docker compose down -v`.
       - './docker/postgres/initdb:/docker-entrypoint-initdb.d:ro'
@@ -26,9 +26,10 @@ services:
     environment:
       - 'SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}'
     ports:
-      - '3000:3000'
-      - '4317:4317'
-      - '4318:4318'
+      # Loopback only: anonymous Admin can read the Slack webhook, and open OTLP accepts forged metrics.
+      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:4317:4317'
+      - '127.0.0.1:4318:4318'
     volumes:
       - './docker/lgtm:/ezeebit:ro'
       - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'

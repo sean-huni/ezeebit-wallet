@@ -10,6 +10,6 @@
      "description": "ServiceDown and HighErrorRate in every state, including Normal. Rules live in docker/lgtm/alerting/rules.yaml.",
      "options": {"viewMode": "list", "showInstances": true, "maxItems": 50, "sortOrder": 1,
        "stateFilter": {"firing": true, "pending": true, "noData": true, "normal": true, "error": true},
-       "groupMode": "default", "groupBy": [], "folder": {"uid": "ezeebit"}, "alertInstanceLabelFilter": ""}}
+       "groupMode": "default", "groupBy": [], "alertInstanceLabelFilter": ""}}
   ]
 }

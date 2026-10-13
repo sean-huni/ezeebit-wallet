@@ -53,8 +53,10 @@ to the used.
 
 ## ledger-svc
 
-84 classes in 23 packages. The three use cases each own a subpackage of `service/`; the domain
-depends on nothing but its own exception.
+94 classes in 25 packages. The three use cases each own a subpackage of `service/`; the domain
+depends on nothing but its own exception. No bean takes more than 3 injected dependencies
+([Dependency injection budget](#dependency-injection-budget)), so a use case is several small classes,
+each named for its one step.
 
 ```text
 io.ezeebit.ledger     LedgerApplication
@@ -69,9 +71,11 @@ io.ezeebit.ledger     LedgerApplication
 │   ├── req/          ConversionPostingReq, DepositReq, StatementReq, VoidReq
 │   └── resp/         ApiResponse, BalanceResp, ConversionPostingResp, DepositResp, StatementLineResp, StatementResp
 ├── service/          CurrencyCatalog (shared by the use cases)
-│   ├── conversion/   ConversionPoster, ConversionPostingCommand, ConversionPostingService, ConversionReplayer, ConversionVoider, RefusalRecorder
-│   ├── deposit/      DepositCommand, DepositPoster, DepositReader, DepositReplayer, DepositService
+│   ├── conversion/   ConversionLegWriter, ConversionPoster, ConversionPostingCommand, ConversionPostingIntake, ConversionPostingRecorder, ConversionPostingService, ConversionReplayer, ConversionVoidService, ConversionVoider, RefusalRecorder
+│   │   └── answer/   ConversionPostingAssembler, ConversionPostingReader, ConversionPostingResponder (the stored answer, counted once)
+│   ├── deposit/      DepositCommand, DepositIntake, DepositPoster, DepositReader, DepositRecorder, DepositReplayer, DepositService
 │   ├── idempotency/  RequestFingerprint (request hashing for replay comparison)
+│   ├── posting/      EntryWriter (one posting line as an entry row, shared by deposit and conversion)
 │   └── statement/    BalanceService, StatementService
 ├── mapper/           AmountFormat, BalanceMapper, ConversionPostingMapper, CurrencyMapper, EntryMapper, StatementMapper (entity and domain to response)
 ├── domain/           AccountType, ConversionLegs, Currency, CurrencyCode, CurrencyKind, JournalStatus, JournalType, MerchantId, Money, Posting, PostingLine (no framework imports)
@@ -95,15 +99,17 @@ api.filter         -> exception(2)
 api.validation     -> dto.req(1)
 common.metrics     -> domain(1), exception(1)
 config             -> api.doc(2), api.filter(1)
-ctl                -> dto.req(4), dto.resp(8), service.conversion(1), service.deposit(1), service.statement(2)
-data.repo          -> data.model(5), data.repo.query(1)
-domain             -> exception(6)
-dto.req            -> api.json(2), api.validation(3)
-mapper             -> data.model(6), domain(8), dto.resp(4)
-service            -> data.repo(1), domain(2), exception(2), mapper(1)
-service.conversion -> common.metrics(2), data.model(5), data.repo(8), domain(20), dto.req(2), dto.resp(1), exception(9), mapper(2), service(1), service.idempotency(2)
-service.deposit    -> common.metrics(2), data.model(3), data.repo(5), domain(14), dto.req(1), dto.resp(2), exception(3), mapper(2), service(1), service.idempotency(2)
-service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2), dto.req(1), dto.resp(2), mapper(2), service(2)
+ctl                       -> dto.req(4), dto.resp(8), service.conversion(2), service.conversion.answer(1), service.deposit(1), service.statement(2)
+data.repo                 -> data.model(5), data.repo.query(1)
+domain                    -> exception(6)
+dto.req                   -> api.json(2), api.validation(3)
+mapper                    -> data.model(6), domain(8), dto.resp(4)
+service                   -> data.repo(1), domain(2), exception(2), mapper(1)
+service.conversion        -> common.metrics(2), data.model(4), data.repo(5), domain(21), dto.req(4), dto.resp(2), exception(12), service(1), service.conversion.answer(2), service.idempotency(3), service.posting(1)
+service.conversion.answer -> common.metrics(2), data.model(1), data.repo(2), domain(3), dto.resp(3), exception(3), mapper(1), service(1)
+service.deposit           -> common.metrics(3), data.model(3), data.repo(4), domain(16), dto.req(2), dto.resp(3), exception(3), mapper(1), service(1), service.idempotency(2), service.posting(1)
+service.posting           -> data.repo(1), domain(2), mapper(1)
+service.statement         -> data.model(1), data.repo(2), data.repo.query(1), domain(2), dto.req(1), dto.resp(2), mapper(2), service(2)
 ```
 
 | Package | One job | Key classes |
@@ -116,8 +122,10 @@ service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2)
 | `api.validation` | request constraints the annotations cannot say | `OrderedWindow`, `SupportedInstant` and validators |
 | `dto.req`, `dto.resp` | wire contract | `DepositReq`, `ConversionPostingReq`, `StatementReq`, `VoidReq`; `ApiResponse`, `DepositResp`, `BalanceResp`, `StatementResp` |
 | `service` | currency lookups shared by the use cases | `CurrencyCatalog` |
-| `service.deposit` | post a deposit once per idempotency key | `DepositService`, `DepositPoster`, `DepositReplayer`, `DepositReader`, `DepositCommand` |
-| `service.conversion` | post, void or refuse a conversion once per conversion id | `ConversionPostingService`, `ConversionPoster`, `ConversionVoider`, `ConversionReplayer`, `RefusalRecorder`, `ConversionPostingCommand` |
+| `service.deposit` | post a deposit once per idempotency key | `DepositService` (span, counter, log), `DepositIntake` (currency, command), `DepositRecorder` (post or replay, read back), `DepositPoster`, `DepositReplayer`, `DepositReader`, `DepositCommand` |
+| `service.conversion` | post, void or refuse a conversion once per conversion id | `ConversionPostingService`, `ConversionVoidService`, `ConversionPostingIntake`, `ConversionPostingRecorder`, `ConversionPoster` (the transaction), `ConversionLegWriter` (both legs), `ConversionVoider`, `ConversionReplayer`, `RefusalRecorder`, `ConversionPostingCommand` |
+| `service.conversion.answer` | build every answer from the stored rows, and count it once | `ConversionPostingResponder`, `ConversionPostingReader`, `ConversionPostingAssembler` |
+| `service.posting` | write one posting line as an entry row, inside the caller's transaction | `EntryWriter` |
 | `service.statement` | read balances and the statement | `BalanceService`, `StatementService` |
 | `service.idempotency` | fingerprint a request for replay comparison | `RequestFingerprint` |
 | `mapper` | entities and domain values to response records | `StatementMapper`, `EntryMapper`, `BalanceMapper`, `ConversionPostingMapper`, `CurrencyMapper`, `AmountFormat` |
@@ -132,7 +140,7 @@ service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2)
 
 ## conversion-svc
 
-74 classes in 25 packages. Each called service has its own anti-corruption layer under
+88 classes in 25 packages. Each called service has its own anti-corruption layer under
 `outbound/`, which owns the translation both ways; nothing else imports another context's shape.
 
 ```text
@@ -148,9 +156,9 @@ io.ezeebit.conversion  ConversionApplication
 │   ├── req/           ConversionReq, QuoteReq
 │   └── resp/          ApiResponse, ConversionResp, QuoteResp
 ├── service/           CurrencyCatalog (shared by the use cases)
-│   ├── conversion/    ConversionService, ConversionSettler, ConversionStarter
-│   ├── quote/         QuoteReader, QuoteService
-│   └── sweep/         PendingOverdueGauge, PendingResolver (resolves overdue PENDING conversions)
+│   ├── conversion/    ConversionAcceptance, ConversionFirstPoster, ConversionLedgerPoster, ConversionOpener, ConversionReader, ConversionReplayer, ConversionService, ConversionSettler, ConversionStarter
+│   ├── quote/         QuotePricer, QuoteReader, QuoteRedeemer, QuoteService, QuoteWriter, RateCheck, RateHistory
+│   └── sweep/         DueCutoff, PendingClaimer, PendingLedgerCheck, PendingOverdueGauge, PendingResolver (resolves overdue PENDING conversions)
 ├── scheduler/         PendingConversionSweeper
 ├── mapper/            ConversionMapper, QuoteMapper
 ├── domain/            ConversionStatus, Currency, LedgerAnswer, MarketRate, Money, PairPolicy, Priced, Pricing, Quote, RateRejection, RateRules, RateValidator, RejectionReason, Settlement, Side (no framework imports)
@@ -177,7 +185,7 @@ api.filter         -> exception(2)
 api.validation     -> dto.req(1)
 common.metrics     -> domain(4), exception(3)
 config             -> api.doc(2), api.filter(1), config.properties(1), domain(2)
-ctl                -> dto.req(2), dto.resp(4), service.conversion(1), service.quote(1)
+ctl                -> dto.req(2), dto.resp(4), service.conversion(2), service.quote(1)
 data.repo          -> data.model(2)
 domain             -> exception(7)
 dto.req            -> api.json(1), api.validation(1)
@@ -186,9 +194,9 @@ outbound.ledger    -> common.log(1), domain(4)
 outbound.rates     -> common.log(1), common.metrics(1), domain(6), exception(2)
 scheduler          -> common.metrics(2), service.sweep(2)
 service            -> config.properties(1), domain(2), exception(2)
-service.conversion -> common.metrics(2), config.properties(1), data.model(3), data.repo(5), domain(6), dto.req(1), dto.resp(1), exception(2), mapper(1), outbound.ledger(1), service.quote(2)
-service.quote      -> common.metrics(1), config.properties(1), data.model(1), data.repo(1), domain(10), dto.req(1), dto.resp(1), exception(1), mapper(2), outbound.rates(1), service(2)
-service.sweep      -> common.metrics(1), config.properties(2), data.model(1), data.repo(2), domain(2), outbound.ledger(1), service.conversion(1)
+service.conversion -> common.metrics(3), data.model(6), data.repo(4), domain(8), dto.req(2), dto.resp(6), exception(5), mapper(1), outbound.ledger(1), service.quote(4)
+service.quote      -> common.metrics(1), config.properties(3), data.model(2), data.repo(3), domain(14), dto.req(2), dto.resp(3), exception(3), mapper(2), outbound.rates(1), service(3)
+service.sweep      -> common.metrics(1), config.properties(1), data.model(1), data.repo(2), domain(2), outbound.ledger(1), service.conversion(1)
 ```
 
 | Package | One job | Key classes |
@@ -201,9 +209,9 @@ service.sweep      -> common.metrics(1), config.properties(2), data.model(1), da
 | `api.validation` | exactly one of sell or buy amount | `ExactlyOneAmount`, `ExactlyOneAmountValidator` |
 | `dto.req`, `dto.resp` | wire contract | `QuoteReq`, `ConversionReq`; `ApiResponse`, `QuoteResp`, `ConversionResp` |
 | `service` | currencies and pair policies from served configuration | `CurrencyCatalog` |
-| `service.quote` | price and store a firm quote; read it back | `QuoteService`, `QuoteReader` |
-| `service.conversion` | accept a quote, post to the ledger, settle the outcome | `ConversionService`, `ConversionStarter`, `ConversionSettler` |
-| `service.sweep` | resolve PENDING conversions past their deadline, and report how many are overdue | `PendingResolver`, `PendingOverdueGauge` |
+| `service.quote` | price and store a firm quote; read it back; redeem it for a conversion | `QuoteService` (span, counter, log), `QuotePricer`, `RateCheck` (fetch and validate), `RateHistory` (recent rate and the clock read), `QuoteWriter`, `QuoteReader` (incl. the live check), `QuoteRedeemer` |
+| `service.conversion` | accept a quote, post to the ledger, settle the outcome | `ConversionService` (span, log), `ConversionAcceptance`, `ConversionOpener`, `ConversionStarter`, `ConversionFirstPoster`, `ConversionReplayer`, `ConversionReader`, `ConversionLedgerPoster`, `ConversionSettler` |
+| `service.sweep` | resolve PENDING conversions past their deadline, and report how many are overdue | `PendingResolver` (transaction, counting), `PendingClaimer`, `PendingLedgerCheck`, `DueCutoff` (the one definition of due), `PendingOverdueGauge` |
 | `scheduler` | trigger the sweep on every replica | `PendingConversionSweeper` |
 | `mapper` | domain and entities to response records and rows | `QuoteMapper`, `ConversionMapper` |
 | `domain` | pricing, rate rules, quote, conversion states, ledger answers | `Pricing`, `RateValidator`, `Quote`, `Money`, `ConversionStatus`, `LedgerAnswer`, `Settlement` |
@@ -356,7 +364,7 @@ io.ezeebit.gateway   GatewayApplication
 | gateway | `common` (2): path classification and metrics | `common.metrics` (1); `MerchantPath` to `api.filter` (2) | the path classifier serves only the filter |
 
 Totals: ledger 77 to 78 classes, conversion 65 to 67, gateway 15 to 15. Largest package that
-mixes use cases: 14 classes before, none after (the largest `service.*` package is 6).
+mixes use cases: 14 classes before, none after (the largest `service.*` package was 6 then; the dependency-injection split since took it to 10, see [Dependency injection budget](#dependency-injection-budget)).
 
 ### Coupling: the edges that changed
 
@@ -383,9 +391,44 @@ was published before the move, so changing any status goes red (proved by remapp
 `GATEWAY_REQUIRED` to 401). A new `ErrorCode` constant does not compile until `ErrorStatus` gives
 it a status, because the switch has no default.
 
+## Dependency injection budget
+
+No bean and no `@Bean` method takes more than 3 injected dependencies (constructor parameters,
+`@Autowired` or `@Inject` fields and setters, `@Value`). `DependencyBudgetTest`, under
+`architecture/src/test/java` and compiled into every service's `test` task, fails `./gradlew build`
+and lists each offender with its count ([quality-gates.md](quality-gates.md#static-analysis-and-coverage)).
+
+Measured on 2026-10-13 at `103e5cf` (BEFORE) and at the split (AFTER). The 8 offenders were split by
+job, with the same calls in the same order, the same transactions, counters and spans:
+
+| Service | Bean | BEFORE | AFTER | Where the steps went |
+|---|---|---|---|---|
+| ledger | `ConversionPostingService` | 10 | 3 | `ConversionPostingIntake`, `ConversionPostingRecorder`, `ConversionVoidService` (void), `answer.ConversionPostingResponder`, `answer.ConversionPostingReader` (find), `answer.ConversionPostingAssembler`; `ConversionVoider` hashes the void itself |
+| ledger | `DepositService` | 6 | 3 | `DepositIntake`, `DepositRecorder` |
+| ledger | `ConversionPoster` | 5 | 3 | `ConversionLegWriter`, `posting.EntryWriter` |
+| ledger | `DepositPoster` | 4 | 3 | `posting.EntryWriter` |
+| conversion | `ConversionService` | 9 | 2 | `ConversionAcceptance`, `ConversionOpener`, `ConversionFirstPoster`, `ConversionReplayer`, `ConversionReader` (find) |
+| conversion | `QuoteService` | 8 | 3 | `QuotePricer`, `RateCheck`, `RateHistory`, `QuoteWriter` |
+| conversion | `PendingResolver` | 7 | 3 | `PendingClaimer`, `PendingLedgerCheck`, `DueCutoff` |
+| conversion | `ConversionSettler` | 5 | 3 | `ConversionLedgerPoster` posts; the settler counts a settlement made outside a transaction |
+
+What the package graph says about it (same commands as [Measuring it](#measuring-it)):
+
+- Classes: ledger 84 to 94, conversion 74 to 88. Largest `service.*` package: 10 (ledger
+  `service.conversion`, the write path only, after its answer side moved to `service.conversion.answer`).
+- Coupling that fell: conversion `service.conversion -> config.properties` 1 to 0 (the grace period
+  moved to `QuoteRedeemer`), `service.sweep -> config.properties` 2 to 1 (`DueCutoff` now holds the
+  rule `PendingResolver` and `PendingOverdueGauge` each restated); ledger `service.conversion -> mapper`
+  2 to 0 and `service.deposit -> mapper` 2 to 1 (mapping sits in `EntryWriter` and the assembler).
+- Coupling that rose, and why it is accepted: `service.* -> dto.resp` (conversion-svc 2 to 9, ledger-svc
+  5 to 10), because more classes now pass the response record along; the trade-off below covers it. `ctl -> service.*` rose by one edge per controller
+  that now reads through its reader.
+- No cycle: `service.conversion.answer` imports nothing from `service.conversion`; `service.posting`
+  imports no use case.
+
 ## The deliberate trade-off: services return `dto.resp`
 
-`service.* -> dto.resp` stays (ledger 5 imports, conversion 2). The layering standard keeps
+`service.* -> dto.resp` stays (ledger 10 imports, conversion 9, after the dependency-injection split). The layering standard keeps
 controllers lean and puts mapping in the service layer, so a use case returns the response record
 and the controller only wraps it. The cost: a second delivery mechanism (a message consumer, a gRPC
 endpoint) would have to take the HTTP response shape or add its own mapping. It is accepted because
@@ -418,6 +461,7 @@ moving the call site later is a local change.
 | a migration | a new numbered changeset in `src/main/resources/db/changelog/2026/10/` (or a new month folder), included from `db.changelog-2026-10.xml` | never edit an applied changeset |
 | configuration a service reads | `config/properties/*Properties` bound from `config-svc/.../served/<service>.yml` | the served file is where the values live; config-svc serves it to every replica |
 | a scheduled job | a trigger in `scheduler/` that only calls a service class | it must be safe on every replica at once |
+| a collaborator to a bean that already has 3 | a new class for the step that needs it (split by job, or extract a cohesive collaborator) | `DependencyBudgetTest` fails the build at 4; never a holder object, a context lookup or field injection |
 
 ## Measuring it
 

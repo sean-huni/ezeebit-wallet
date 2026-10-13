@@ -64,16 +64,17 @@ What exists:
   domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** `./gradlew clean build --rerun-tasks` on 2026-10-13, counted from the JUnit XML reports:
-**452 tests, 0 failures, 0 skipped.**
+**Tests.** `./gradlew clean build` on 2026-10-13 (branch `bugfix-di-flooding`), counted from the
+JUnit XML reports: **503 tests, 0 failures, 0 skipped.** Each unit count includes the 6 tests of the
+shared dependency-injection gate (`DependencyBudgetTest`, `InjectionCounterTest`).
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 68 | 33 | 61 |
-| conversion-svc | 112 | 27 | 44 |
-| gateway-svc | 51 | 54 | |
-| config-svc | 1 | | |
-| eureka-svc | 1 | | |
+| ledger-svc | 80 | 33 | 61 |
+| conversion-svc | 129 | 27 | 47 |
+| gateway-svc | 58 | 54 | |
+| config-svc | 7 | | |
+| eureka-svc | 7 | | |
 
 conversion-svc's acceptance scenarios run against the real ledger jar as its own process, with
 WireMock scripting rate-feed faults and ledger faults. Across both services' suites: 50 concurrent deposits sum

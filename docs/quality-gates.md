@@ -40,6 +40,15 @@ service. Tool versions are pinned in `gradle.properties`.
 | Checkstyle 14.3.0 (`checkstyleMain`, `checkstyleTest`, `checkstyleAcceptanceTest`) | every Java source set, against `config/checkstyle/checkstyle.xml` (tabs, static imports first, `}` alone before `catch`/`else`; main code may not catch `Exception`, `RuntimeException`, `Error` or `Throwable`, tests only `Error` or `Throwable`) | any violation (`maxWarnings` and `maxErrors` are 0) |
 | JaCoCo 0.8.15 (`jacocoTestCoverageVerification`) | one report per service, merged over every test tier it runs | line or branch coverage falls below the service's floor in `coverageFloors` |
 | `checkCoverageFloors` | the same report | a floor sits more than 5 points below the measured value (raise it to the value the message prints), or a measured counter has no floor |
+| Dependency-injection budget (`DependencyBudgetTest`, in every service's `test` task; source `architecture/src/test/java`) | the compiled main classes: every Spring component (`@Component` and its stereotypes, `@Configuration`, advice) found by classpath scanning under `io.ezeebit`, counting the constructor Spring selects, `@Autowired`, `@Inject` and `@Value` fields, and injected setter parameters; plus every `@Bean` method's parameters | any bean or `@Bean` method takes more than 3 injected dependencies (the message lists each with its count; no suppression), or the scan does not reach the service's `@SpringBootApplication` class |
+
+The dependency-injection budget enforces the estate rule that a bean takes at most 3 injected
+dependencies: a class with more is doing several jobs. Its first run failed on 8 beans (ledger
+`ConversionPostingService` 10, `DepositService` 6, `ConversionPoster` 5, `DepositPoster` 4;
+conversion `ConversionService` 9, `QuoteService` 8, `PendingResolver` 7, `ConversionSettler` 5),
+which were split by job; [project-layout.md](project-layout.md#dependency-injection-budget) has the
+before and after. `InjectionCounterTest` pins each counting rule with a fixture, and a temporary
+4-dependency bean plus a 4-parameter `@Bean` method in gateway-svc turned it red with both listed.
 
 Every SpotBugs exclusion carries a one-line reason in `config/spotbugs/exclude.xml`. Reports land in
 `services/<svc>/build/reports/{spotbugs,checkstyle,jacoco}/`.
@@ -64,7 +73,8 @@ defaults to `http://localhost:9000`; `SONAR_PROJECT_KEY` overrides the default k
 
 ## SAST and SCA read different things
 
-- **SAST** (SpotBugs with Find Security Bugs, Checkstyle, SonarQube) reads this repository's own
-  code. It finds **unknown** defects that no CVE describes.
+- **SAST** (static application security testing: SpotBugs with Find Security Bugs, Checkstyle, the
+  dependency-injection budget, SonarQube) reads this repository's own code. It finds **unknown**
+  defects that no CVE describes.
 - **SCA** (trivy, in [supply-chain.md](supply-chain.md)) reads the shipped image: jars, OS
   packages, the JRE, buildpack binaries. It finds **known** CVEs in code nobody here wrote.

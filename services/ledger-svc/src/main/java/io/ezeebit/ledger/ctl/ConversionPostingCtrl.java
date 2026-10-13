@@ -6,7 +6,7 @@ import io.ezeebit.ledger.dto.req.ConversionPostingReq;
 import io.ezeebit.ledger.dto.req.VoidReq;
 import io.ezeebit.ledger.dto.resp.ApiResponse;
 import io.ezeebit.ledger.dto.resp.ConversionPostingResp;
-import io.ezeebit.ledger.service.ConversionPostingService;
+import io.ezeebit.ledger.service.conversion.ConversionPostingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;

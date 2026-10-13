@@ -1,6 +1,6 @@
 package io.ezeebit.ledger.api.advice;
 
-import io.ezeebit.ledger.common.LogText;
+import io.ezeebit.ledger.common.log.LogText;
 import io.ezeebit.ledger.exception.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class BusinessExceptionHandler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BusinessExceptionHandler.class);
-	private static final int SERVER_ERROR = 500;
 
 	private final ProblemFactory problems;
 
@@ -25,7 +24,7 @@ public class BusinessExceptionHandler {
 	// A 5xx code here (currency mismatch, unbalanced posting) is an invariant the code broke, not bad input.
 	@ExceptionHandler(LedgerException.class)
 	ProblemDetail business(final LedgerException ex) {
-		if (ex.code().status() >= SERVER_ERROR) {
+		if (ErrorStatus.of(ex.code()).is5xxServerError()) {
 			LOG.error("ledger invariant violated", LogText.sanitised(ex));
 		}
 		ProblemDetail problem = problems.of(ex.code(), ex.args());

@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import io.ezeebit.gateway.common.MerchantPath;
+import io.ezeebit.gateway.api.filter.MerchantPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.server.mvc.config.GatewayMvcProperties;
 import org.springframework.cloud.gateway.server.mvc.config.PredicateProperties;

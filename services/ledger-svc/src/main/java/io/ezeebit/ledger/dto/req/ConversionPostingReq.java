@@ -3,8 +3,8 @@ package io.ezeebit.ledger.dto.req;
 import java.time.Instant;
 import java.util.UUID;
 
+import io.ezeebit.ledger.api.json.StrictStringDeserializer;
 import io.ezeebit.ledger.api.validation.SupportedInstant;
-import io.ezeebit.ledger.common.StrictStringDeserializer;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import tools.jackson.databind.annotation.JsonDeserialize;

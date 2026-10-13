@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import io.ezeebit.gateway.config.properties.RateLimitProperties;
+import io.ezeebit.gateway.service.MerchantBuckets;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -26,6 +28,7 @@ class RateLimiterUnavailableIT {
 	private static final Duration GIVE_UP = Duration.ofSeconds(15);
 	private static final Duration DOWN = Duration.ofSeconds(6);
 	private static final Duration POLL = Duration.ofMillis(100);
+	private static final Duration GAUGE_MARGIN = Duration.ofSeconds(3);
 	private static final String STORE_UP = "ezeebit.gateway.ratelimit.store.up";
 
 	@Test
@@ -98,13 +101,13 @@ class RateLimiterUnavailableIT {
 	// The connect back-off is 1s, so a store that appears after boot is used within it plus one connect.
 	@Test
 	void aStoreThatComesUpAfterBootIsUsedWithinTheBackOff() {
-		RedisStore store = RedisStore.onFixedPort();
+		RedisStore store = RedisStore.held();
 		try (UpstreamStub upstream = UpstreamStub.start();
-				ConfigurableApplicationContext gateway = Gateways.start(store.fixedArgs(), upstream.instances())) {
+				ConfigurableApplicationContext gateway = Gateways.start(store.args(), upstream.instances())) {
 			String path = "/api/v1/merchants/%s/balances".formatted(UUID.randomUUID());
 			assertUnavailable(get(gateway, path));
 
-			store.start();
+			store.serve();
 
 			assertThat(firstAdmission(gateway, path)).as("admitted after the store came up").isLessThan(RECOVERY);
 		}
@@ -116,17 +119,17 @@ class RateLimiterUnavailableIT {
 	// Lettuce's own reconnect backs off to 30s by default; capped at 1s, a restarted store is used at once.
 	@Test
 	void aKilledStoreIsUsedAgainAfterItRestarts() throws InterruptedException {
-		RedisStore store = RedisStore.onFixedPort();
-		store.start();
+		RedisStore store = RedisStore.held();
+		store.serve();
 		try (UpstreamStub upstream = UpstreamStub.start();
-				ConfigurableApplicationContext gateway = Gateways.start(store.fixedArgs(), upstream.instances())) {
+				ConfigurableApplicationContext gateway = Gateways.start(store.args(), upstream.instances())) {
 			String path = "/api/v1/merchants/%s/balances".formatted(UUID.randomUUID());
 			assertThat(get(gateway, path).getStatusCode().value()).isEqualTo(200);
 
-			store.kill();
+			store.drop();
 			Thread.sleep(DOWN.toMillis());
 			assertUnavailable(get(gateway, path));
-			store.start();
+			store.serve();
 
 			assertThat(firstAdmission(gateway, path)).as("admitted after the store restarted").isLessThan(RECOVERY);
 		}
@@ -137,17 +140,17 @@ class RateLimiterUnavailableIT {
 
 	@Test
 	void theStoreHealthGaugeFollowsTheStore() throws InterruptedException {
-		RedisStore store = RedisStore.onFixedPort();
-		store.start();
+		RedisStore store = RedisStore.held();
+		store.serve();
 		try (UpstreamStub upstream = UpstreamStub.start();
-				ConfigurableApplicationContext gateway = Gateways.start(store.fixedArgs(), upstream.instances(),
+				ConfigurableApplicationContext gateway = Gateways.start(store.args(), upstream.instances(),
 						List.of("--ezeebit.gateway.rate-limit.store.probe-interval=200ms"))) {
 			assertThat(awaitStoreUp(gateway, 1.0)).as("up while the store answers PING").isTrue();
 
-			store.kill();
+			store.drop();
 			assertThat(awaitStoreUp(gateway, 0.0)).as("down once PING fails").isTrue();
 
-			store.start();
+			store.serve();
 			assertThat(awaitStoreUp(gateway, 1.0)).as("up again after the store restarts").isTrue();
 		}
 		finally {
@@ -169,7 +172,8 @@ class RateLimiterUnavailableIT {
 	}
 
 	private static boolean awaitStoreUp(final ConfigurableApplicationContext gateway, final double expected) throws InterruptedException {
-		for (int i = 0; i < 50; i++) {
+		long deadline = System.nanoTime() + gaugeBudget(gateway).toNanos();
+		while (System.nanoTime() - deadline < 0) {
 			Double up = gateway.getBean(MeterRegistry.class).find(STORE_UP).gauges().stream().findFirst()
 					.map(gauge -> gauge.value()).orElse(null);
 			if (up != null && up == expected) {
@@ -178,6 +182,13 @@ class RateLimiterUnavailableIT {
 			Thread.sleep(POLL.toMillis());
 		}
 		return false;
+	}
+
+	// From the running gateway's own settings: the next probe, a connect and a PING each cut at the store timeout,
+	// one reconnect back-off, and a margin for a loaded JVM and Docker VM.
+	private static Duration gaugeBudget(final ConfigurableApplicationContext gateway) {
+		RateLimitProperties.Store store = gateway.getBean(RateLimitProperties.class).store();
+		return store.probeInterval().plus(store.timeout().multipliedBy(2)).plus(MerchantBuckets.RETRY_AFTER).plus(GAUGE_MARGIN);
 	}
 
 	private static void sleep(final Duration duration) {

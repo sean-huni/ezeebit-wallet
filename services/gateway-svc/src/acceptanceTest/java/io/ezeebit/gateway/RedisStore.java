@@ -1,7 +1,7 @@
 package io.ezeebit.gateway;
 
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 // The rate-limit store, real, on the image compose runs (redis.image from gradle.properties). Each container gets
@@ -16,6 +17,8 @@ import org.testcontainers.utility.DockerImageName;
 final class RedisStore {
 
 	private static final int REDIS_PORT = 6379;
+	private static final String DOWN_FLAG = "/tmp/down";
+	private static final Duration SETTLE = Duration.ofSeconds(10);
 
 	private final GenericContainer<?> container;
 	private final String password = UUID.randomUUID().toString();
@@ -26,45 +29,42 @@ final class RedisStore {
 				.withCommand("redis-server", "--requirepass", password);
 	}
 
+	// A shell keeps the container, and so its port, alive; Redis runs under it unless the down flag exists.
+	private RedisStore(final String downFlag) {
+		String supervisor = "while :; do [ -e %s ] || redis-server --requirepass %s; sleep 0.1; done"
+				.formatted(downFlag, password);
+		container = new GenericContainer<>(DockerImageName.parse(System.getProperty("redis.image")))
+				.withExposedPorts(REDIS_PORT)
+				.withCommand("sh", "-c", supervisor)
+				.waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1));
+	}
+
 	static RedisStore started() {
 		RedisStore store = new RedisStore();
 		store.container.start();
 		return store;
 	}
 
-	// Bound to a fixed host port and NOT started: the gateway can boot against an address that later answers.
-	static RedisStore onFixedPort() {
-		RedisStore store = new RedisStore();
-		store.container.setPortBindings(List.of("%d:%d".formatted(freePort(), REDIS_PORT)));
+	// Returned DOWN, on a port Docker keeps for the container's whole life. A port picked free and bound later, or
+	// freed by a stopped container, can be taken by another process on 127.0.0.1 while Redis stays up behind it.
+	static RedisStore held() {
+		RedisStore store = new RedisStore(DOWN_FLAG);
+		store.container.start();
+		store.drop();
 		return store;
 	}
 
-	static int freePort() {
-		try (ServerSocket probe = new ServerSocket(0)) {
-			return probe.getLocalPort();
-		}
-		catch (IOException ex) {
-			throw new IllegalStateException(ex);
-		}
+	// Returns once the store itself answers PONG, so a caller's clock starts at a known-up store.
+	void serve() {
+		exec("rm", "-f", DOWN_FLAG);
+		await(true);
 	}
 
-	int fixedPort() {
-		return Integer.parseInt(container.getPortBindings().getFirst().split(":")[0]);
-	}
-
-	List<String> fixedArgs() {
-		return List.of("--ezeebit.gateway.rate-limit.store.host=127.0.0.1",
-				"--ezeebit.gateway.rate-limit.store.port=%d".formatted(fixedPort()),
-				"--ezeebit.gateway.rate-limit.store.password=%s".formatted(password));
-	}
-
-	void start() {
-		if (container.getContainerId() == null) {
-			container.start();
-		}
-		else {
-			container.getDockerClient().startContainerCmd(container.getContainerId()).exec();
-		}
+	// The server exits and its sockets drop, as when the store's pod is evicted; the host port stays held.
+	void drop() {
+		exec("touch", DOWN_FLAG);
+		exec("redis-cli", "-a", password, "--no-auth-warning", "shutdown", "nosave");
+		await(false);
 	}
 
 	Map<String, String> properties() {
@@ -75,6 +75,41 @@ final class RedisStore {
 
 	List<String> args() {
 		return properties().entrySet().stream().map(entry -> "--%s=%s".formatted(entry.getKey(), entry.getValue())).toList();
+	}
+
+	private void await(final boolean up) {
+		long deadline = System.nanoTime() + SETTLE.toNanos();
+		while (System.nanoTime() - deadline < 0) {
+			boolean pong = "PONG".equals(exec("redis-cli", "-a", password, "--no-auth-warning", "ping").getStdout().strip());
+			if (pong == up) {
+				return;
+			}
+			sleepQuietly();
+		}
+		throw new IllegalStateException("store did not turn %s within %s".formatted(up ? "up" : "down", SETTLE));
+	}
+
+	private Container.ExecResult exec(final String... command) {
+		try {
+			return container.execInContainer(command);
+		}
+		catch (IOException ex) {
+			throw new IllegalStateException(ex);
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(ex);
+		}
+	}
+
+	private static void sleepQuietly() {
+		try {
+			Thread.sleep(Duration.ofMillis(50));
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(ex);
+		}
 	}
 
 	// The store's own answer through redis-cli, not through a client this suite configured; an error reply fails.

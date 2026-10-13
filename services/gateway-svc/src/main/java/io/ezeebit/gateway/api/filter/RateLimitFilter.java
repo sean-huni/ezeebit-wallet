@@ -2,9 +2,8 @@ package io.ezeebit.gateway.api.filter;
 
 import java.io.IOException;
 
-import io.ezeebit.gateway.common.MerchantPath;
-import io.ezeebit.gateway.common.MerchantPath.Kind;
-import io.ezeebit.gateway.common.RateLimitMetrics;
+import io.ezeebit.gateway.api.filter.MerchantPath.Kind;
+import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
 import io.ezeebit.gateway.domain.Admission;
 import io.ezeebit.gateway.domain.LimitOutcome;
 import io.ezeebit.gateway.exception.EdgeRefusalException;

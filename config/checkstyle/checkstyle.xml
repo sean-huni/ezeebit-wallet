@@ -18,10 +18,6 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]gateway[\\/]api[\\/]filter[\\/]RateLimitFilter\.java$"/>
 	</module>
-	<module name="SuppressionSingleFilter">
-		<property name="id" value="illegalCatchTest"/>
-		<property name="files" value="[\\/]src[\\/]main[\\/]"/>
-	</module>
 
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">

@@ -2,7 +2,8 @@
 
 How the system is shaped and why. [README.md](README.md) covers running it;
 [SOLUTION.md](SOLUTION.md) covers task choice, trade-offs, how Tasks 3 to 6 slot in, and the single
-list of known gaps.
+list of known gaps. [docs/project-layout.md](docs/project-layout.md) maps every package and class in
+each service, with the measured dependencies between packages.
 
 Everything described here is built and tested unless it says otherwise. A WireMock container stands
 in for the exchange-rate service the brief says already exists.
@@ -274,8 +275,10 @@ replays while `"100.0"` and `"100.00"` are different requests.
 Amounts are decimal strings; a JSON number is refused, so no binary float reaches the service. Too
 many decimals for the currency is refused (`"10.500"` is fine for ZAR, `"10.001"` is not), as is
 more than 20 digits before the point. Input Postgres cannot store (a NUL in `reference`, a statement
-window outside 1970 to 9999) is 400 at the edge. `ErrorCode` carries its HTTP status, so the
-framework-free domain knows its errors' web statuses: a coupling accepted for the timebox.
+window outside 1970 to 9999) is 400 at the edge. `ErrorCode` carries only the stable wire code and
+its message key; `api/advice/ErrorStatus` is the one table mapping each code to its HTTP status, an
+exhaustive switch (a new code does not compile without a status), and `ErrorStatusTest` pins every
+published status.
 
 ## 5. Conversion design (Task 2)
 

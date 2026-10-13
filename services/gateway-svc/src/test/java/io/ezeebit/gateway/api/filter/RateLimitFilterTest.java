@@ -6,7 +6,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.ezeebit.gateway.common.RateLimitMetrics;
+import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
 import io.ezeebit.gateway.exception.EdgeRefusalException;
 import io.ezeebit.gateway.exception.ErrorCode;

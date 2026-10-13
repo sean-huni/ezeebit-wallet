@@ -1,10 +1,12 @@
 package io.ezeebit.conversion.outbound.ledger;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
-import io.ezeebit.conversion.common.LogText;
+import io.ezeebit.conversion.common.log.LogText;
 import io.ezeebit.conversion.domain.LedgerAnswer;
+import io.ezeebit.conversion.domain.Quote;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -22,13 +24,17 @@ public class LedgerClient {
 
 	private final RestClient ledger;
 	private final LedgerAnswerMapper mapper;
+	private final PostingMapper postings;
 
-	public LedgerClient(@Qualifier("ledgerRestClient") final RestClient ledger, final LedgerAnswerMapper mapper) {
+	public LedgerClient(@Qualifier("ledgerRestClient") final RestClient ledger, final LedgerAnswerMapper mapper,
+			final PostingMapper postings) {
 		this.ledger = ledger;
 		this.mapper = mapper;
+		this.postings = postings;
 	}
 
-	public LedgerAnswer post(final PostingDto posting) {
+	public LedgerAnswer post(final UUID conversionId, final UUID merchantId, final Quote quote, final Instant deadline) {
+		PostingDto posting = postings.toPosting(conversionId, merchantId, quote, deadline);
 		return call(() -> ledger.post().uri(POSTINGS).contentType(MediaType.APPLICATION_JSON).body(posting));
 	}
 

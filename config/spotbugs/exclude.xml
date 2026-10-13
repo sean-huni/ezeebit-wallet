@@ -18,7 +18,7 @@
 			<Field type="io.ezeebit.ledger.data.repo.JournalRepo"/>
 			<Field type="io.ezeebit.conversion.data.repo.ConversionRepo"/>
 			<Field type="io.ezeebit.conversion.data.repo.QuoteRepo"/>
-			<Field type="io.ezeebit.conversion.service.ConversionSettler"/>
+			<Field type="io.ezeebit.conversion.service.conversion.ConversionSettler"/>
 			<Field type="io.micrometer.core.instrument.MeterRegistry"/>
 			<Field type="org.springframework.web.client.RestClient"/>
 			<Field type="org.springframework.transaction.support.TransactionTemplate"/>

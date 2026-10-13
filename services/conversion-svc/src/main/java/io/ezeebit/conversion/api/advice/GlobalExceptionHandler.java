@@ -1,6 +1,6 @@
 package io.ezeebit.conversion.api.advice;
 
-import io.ezeebit.conversion.common.LogText;
+import io.ezeebit.conversion.common.log.LogText;
 import io.ezeebit.conversion.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -27,6 +27,19 @@ await_healthy() {
   return 1
 }
 
+await_routed() {
+  # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
+  local m=00000000-0000-0000-0000-000000000000 deadline=$(( SECONDS + 60 )) b q
+  while (( SECONDS < deadline )); do
+    b=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/balances")
+    q=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/conversions/$m")
+    [[ $b == 200 && $q == 404 ]] && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }
+    sleep 1
+  done
+  print -u2 "  gateway not routing after 60s (balances '$b', conversions '$q')"
+  return 1
+}
+
 start() {
   local svc=$1
   java -jar services/$svc/build/libs/$svc-*.jar > "$RUN/$svc.log" 2>&1 &
@@ -51,6 +64,7 @@ up() {
   local svc
   for svc in ledger-svc conversion-svc gateway-svc; do start $svc; done
   for svc in ledger-svc conversion-svc gateway-svc; do await_healthy $svc || return 1; done
+  await_routed || return 1
   # Last, so neither a slow boot nor a failed up can page: ServiceDown only ever sees a healthy fleet.
   print "lgtm"
   docker compose up -d --wait lgtm || return 1

@@ -59,7 +59,7 @@ mounts (`docker/wiremock/mappings/`). Run one tier with `./gradlew :services:led
 
 `up` starts Postgres and the WireMock rate service (`docker compose up -d --wait postgres wiremock`), builds the jars, starts the control
 plane first (config-svc, then eureka-svc), then ledger-svc, conversion-svc and gateway-svc, and
-finally Grafana LGTM (`docker compose up -d --wait lgtm`). Each service is waited on for up to 90 s (a real deadline) to report healthy.
+finally Grafana LGTM (`docker compose up -d --wait lgtm`). Each service is waited on for up to 90 s (a real deadline) to report healthy. `up` then waits (up to 60 s) until the gateway actually routes to ledger-svc and conversion-svc, because a healthy service is only routable once the gateway has fetched the registry.
 `up` refuses to start when a fleet from `.fleet/*.pid` is still running. Expected tail of `up`:
 
 ```

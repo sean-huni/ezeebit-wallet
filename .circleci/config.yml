@@ -1,0 +1,188 @@
+# The pipeline runs the same Gradle commands a laptop runs and names no quality tool itself, so a
+# gate wired into `check` is picked up here without this file changing. No orbs: an orb is a
+# third-party include resolved at pipeline time, in a pipeline whose job includes supply-chain checks.
+version: 2.1
+
+jobs:
+  gate:
+    # Machine, not docker: Testcontainers and the scanners need a Docker daemon on the job's host.
+    machine:
+      # A dated tag, never ':current'. Newest listed on the CircleCI ubuntu-2604 image page, 2026-10-13.
+      image: ubuntu-2604:2026.07.1
+    # Measured, see README "Continuous integration": the gate peaked at 2.2 GiB across 12 JVMs and
+    # 3 containers, a third of medium's 7.5 GB. Its 2 vCPUs are not measured: go large if it is slow.
+    resource_class: medium
+    environment:
+      # Derived copies of .sdkmanrc's java=25-tem, which resolves to Temurin 25+36; step 2 compares them.
+      JDK_SDKMANRC_ID: 25-tem
+      JDK_RELEASE: jdk-25+36
+      JDK_URL: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25%2B36/OpenJDK25U-jdk_x64_linux_hotspot_25_36.tar.gz
+      JDK_SHA256: ee04de95ab9da7287d40bd2173076ecc2a6dd662f007bedfc6eb0380c0ef90e8
+      JAVA_HOME: /home/circleci/java/current
+    steps:
+      - checkout
+
+      - run:
+          name: The pinned JDK still matches .sdkmanrc
+          command: |
+            want="$(sed -n 's/^[[:space:]]*java[[:space:]]*=[[:space:]]*\([^[:space:]]*\).*/\1/p' .sdkmanrc)"
+            echo ".sdkmanrc java=${want:-<none>}   config.yml JDK_SDKMANRC_ID=${JDK_SDKMANRC_ID}"
+            if [ -z "$want" ]; then
+              echo "FAIL: .sdkmanrc names no java candidate"
+              exit 1
+            fi
+            if [ "$want" != "$JDK_SDKMANRC_ID" ]; then
+              echo "FAIL: .sdkmanrc says '$want' and this config installs '$JDK_SDKMANRC_ID' ($JDK_RELEASE)."
+              echo "      Update JDK_SDKMANRC_ID, JDK_RELEASE, JDK_URL and JDK_SHA256 together."
+              exit 1
+            fi
+
+      # No service declares a Gradle toolchain, so the JDK Gradle runs on is the JDK that compiles.
+      - run:
+          name: Install Temurin 25, checksum verified
+          command: |
+            curl -fsSL -o /tmp/jdk.tar.gz "$JDK_URL"
+            echo "${JDK_SHA256}  /tmp/jdk.tar.gz" | sha256sum -c -
+            mkdir -p "$JAVA_HOME"
+            tar -xzf /tmp/jdk.tar.gz -C "$JAVA_HOME" --strip-components=1
+            echo "export PATH=\"$JAVA_HOME/bin:\$PATH\"" >> "$BASH_ENV"
+
+      - run:
+          name: The running JDK is the pinned one
+          command: |
+            want="Temurin-${JDK_RELEASE#jdk-}"
+            impl="$(sed -n 's/^IMPLEMENTOR_VERSION="\(.*\)"$/\1/p' "$JAVA_HOME/release")"
+            java -version
+            echo "java on PATH: $(command -v java)   release IMPLEMENTOR_VERSION=${impl:-<none>}   expected=${want}"
+            if [ "$impl" != "$want" ] || [ "$(command -v java)" != "$JAVA_HOME/bin/java" ]; then
+              echo "FAIL: the JDK running is not the pinned $want at $JAVA_HOME"
+              exit 1
+            fi
+
+      # The key digests every build file on disk, not a typed list a new service would be missing from.
+      # A find that stopped matching would make the digest constant, so zero files fails closed.
+      - run:
+          name: Derive the Gradle dependency cache key
+          command: |
+            find . -path ./.git -prune -o -name .gradle -prune -o -path '*/build' -prune -o -type f \
+              \( -name '*.gradle' -o -name gradle.properties -o -name gradle-wrapper.properties \) -print \
+              | sort > /tmp/gradle-build-files.txt
+            n="$(awk 'END{print NR}' /tmp/gradle-build-files.txt)"
+            echo "build files feeding the key: $n"
+            cat /tmp/gradle-build-files.txt
+            if [ "$n" -eq 0 ]; then
+              echo "FAIL: no build file matched, so the cache key would be the digest of nothing"
+              exit 1
+            fi
+            xargs -a /tmp/gradle-build-files.txt cat | sha256sum | cut -c1-64 > /tmp/gradle-cache-key
+            echo "key digest: $(cat /tmp/gradle-cache-key)"
+
+      - restore_cache:
+          keys:
+            - gradle-v1-{{ checksum "/tmp/gradle-cache-key" }}
+            - gradle-v1-
+
+      # The two flags forbid a green read off cached or up-to-date task outputs.
+      - run:
+          name: ./gradlew --no-build-cache --rerun-tasks clean build
+          no_output_timeout: 30m
+          command: |
+            ./gradlew --console=plain --no-build-cache --rerun-tasks clean build 2>&1 | tee /tmp/gate.log
+            st=("${PIPESTATUS[@]}")
+            echo "gradle_exit=${st[0]} (gradlew=${st[0]} tee=${st[1]})"
+            exit "${st[0]}"
+
+      # After the gate, so it holds what the build resolved. Task output is never cached.
+      - save_cache:
+          key: gradle-v1-{{ checksum "/tmp/gradle-cache-key" }}
+          paths:
+            - ~/.gradle/wrapper/dists
+            - ~/.gradle/caches/modules-2
+
+      # A green build is not proof every suite ran. Services come from settings.gradle and the
+      # three-tier ones from build.gradle's tieredServices, so neither list is typed here.
+      - run:
+          name: Every service's test tasks ran
+          command: |
+            [ -s /tmp/gate.log ] || { echo "FAIL: the gate log is empty, so nothing below can be measured"; exit 1; }
+            services="$(sed -n "s|^[[:space:]]*include[[:space:]]*'services:\([A-Za-z0-9_-]*\)'.*|\1|p" settings.gradle)"
+            tiered="$(sed -n "s|^def tieredServices = \[\(.*\)\]|\1|p" build.gradle | tr -d "' " | tr ',' '\n')"
+            [ -n "$services" ] || { echo "FAIL: settings.gradle includes no service"; exit 1; }
+            [ -n "$tiered" ] || { echo "FAIL: build.gradle declares no tieredServices"; exit 1; }
+            echo "services: $(echo $services)   three-tier: $(echo $tiered)"
+            missing=""
+            for s in $services; do
+              tasks="test"
+              if printf '%s\n' $tiered | grep -qx -- "$s"; then tasks="test integrationTest acceptanceTest"; fi
+              for t in $tasks; do
+                ran="$(awk -v want="> Task :services:$s:$t" '$0==want{n++} END{print n+0}' /tmp/gate.log)"
+                xml="$(find "services/$s/build/test-results/$t" -name 'TEST-*.xml' 2>/dev/null | awk 'END{print NR}')"
+                printf '  %-16s %-16s task lines=%s  junit xml=%s\n' "$s" "$t" "$ran" "$xml"
+                if [ "$ran" -lt 1 ] || [ "$xml" -lt 1 ]; then missing="$missing $s:$t"; fi
+              done
+            done
+            if [ -n "$missing" ]; then echo "FAIL: did not run, or left no results:$missing"; exit 1; fi
+            cached="$(awk '/FROM-CACHE/{n++} END{print n+0}' /tmp/gate.log)"
+            echo "FROM-CACHE task lines: $cached"
+            if [ "$cached" -ne 0 ]; then echo "FAIL: $cached task(s) read FROM-CACHE under --no-build-cache"; exit 1; fi
+
+      # The image half of the supply chain. Not cleaned first, so bootJar reuses the gate's classes.
+      # The Paketo builder and run image are pinned by multi-arch index digest; amd64 resolves here.
+      - run:
+          name: ./gradlew bootBuildImageAll checkSupplyChain
+          no_output_timeout: 30m
+          command: |
+            ./gradlew --console=plain bootBuildImageAll checkSupplyChain 2>&1 | tee /tmp/supplychain.log
+            st=("${PIPESTATUS[@]}")
+            echo "supplychain_exit=${st[0]} (gradlew=${st[0]} tee=${st[1]})"
+            exit "${st[0]}"
+
+      - run:
+          name: ./gradlew sonarAll, skipped without SONAR_TOKEN
+          command: |
+            if [ -z "${SONAR_TOKEN:-}" ]; then
+              echo "SKIP: SONAR_TOKEN is not set in this project's CircleCI environment, so no analysis runs."
+              exit 0
+            fi
+            ./gradlew --console=plain sonarAll
+
+      # Never a gate: a red run is when the reports are worth having.
+      - run:
+          name: Collect test XMLs and reports
+          when: always
+          command: |
+            mkdir -p /tmp/test-results /tmp/artifacts
+            for d in services/*/build/test-results/*; do
+              [ -d "$d" ] || continue
+              dest="/tmp/test-results/$(echo "$d" | cut -d/ -f2)/$(basename "$d")"
+              mkdir -p "$dest"
+              cp "$d"/TEST-*.xml "$dest/" 2>/dev/null || true
+            done
+            for d in services/*/build/reports; do
+              [ -d "$d" ] || continue
+              mkdir -p "/tmp/artifacts/$(echo "$d" | cut -d/ -f2)"
+              cp -R "$d" "/tmp/artifacts/$(echo "$d" | cut -d/ -f2)/" || true
+            done
+            [ -d build/reports ] && { mkdir -p /tmp/artifacts/root; cp -R build/reports /tmp/artifacts/root/ || true; }
+            if [ -d build/supply-chain ]; then
+              mkdir -p /tmp/artifacts/supply-chain
+              cp -R build/supply-chain/sbom build/supply-chain/status.txt /tmp/artifacts/supply-chain/ 2>/dev/null || true
+            fi
+            cp /tmp/gate.log /tmp/supplychain.log /tmp/artifacts/ 2>/dev/null || true
+            echo "test XMLs collected: $(find /tmp/test-results -name 'TEST-*.xml' | awk 'END{print NR}')"
+            echo "artifact files collected: $(find /tmp/artifacts -type f | awk 'END{print NR}')"
+
+      # store_* run after a failed step by design (configuration reference, "The when attribute"),
+      # so they carry no `when` key: the validator accepts one there and nothing reads it.
+      - store_test_results:
+          path: /tmp/test-results
+
+      - store_artifacts:
+          path: /tmp/artifacts
+          destination: reports
+
+workflows:
+  # Every branch: the gate is what makes a branch mergeable. No deploy job, no registry credential.
+  gate:
+    jobs:
+      - gate

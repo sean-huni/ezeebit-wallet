@@ -37,12 +37,19 @@ CACHE_VOLUME="$(lock_value TRIVY_CACHE_VOLUME)" || exit 2
 DB_REPO="$(lock_value TRIVY_DB_REPOSITORY)" || exit 2
 JAVA_DB_REPO="$(lock_value TRIVY_JAVA_DB_REPOSITORY)" || exit 2
 
+# Containers run as the caller: as root they leave files under build/ that a Linux user cannot
+# replace, and Docker Desktop's file sharing hides that on a Mac. HOME is for git inside gitleaks.
+AS_CALLER=(--user "$(id -u):$(id -g)" -e HOME=/tmp)
+
 record() { printf '%s exit=%s\n' "$1" "$2" >> "$OUT/status.txt"; }
 
 cleanup() { rm -rf "$OUT/stage-tree" "$OUT/stage-config"; rm -f "$OUT"/images/*.tar; }
 
 preflight() {
   docker info > /dev/null 2>&1 || die "Docker unavailable: every scanner runs as a container, so nothing was scanned."
+  # The cache volume was created by root; the one root container hands it to the caller.
+  docker run --rm --user 0:0 --entrypoint chown -v "$CACHE_VOLUME:/cache" "$TRIVY_IMAGE" -R "$(id -u):$(id -g)" /cache \
+    || die "could not hand the trivy cache volume $CACHE_VOLUME to uid $(id -u)."
 }
 
 # Scanners see only /out (reports and staged inputs) and /sec (policy), never the repository root,
@@ -51,7 +58,7 @@ trivy() {
   local sub="$1" db=()
   shift
   [ "$sub" = config ] || db=(--db-repository "$DB_REPO" --java-db-repository "$JAVA_DB_REPO")
-  docker run --rm -v "$CACHE_VOLUME:/cache" -v "$OUT:/out" -v "$SEC:/sec:ro" "$TRIVY_IMAGE" "$sub" \
+  docker run --rm "${AS_CALLER[@]}" -v "$CACHE_VOLUME:/cache" -v "$OUT:/out" -v "$SEC:/sec:ro" "$TRIVY_IMAGE" "$sub" \
     --cache-dir /cache ${db[@]+"${db[@]}"} --skip-version-check "$@"
 }
 
@@ -74,7 +81,7 @@ stage_files() {
 cmd_secrets() {
   local rc n
   rm -f "$OUT"/gitleaks-*.json "$OUT"/gitleaks-*.log "$OUT"/trivy-secrets.* "$OUT/tree-files.txt"
-  docker run --rm -v "$ROOT/.git:/repo/.git:ro" -v "$OUT:/out" \
+  docker run --rm "${AS_CALLER[@]}" -v "$ROOT/.git:/repo/.git:ro" -v "$OUT:/out" \
     -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
     "$GITLEAKS_IMAGE" git /repo "--log-opts=--all --diff-merges=first-parent" --redact --no-banner \
     --report-format json --report-path /out/gitleaks-history.json > "$OUT/gitleaks-history.log" 2>&1
@@ -84,7 +91,7 @@ cmd_secrets() {
   n="$(stage_files "$OUT/stage-tree" git ls-files -z --cached --others --exclude-standard)" || exit 2
   printf '%s\n' "$n" > "$OUT/tree-files.txt"
 
-  docker run --rm -v "$OUT:/out" "$GITLEAKS_IMAGE" dir /out/stage-tree --redact --no-banner \
+  docker run --rm "${AS_CALLER[@]}" -v "$OUT:/out" "$GITLEAKS_IMAGE" dir /out/stage-tree --redact --no-banner \
     --report-format json --report-path /out/gitleaks-tree.json > "$OUT/gitleaks-tree.log" 2>&1
   rc=$?; record gitleaks-tree "$rc"
 
@@ -127,7 +134,7 @@ cmd_images() {
     rc=$?; record "sbom-$s" "$rc"
     rm -f "$tar"
   done
-  docker run --rm -v "$CACHE_VOLUME:/cache" "$TRIVY_IMAGE" version --cache-dir /cache --format json \
+  docker run --rm "${AS_CALLER[@]}" -v "$CACHE_VOLUME:/cache" "$TRIVY_IMAGE" version --cache-dir /cache --format json \
     > "$OUT/trivy-version.json" 2> "$OUT/trivy-version.log"
 }
 

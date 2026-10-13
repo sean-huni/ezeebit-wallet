@@ -222,7 +222,7 @@
     {
       "type": "stat",
       "title": "JVMs per service",
-      "description": "Metric identity: each JVM is its own series (instance = host:port), so this counts the instances exporting under each service. A number below the replicas running means two JVMs share one series and every rate panel above is wrong.",
+      "description": "Metric identity: each JVM is its own series (instance = host:port:pid), so this counts the JVMs that exported under each service in the last 30s. A number below the replicas running means two JVMs share one series and every rate panel above is wrong.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -234,7 +234,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count by (job) (group by (job, instance) (jvm_threads_live{job=~\"$service\"}))",
+          "expr": "count by (job) (group by (job, instance) (present_over_time(jvm_threads_live{job=~\"$service\"}[30s])))",
           "legendFormat": "{{job}}",
           "instant": true,
           "range": false

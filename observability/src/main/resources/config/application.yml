@@ -2,8 +2,9 @@
 management:
   opentelemetry:
     resource-attributes:
-      # One series per JVM: without it every replica of a service writes into one Prometheus series.
-      service.instance.id: ${HOSTNAME:localhost}:${server.port}
+      # One series per JVM: without it every replica of a service writes into one Prometheus series. The pid makes a
+      # restarted JVM a new series, as a new pod is: one reusing the old labels hides its first counts from rate().
+      service.instance.id: ${HOSTNAME:localhost}:${server.port}:${PID:0}
     tracing:
       export:
         otlp:

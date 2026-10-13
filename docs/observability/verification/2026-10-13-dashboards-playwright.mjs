@@ -32,7 +32,7 @@ pass('traffic', 'driven', JSON.stringify(traffic.tally));
 await sleep(25000);
 
 // 2. Metric identity: one instance series per JVM, so no two JVMs share a counter.
-const identity = await getJson(`${PROM}/api/v1/query?query=${encodeURIComponent('count by (job) (group by (job, instance) (jvm_threads_live))')}`);
+const identity = await getJson(`${PROM}/api/v1/query?query=${encodeURIComponent('count by (job) (group by (job, instance) (present_over_time(jvm_threads_live[30s])))')}`);
 const perJob = Object.fromEntries(identity.data.result.map(r => [r.metric.job, Number(r.value[1])]));
 expect(Object.keys(perJob).length === 5 && Object.values(perJob).every(n => n === 1), 'prometheus', 'one series per JVM',
   JSON.stringify(perJob));

@@ -189,8 +189,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Deposits per minute by currency and outcome",
-      "description": "posted, replayed (same Idempotency-Key, answered from the stored rows) or refused with a code. 'unknown' currency: refused before the currency was known.",
+      "title": "Deposits by currency and outcome",
+      "description": "posted, replayed (same Idempotency-Key, answered from the stored rows) or refused with a code. 'unknown' currency: refused before the currency was known. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -202,7 +202,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (currency, outcome, code) (rate(ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"}[$interval])) * 60",
+          "expr": "sum by (currency, outcome, code) (((ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} - ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} offset $interval) >= 0) or (ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} unless ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} offset $interval) or (ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} < ezeebit_ledger_deposits_total{currency=~\"$currency\", outcome=~\"$outcome\"} offset $interval))",
           "legendFormat": "{{currency}} {{outcome}} {{code}}",
           "range": true
         }
@@ -313,8 +313,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Quotes per minute by pair and outcome",
-      "description": "issued or refused. 'unknown' pair: a currency the service does not support, so the caller's text never becomes a tag.",
+      "title": "Quotes by pair and outcome",
+      "description": "issued or refused. 'unknown' pair: a currency the service does not support, so the caller's text never becomes a tag. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -326,7 +326,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (pair, outcome) (rate(ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"}[$interval])) * 60",
+          "expr": "sum by (pair, outcome) (((ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} - ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval) >= 0) or (ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} unless ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval) or (ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} < ezeebit_conversion_quotes_total{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval))",
           "legendFormat": "{{pair}} {{outcome}}",
           "range": true
         }
@@ -369,7 +369,7 @@
     {
       "type": "timeseries",
       "title": "Quote refusals by reason",
-      "description": "Refusal code, and for RATE_REJECTED the rule broken (stale, out of band, jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Empty: nothing refused.",
+      "description": "Refusal code, and for RATE_REJECTED the rule broken (stale, out of band, jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Empty: nothing refused. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -381,7 +381,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (reason, detail) (rate(ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"}[$interval])) * 60",
+          "expr": "sum by (reason, detail) (((ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} - ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} offset $interval) >= 0) or (ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} unless ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} offset $interval) or (ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} < ezeebit_conversion_quotes_total{outcome=\"refused\", pair=~\"$pair\"} offset $interval))",
           "legendFormat": "{{reason}} {{detail}}",
           "range": true
         }
@@ -480,7 +480,7 @@
     {
       "type": "timeseries",
       "title": "Rate feed calls and p95",
-      "description": "Calls to the exchange-rate service by outcome (answered, unavailable, unreadable) and their p95. The client fails closed: unavailable is a 503 to the merchant.",
+      "description": "Calls to the exchange-rate service by outcome (answered, unavailable, unreadable) and their p95. The client fails closed: unavailable is a 503 to the merchant. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -492,8 +492,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (outcome) (rate(ezeebit_conversion_rate_calls_milliseconds_count[$interval])) * 60",
-          "legendFormat": "{{outcome}} per min",
+          "expr": "sum by (outcome) (((ezeebit_conversion_rate_calls_milliseconds_count - ezeebit_conversion_rate_calls_milliseconds_count offset $interval) >= 0) or (ezeebit_conversion_rate_calls_milliseconds_count unless ezeebit_conversion_rate_calls_milliseconds_count offset $interval) or (ezeebit_conversion_rate_calls_milliseconds_count < ezeebit_conversion_rate_calls_milliseconds_count offset $interval))",
+          "legendFormat": "{{outcome}} calls",
           "range": true
         },
         {
@@ -575,7 +575,7 @@
     {
       "type": "timeseries",
       "title": "Conversion requests by pair and outcome",
-      "description": "Every accept answer from the 'conversion accept' span: completed, pending (the ledger's answer was unknown), rejected by the ledger, or refused (quote missing, expired or used).",
+      "description": "Every accept answer from the 'conversion accept' span: completed, pending (the ledger's answer was unknown), rejected by the ledger, or refused (quote missing, expired or used). Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -587,7 +587,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (pair, outcome) (rate(ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"}[$interval])) * 60",
+          "expr": "sum by (pair, outcome) (((ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} - ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval) >= 0) or (ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} unless ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval) or (ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} < ezeebit_conversion_accept_milliseconds_count{pair=~\"$pair\", outcome=~\"$outcome\"} offset $interval))",
           "legendFormat": "{{pair}} {{outcome}}",
           "range": true
         }
@@ -630,7 +630,7 @@
     {
       "type": "timeseries",
       "title": "Conversion outcomes settled",
-      "description": "Each conversion counted once, when its row moves to COMPLETED or REJECTED, plus those left PENDING by their first ledger answer.",
+      "description": "Each conversion counted once, when its row moves to COMPLETED or REJECTED, plus those left PENDING by their first ledger answer. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -642,7 +642,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (status, reason) (rate(ezeebit_conversion_outcomes_total[$interval])) * 60",
+          "expr": "sum by (status, reason) (((ezeebit_conversion_outcomes_total - ezeebit_conversion_outcomes_total offset $interval) >= 0) or (ezeebit_conversion_outcomes_total unless ezeebit_conversion_outcomes_total offset $interval) or (ezeebit_conversion_outcomes_total < ezeebit_conversion_outcomes_total offset $interval))",
           "legendFormat": "{{status}} {{reason}}",
           "range": true
         },
@@ -652,7 +652,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(ezeebit_conversion_left_pending_total[$interval])) * 60",
+          "expr": "sum(((ezeebit_conversion_left_pending_total - ezeebit_conversion_left_pending_total offset $interval) >= 0) or (ezeebit_conversion_left_pending_total unless ezeebit_conversion_left_pending_total offset $interval) or (ezeebit_conversion_left_pending_total < ezeebit_conversion_left_pending_total offset $interval))",
           "legendFormat": "left PENDING",
           "range": true
         }
@@ -751,7 +751,7 @@
     {
       "type": "timeseries",
       "title": "Ledger postings by outcome",
-      "description": "The ledger's answers to conversion-svc: posted, replayed, voided by the sweeper, or refused with a code.",
+      "description": "The ledger's answers to conversion-svc: posted, replayed, voided by the sweeper, or refused with a code. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -763,7 +763,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (outcome, code) (rate(ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"}[$interval])) * 60",
+          "expr": "sum by (outcome, code) (((ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} - ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} offset $interval) >= 0) or (ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} unless ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} offset $interval) or (ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} < ezeebit_ledger_conversion_postings_total{outcome=~\"$outcome\"} offset $interval))",
           "legendFormat": "{{outcome}} {{code}}",
           "range": true
         }
@@ -923,7 +923,7 @@
     {
       "type": "timeseries",
       "title": "Sweeper actions",
-      "description": "What the sweeper did with each overdue row it claimed: completed (the ledger had posted it), voided, refused, or unresolved (ask again next run). Empty: nothing was overdue.",
+      "description": "What the sweeper did with each overdue row it claimed: completed (the ledger had posted it), voided, refused, or unresolved (ask again next run). Empty: nothing was overdue. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -935,7 +935,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (action) (increase(ezeebit_conversion_sweeps_total[$interval]))",
+          "expr": "sum by (action) (((ezeebit_conversion_sweeps_total - ezeebit_conversion_sweeps_total offset $interval) >= 0) or (ezeebit_conversion_sweeps_total unless ezeebit_conversion_sweeps_total offset $interval) or (ezeebit_conversion_sweeps_total < ezeebit_conversion_sweeps_total offset $interval))",
           "legendFormat": "{{action}}",
           "range": true
         }

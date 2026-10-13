@@ -306,6 +306,14 @@ def p95(metric, by, extra="", sel=SEL):
     return f"histogram_quantile(0.95, sum by ({by}, le) (rate({metric}_bucket{{{s}}}{WINDOW})))"
 
 
+def counted(by, selector):
+    """Events per rate window, in three disjoint arms: growth, a series born in the window, a JVM restarted in it.
+    A business counter is created at its first event and a restart reuses the instance label, so rate() sees neither."""
+    x, w = selector, "$interval"
+    arms = f"((({x} - {x} offset {w}) >= 0) or ({x} unless {x} offset {w}) or ({x} < {x} offset {w}))"
+    return f"sum by ({by}) {arms}" if by else f"sum{arms}"
+
+
 def service_var():
     return {"name": "service", "label": "Service", "type": "query", "datasource": PROM,
             "query": {"query": "label_values(jvm_threads_live, job)", "refId": "service"}, "definition":
@@ -358,10 +366,11 @@ def fleet():
                mappings=[{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"},
                                                        "1": {"text": "UP", "color": "green"}}}],
                steps=[{"color": "red", "value": None}, {"color": "green", "value": 1}], links=SERVICE_LINKS), 10, 5)
-    b.add(stat("JVMs per service", "Metric identity: each JVM is its own series (instance = host:port), so this counts "
-               "the instances exporting under each service. A number below the replicas running means two JVMs share one "
+    b.add(stat("JVMs per service", "Metric identity: each JVM is its own series (instance = host:port:pid), so this "
+               "counts the JVMs that exported under each service in the last 30s. A number below the replicas running means two JVMs share one "
                "series and every rate panel above is wrong.",
-               [prom(f"count by (job) (group by (job, instance) (jvm_threads_live{{{SEL}}}))", "{{job}}", instant=True)],
+               [prom(f"count by (job) (group by (job, instance) (present_over_time(jvm_threads_live{{{SEL}}}[30s])))", "{{job}}",
+                     instant=True)],
                steps=[{"color": "blue", "value": None}]), 5, 5)
     b.add({"type": "alertlist", "title": "Firing and pending now", "description": "Rules currently Pending or Firing. "
            "Empty is the healthy state. Every rule is on the Alerts dashboard with its input plotted.",
@@ -447,36 +456,39 @@ def fleet():
                      "and JVM.", b.numbered(), [service_var(), interval_var()])
 
 
+COUNTED = (" Counted per rate window, including a series' first event and the events after a restart, which rate() "
+           "cannot see.")
+
+
 def money():
     b = Board()
     out_sel = 'outcome=~"$outcome"'
     b.row("Deposits (ledger-svc)")
-    b.add(timeseries("Deposits per minute by currency and outcome", "posted, replayed (same Idempotency-Key, answered from "
-                     "the stored rows) or refused with a code. 'unknown' currency: refused before the currency was known.",
-                     [prom(f'sum by (currency, outcome, code) (rate(ezeebit_ledger_deposits_total{{currency=~"$currency", '
-                           f'{out_sel}}}{WINDOW})) * 60', "{{currency}} {{outcome}} {{code}}")], "short"), 12, 8)
+    b.add(timeseries("Deposits by currency and outcome", "posted, replayed (same Idempotency-Key, answered from the "
+                     "stored rows) or refused with a code. 'unknown' currency: refused before the currency was known." + COUNTED,
+                     [prom(counted("currency, outcome, code", f'ezeebit_ledger_deposits_total{{currency=~"$currency", {out_sel}}}'),
+                           "{{currency}} {{outcome}} {{code}}")], "short"), 12, 8)
     b.add(timeseries("Deposit p95", "Time inside the ledger's 'deposit' span, by currency and outcome. Exemplars open the "
                      "deposit's trace.",
                      [prom(f'histogram_quantile(0.95, sum by (currency, outcome, le) (rate(ezeebit_deposit_milliseconds_bucket'
                            f'{{currency=~"$currency", {out_sel}}}{WINDOW})))', "{{currency}} {{outcome}}", exemplar=True)],
                      "ms"), 12, 8)
     b.row("Quotes (conversion-svc)")
-    b.add(timeseries("Quotes per minute by pair and outcome", "issued or refused. 'unknown' pair: a currency the service "
-                     "does not support, so the caller's text never becomes a tag.",
-                     [prom(f'sum by (pair, outcome) (rate(ezeebit_conversion_quotes_total{{pair=~"$pair", {out_sel}}}'
-                           f'{WINDOW})) * 60', "{{pair}} {{outcome}}")], "short"), 8, 8)
+    b.add(timeseries("Quotes by pair and outcome", "issued or refused. 'unknown' pair: a currency the service does not "
+                     "support, so the caller's text never becomes a tag." + COUNTED,
+                     [prom(counted("pair, outcome", f'ezeebit_conversion_quotes_total{{pair=~"$pair", {out_sel}}}'),
+                           "{{pair}} {{outcome}}")], "short"), 8, 8)
     b.add(timeseries("Quote refusals by reason", "Refusal code, and for RATE_REJECTED the rule broken (stale, out of band, "
-                     "jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Empty: nothing refused.",
-                     [prom(f'sum by (reason, detail) (rate(ezeebit_conversion_quotes_total{{outcome="refused", '
-                           f'pair=~"$pair"}}{WINDOW})) * 60', "{{reason}} {{detail}}")], "short"), 8, 8)
+                     "jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Empty: nothing refused." + COUNTED,
+                     [prom(counted("reason, detail", 'ezeebit_conversion_quotes_total{outcome="refused", pair=~"$pair"}'),
+                           "{{reason}} {{detail}}")], "short"), 8, 8)
     b.add(timeseries("Quote p95 by pair", "Time inside the 'quote' span: validation, the rate-feed call, pricing and the "
                      "insert. Exemplars open the quote's trace.",
                      [prom(f'histogram_quantile(0.95, sum by (pair, le) (rate(ezeebit_quote_milliseconds_bucket'
                            f'{{pair=~"$pair", {out_sel}}}{WINDOW})))', "{{pair}}", exemplar=True)], "ms"), 8, 8)
     b.add(timeseries("Rate feed calls and p95", "Calls to the exchange-rate service by outcome (answered, unavailable, "
-                     "unreadable) and their p95. The client fails closed: unavailable is a 503 to the merchant.",
-                     [prom(f"sum by (outcome) (rate(ezeebit_conversion_rate_calls_milliseconds_count{WINDOW})) * 60",
-                           "{{outcome}} per min"),
+                     "unreadable) and their p95. The client fails closed: unavailable is a 503 to the merchant." + COUNTED,
+                     [prom(counted("outcome", "ezeebit_conversion_rate_calls_milliseconds_count"), "{{outcome}} calls"),
                       prom(f"histogram_quantile(0.95, sum by (outcome, le) "
                            f"(rate(ezeebit_conversion_rate_calls_milliseconds_bucket{WINDOW})))", "{{outcome}} p95")],
                      "short", overrides=[{"matcher": {"id": "byRegexp", "options": ".* p95"}, "properties": [
@@ -484,23 +496,22 @@ def money():
     b.row("Conversions and ledger postings")
     b.add(timeseries("Conversion requests by pair and outcome", "Every accept answer from the 'conversion accept' span: "
                      "completed, pending (the ledger's answer was unknown), rejected by the ledger, or refused (quote "
-                     "missing, expired or used).",
-                     [prom(f'sum by (pair, outcome) (rate(ezeebit_conversion_accept_milliseconds_count{{pair=~"$pair", '
-                           f'{out_sel}}}{WINDOW})) * 60', "{{pair}} {{outcome}}")], "short"), 8, 8)
+                     "missing, expired or used)." + COUNTED,
+                     [prom(counted("pair, outcome", f'ezeebit_conversion_accept_milliseconds_count{{pair=~"$pair", {out_sel}}}'),
+                           "{{pair}} {{outcome}}")], "short"), 8, 8)
     b.add(timeseries("Conversion outcomes settled", "Each conversion counted once, when its row moves to COMPLETED or "
-                     "REJECTED, plus those left PENDING by their first ledger answer.",
-                     [prom(f"sum by (status, reason) (rate(ezeebit_conversion_outcomes_total{WINDOW})) * 60",
-                           "{{status}} {{reason}}"),
-                      prom(f"sum(rate(ezeebit_conversion_left_pending_total{WINDOW})) * 60", "left PENDING")], "short"),
+                     "REJECTED, plus those left PENDING by their first ledger answer." + COUNTED,
+                     [prom(counted("status, reason", "ezeebit_conversion_outcomes_total"), "{{status}} {{reason}}"),
+                      prom(counted("", "ezeebit_conversion_left_pending_total"), "left PENDING")], "short"),
           8, 8)
     b.add(timeseries("Conversion accept p95 by pair", "Time inside the 'conversion accept' span, which includes the "
                      "ledger posting. Exemplars open the conversion's trace across gateway, conversion-svc and ledger-svc.",
                      [prom(f'histogram_quantile(0.95, sum by (pair, le) (rate(ezeebit_conversion_accept_milliseconds_bucket'
                            f'{{pair=~"$pair", {out_sel}}}{WINDOW})))', "{{pair}}", exemplar=True)], "ms"), 8, 8)
     b.add(timeseries("Ledger postings by outcome", "The ledger's answers to conversion-svc: posted, replayed, voided by the "
-                     "sweeper, or refused with a code.",
-                     [prom(f"sum by (outcome, code) (rate(ezeebit_ledger_conversion_postings_total{{{out_sel}}}{WINDOW})) "
-                           f"* 60", "{{outcome}} {{code}}")], "short"), 8, 8)
+                     "sweeper, or refused with a code." + COUNTED,
+                     [prom(counted("outcome, code", f"ezeebit_ledger_conversion_postings_total{{{out_sel}}}"),
+                           "{{outcome}} {{code}}")], "short"), 8, 8)
     b.add(timeseries("Ledger posting p95", "Time inside the ledger's 'ledger posting' span, by operation (post, void).",
                      [prom(f"histogram_quantile(0.95, sum by (operation, le) (rate(ezeebit_ledger_posting_milliseconds_bucket"
                            f"{{{out_sel}}}{WINDOW})))", "{{operation}}", exemplar=True)], "ms"), 8, 8)
@@ -509,8 +520,8 @@ def money():
                [prom("max(ezeebit_conversion_pending_overdue)", "overdue", instant=True)],
                steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}], text_mode="value"), 8, 8)
     b.add(timeseries("Sweeper actions", "What the sweeper did with each overdue row it claimed: completed (the ledger had "
-                     "posted it), voided, refused, or unresolved (ask again next run). Empty: nothing was overdue.",
-                     [prom(f"sum by (action) (increase(ezeebit_conversion_sweeps_total{WINDOW}))", "{{action}}")], "short"),
+                     "posted it), voided, refused, or unresolved (ask again next run). Empty: nothing was overdue." + COUNTED,
+                     [prom(counted("action", "ezeebit_conversion_sweeps_total"), "{{action}}")], "short"),
           24, 7)
     variables = [label_var("currency", "Currency", "label_values(ezeebit_ledger_deposits_total, currency)"),
                  label_var("pair", "Pair", "label_values(ezeebit_conversion_quotes_total, pair)"),

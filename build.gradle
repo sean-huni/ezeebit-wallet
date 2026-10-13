@@ -176,7 +176,7 @@ def coverageFloors = [
 	'eureka-svc'    : [LINE: '0.57'],
 	'gateway-svc'   : [LINE: '0.95', BRANCH: '0.97'],
 	'ledger-svc'    : [LINE: '0.93', BRANCH: '0.87'],
-	'conversion-svc': [LINE: '0.90', BRANCH: '0.84'],
+	'conversion-svc': [LINE: '0.92', BRANCH: '0.84'],
 ]
 def coverageBand = new BigDecimal('0.05')
 def findsecbugsPluginId = 'com.h3xstream.findsecbugs'

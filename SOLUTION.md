@@ -70,6 +70,8 @@ What exists and is verified:
   published fix in a layer this repository builds. Its first run failed on nine such CVEs in jars
   Spring Boot 4.1.1 manages; patch overrides (Tomcat 11.0.26, Jackson 3.1.7 and 2.21.7, FreeMarker
   2.3.35) cleared them, and it passes with nothing suppressed.
+- A CircleCI pipeline (README "Continuous integration") runs the same Gradle commands a laptop runs;
+  it has not run anywhere yet, because the repository has no remote.
 - `./gradlew clean build` passes: 303 tests, 0 failures. The ledger runs three tiers: 63 unit tests
   (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
   real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 106 unit tests

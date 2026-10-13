@@ -72,8 +72,10 @@ groups:
       - uid: ezeebit-rate-feed-refusing
         title: RateFeedRefusing
         condition: B
-        # Refusals in the last minute per pair. A series first created inside the window has nothing for
-        # increase() to start from, so it counts whole (unless); a restarted JVM's drop is clamped to 0.
+        # A is the pair's rate refusals in the last minute when either arm holds, else 0: more than 2 refusals,
+        # or at least 1 that is half or more of the pair's quotes, so a quiet pair refused every time pages too.
+        # Each count: a series first created inside the window has nothing for increase() to start from, so it
+        # counts whole (unless); a restarted JVM's drop is clamped to 0.
         data:
           - refId: A
             datasourceUid: prometheus
@@ -82,14 +84,12 @@ groups:
               refId: A
               instant: true
               expr: >-
-                sum by (pair) (
-                  clamp_min(
-                    ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"}
-                    - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m,
-                    0)
-                  or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"}
-                    unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m)
-                )
+                (sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m)))
+                * clamp_max(
+                    ((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) > bool 2)
+                    + (((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) >= bool 1)
+                      * (((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) / (sum by (pair) (clamp_min(ezeebit_conversion_quotes_total - ezeebit_conversion_quotes_total offset 1m, 0) or (ezeebit_conversion_quotes_total unless ezeebit_conversion_quotes_total offset 1m)))) >= bool 0.5)),
+                    1)
           - refId: B
             datasourceUid: __expr__
             model:
@@ -97,7 +97,7 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: {type: gt, params: [2]}
+                - evaluator: {type: gt, params: [0]}
         # No rate refusal since the services started returns no series: nothing to report. A silent
         # conversion-svc is ServiceDown's to page, not this rule's.
         noDataState: OK
@@ -106,7 +106,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: 'Quotes for {{ $labels.pair }} refused for the rate (unavailable or rejected) {{ $values.A.Value }} times in the last minute'
+          summary: 'Quotes for {{ $labels.pair }} refused for the rate (unavailable or rejected) {{ $values.A.Value }} times in the last minute: more than 2, or half or more of its quotes'
       - uid: ezeebit-conversions-stuck-pending
         title: ConversionsStuckPending
         condition: B

@@ -35,11 +35,11 @@ the root `build.gradle` (a service opts in by being added to its `tieredServices
 
 | Gradle task | Source | What it is | ledger-svc | conversion-svc |
 |---|---|---|---|---|
-| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle, business-metric tags; no Spring context, no Docker | 55 | 87 |
+| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle, business-metric tags and when they are counted; no Spring context, no Docker | 55 | 95 |
 | `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses; for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the LAN address | 16 | 11 |
 | `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance; `business-metrics.feature` checks that the counters move on the real path | 59 scenarios | 44 scenarios |
 
-The other three services have one `test` task each (4 tests). Total: 276 tests. The Spring tiers
+The other three services have one `test` task each (4 tests). Total: 284 tests. The Spring tiers
 start `postgres:18.6-alpine` containers through Testcontainers, so Docker must be running. They run
 under the `acceptance` profile and boot each service alone, with the config server, the registry and
 OTLP export switched off. conversion-svc's acceptance tier also runs the **real ledger-svc jar** as
@@ -219,7 +219,7 @@ ARCHITECTURE.md section 3):
 | Panel | Shows |
 |---|---|
 | Deposits per minute by currency | posted, replayed and refused deposits, a refusal with its code (`BALANCE_LIMIT_EXCEEDED` is the balance-limit refusal) |
-| Conversions by outcome | conversions COMPLETED, REJECTED (by reason) or left PENDING by their first ledger answer; and the ledger's conversion postings by outcome |
+| Conversions by outcome | conversions settled COMPLETED or REJECTED (by reason), each counted once; conversions left PENDING by their first ledger answer, as a separate line; and the ledger's conversion postings by outcome |
 | Quote refusals per minute by reason | refused quotes by code; `RATE_REJECTED` also names the rate rule broken (`RATE_STALE`, `RATE_OUT_OF_BAND`, `RATE_JUMP`, ...) |
 | Rate service p95 latency | conversion-svc's calls to the exchange-rate service, by outcome |
 | Overdue PENDING conversions | PENDING conversions the sweeper should already have resolved, counted in the database |
@@ -231,7 +231,7 @@ Alert rules (`docker/lgtm/alerting/rules.yaml`, Grafana-managed):
 |---|---|
 | ServiceDown | a service has exported no metrics for 30 s, for 1 min; one alert per service |
 | HighErrorRate | more than 5% of a service's requests answer 5xx over 1 min, for 2 min |
-| RateFeedRefusing | more than 2 quotes for one pair refused for the rate (`RATE_UNAVAILABLE` or `RATE_REJECTED`) in the last minute, for 2 min; one alert per pair |
+| RateFeedRefusing | quotes for one pair refused for the rate (`RATE_UNAVAILABLE` or `RATE_REJECTED`) in the last minute: more than 2, or at least 1 that is half or more of that pair's quotes; for 2 min; one alert per pair |
 | ConversionsStuckPending | at least one PENDING conversion is overdue for the sweeper, for 5 min |
 
 `fleet.sh` starts lgtm only after every service is healthy and stops it first on `down`, so

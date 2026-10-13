@@ -73,7 +73,7 @@ public class ConversionRepo {
 	// The sweeper's own definition of due: a non-zero count that persists means it cannot resolve them.
 	public long countDue(final Instant cutoff) {
 		return jdbc.sql("SELECT count(*) FROM conversion WHERE status = 'PENDING' AND deadline < :cutoff")
-				.param("cutoff", Timestamps.of(cutoff)).query(Long.class).single();
+				.param("cutoff", Timestamps.of(cutoff)).withQueryTimeout(2).query(Long.class).single();
 	}
 
 	private static ConversionEntity read(final ResultSet rs) throws SQLException {

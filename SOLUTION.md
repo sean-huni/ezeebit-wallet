@@ -60,9 +60,9 @@ What exists and is verified:
   Money row on Fleet Overview and two alerts: RateFeedRefusing (repeated rate refusals for a pair)
   and ConversionsStuckPending. Both were driven to Alerting on a local run with Slack disconnected.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 276 tests, 0 failures. The ledger runs three tiers: 55 unit tests
+- `./gradlew clean build` passes: 284 tests, 0 failures. The ledger runs three tiers: 55 unit tests
   (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 87 unit tests
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 95 unit tests
   (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
   states), 11 integration tests, and 44 acceptance scenarios against the real ledger jar running as
   its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of

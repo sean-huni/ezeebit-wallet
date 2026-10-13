@@ -72,7 +72,7 @@ public class ConversionService {
 		ConversionEntity first = settler.postAndSettle(conversions.findByKey(merchantId, key).orElseThrow());
 		// A settled outcome is counted where it is settled; a first answer that left it open is counted here.
 		if (ConversionStatus.PENDING.name().equals(first.status())) {
-			metrics.conversion(ConversionStatus.PENDING, null);
+			metrics.leftPending();
 		}
 		return answer(first);
 	}

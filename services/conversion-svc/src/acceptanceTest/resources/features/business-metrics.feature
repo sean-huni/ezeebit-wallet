@@ -46,9 +46,9 @@ Feature: conversion-svc counts quotes, conversions and sweeps
     When the posting deadline of the conversion has passed
     Then conversion-svc reports 1 more overdue PENDING conversion than at the start
     When the sweeper runs
-    Then conversion-svc counted these conversions:
+    Then conversion-svc counted 1 conversion left PENDING
+    And conversion-svc counted these conversions:
       | status   | reason | count |
-      | PENDING  | none   | 1     |
       | REJECTED | VOIDED | 1     |
     And conversion-svc counted these sweeps:
       | action | count |

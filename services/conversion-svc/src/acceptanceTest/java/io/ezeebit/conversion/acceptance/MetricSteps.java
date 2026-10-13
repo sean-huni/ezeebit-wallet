@@ -23,7 +23,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public class MetricSteps {
 
 	private static final List<String> COUNTERS = List.of(ConversionMetrics.QUOTES, ConversionMetrics.OUTCOMES,
-			ConversionMetrics.SWEEPS);
+			ConversionMetrics.LEFT_PENDING, ConversionMetrics.SWEEPS);
 
 	private final MeterRegistry registry;
 	private final JdbcClient conversionDb;
@@ -60,6 +60,14 @@ public class MetricSteps {
 	@Then("conversion-svc counted these conversions:")
 	public void countedConversions(final DataTable expected) {
 		assertCounted(ConversionMetrics.OUTCOMES, expected);
+	}
+
+	@Then("conversion-svc counted {int} conversion(s) left PENDING")
+	public void countedLeftPending(final int count) {
+		Counter counter = registry.find(ConversionMetrics.LEFT_PENDING).counter();
+		assertThat(counter).isNotNull();
+		assertThat(counter.count() - baseline.getOrDefault(counter.getId(), 0.0)).isEqualTo(count);
+		assertThat(registry.find(ConversionMetrics.OUTCOMES).tag("status", "PENDING").counter()).isNull();
 	}
 
 	@Then("conversion-svc counted these sweeps:")

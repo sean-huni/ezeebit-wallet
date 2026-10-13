@@ -19,6 +19,7 @@ public class ConversionMetrics {
 	public static final String QUOTES = "ezeebit.conversion.quotes";
 	public static final String RATE_CALLS = "ezeebit.conversion.rate.calls";
 	public static final String OUTCOMES = "ezeebit.conversion.outcomes";
+	public static final String LEFT_PENDING = "ezeebit.conversion.left.pending";
 	public static final String SWEEPS = "ezeebit.conversion.sweeps";
 	private static final String NONE = "none";
 	// The rate client gives up at about 4 s (2 s connect, 2 s read), so the top bucket holds every call.
@@ -51,6 +52,11 @@ public class ConversionMetrics {
 	public void conversion(final ConversionStatus status, final RejectionReason reason) {
 		registry.counter(OUTCOMES, "status", status.name(), "reason", reason == null ? NONE : reason.name())
 				.increment();
+	}
+
+	// Kept apart from OUTCOMES so that summing outcomes counts conversions: a PENDING one settles later.
+	public void leftPending() {
+		registry.counter(LEFT_PENDING).increment();
 	}
 
 	public void sweep(final LedgerAnswer answer) {

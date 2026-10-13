@@ -62,7 +62,7 @@ public class QuoteService {
 		}
 	}
 
-	// Two known currency codes, so the tag has at most 25 values whatever a caller sends.
+	// Two known currency codes or "unknown", so the tag has at most 26 values whatever a caller sends.
 	private String pairTag(final QuoteReq request) {
 		return catalog.isKnown(request.sell()) && catalog.isKnown(request.buy())
 				? "%s/%s".formatted(request.sell(), request.buy()) : "unknown";

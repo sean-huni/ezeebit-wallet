@@ -51,12 +51,12 @@ class ConversionMetricsTest {
 
 	@Test
 	void rateCallsAreTimedByOutcomeWithBucketsForAPercentile() {
-		metrics.rateCall(Duration.ofMillis(40), "ok");
+		metrics.rateCall(Duration.ofMillis(40), "answered");
 		metrics.rateCall(Duration.ofMillis(2100), "unavailable");
 
-		Timer ok = registry.get(ConversionMetrics.RATE_CALLS).tag("outcome", "ok").timer();
-		assertThat(ok.count()).isEqualTo(1);
-		assertThat(ok.takeSnapshot().histogramCounts()).extracting(CountAtBucket::bucket).isNotEmpty();
+		Timer answered = registry.get(ConversionMetrics.RATE_CALLS).tag("outcome", "answered").timer();
+		assertThat(answered.count()).isEqualTo(1);
+		assertThat(answered.takeSnapshot().histogramCounts()).extracting(CountAtBucket::bucket).isNotEmpty();
 		assertThat(registry.get(ConversionMetrics.RATE_CALLS).tag("outcome", "unavailable").timer().count())
 				.isEqualTo(1);
 	}
@@ -65,14 +65,19 @@ class ConversionMetricsTest {
 	void conversionsAreCountedByStatusAndReason() {
 		metrics.conversion(ConversionStatus.COMPLETED, null);
 		metrics.conversion(ConversionStatus.REJECTED, RejectionReason.INSUFFICIENT_FUNDS);
-		metrics.conversion(ConversionStatus.PENDING, null);
 
 		assertThat(registry.get(ConversionMetrics.OUTCOMES).tag("status", "COMPLETED").tag("reason", "none")
 				.counter().count()).isEqualTo(1.0);
 		assertThat(registry.get(ConversionMetrics.OUTCOMES).tag("status", "REJECTED")
 				.tag("reason", "INSUFFICIENT_FUNDS").counter().count()).isEqualTo(1.0);
-		assertThat(registry.get(ConversionMetrics.OUTCOMES).tag("status", "PENDING").counter().count())
-				.isEqualTo(1.0);
+	}
+
+	@Test
+	void aConversionLeftPendingHasItsOwnCounterSoOutcomesCountConversions() {
+		metrics.leftPending();
+
+		assertThat(registry.get(ConversionMetrics.LEFT_PENDING).counter().count()).isEqualTo(1.0);
+		assertThat(registry.find(ConversionMetrics.OUTCOMES).counters()).isEmpty();
 	}
 
 	@Test

@@ -64,9 +64,9 @@ What exists and is verified:
   Bugs, Checkstyle, and JaCoCo floors per service, with SonarQube opt-in. Its first run found a real
   defect: conversion-svc accepted a currency code spelled with U+212A (Kelvin sign), which lower-cases
   onto `kes`; codes are now ASCII `[A-Z]{3,5}` as in the ledger.
-- `./gradlew clean build` passes: 297 tests, 0 failures. The ledger runs three tiers: 60 unit tests
+- `./gradlew clean build` passes: 303 tests, 0 failures. The ledger runs three tiers: 63 unit tests
   (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 103 unit tests
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 106 unit tests
   (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
   states), 11 integration tests, and 44 acceptance scenarios against the real ledger jar running as
   its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of

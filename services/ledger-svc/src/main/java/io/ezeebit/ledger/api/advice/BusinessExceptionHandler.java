@@ -26,7 +26,7 @@ public class BusinessExceptionHandler {
 	@ExceptionHandler(LedgerException.class)
 	ProblemDetail business(final LedgerException ex) {
 		if (ex.code().status() >= SERVER_ERROR) {
-			LOG.error("ledger invariant violated: {}", LogText.oneLine(ex.getMessage()), ex);
+			LOG.error("ledger invariant violated", LogText.sanitised(ex));
 		}
 		ProblemDetail problem = problems.of(ex.code(), ex.args());
 		if (ex.field() != null) {

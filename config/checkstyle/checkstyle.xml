@@ -9,6 +9,15 @@
 	<property name="charset" value="UTF-8"/>
 	<property name="tabWidth" value="4"/>
 
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]src[\\/](test|acceptanceTest)[\\/]"/>
+	</module>
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchTest"/>
+		<property name="files" value="[\\/]src[\\/]main[\\/]"/>
+	</module>
+
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">
 		<property name="max" value="140"/>
@@ -53,6 +62,11 @@
 		<module name="EqualsAvoidNull"/>
 		<module name="ModifiedControlVariable"/>
 		<module name="IllegalCatch">
+			<property name="id" value="illegalCatchMain"/>
+		</module>
+		<!-- Tests may catch Exception to assert on it; Error and Throwable stay banned everywhere. -->
+		<module name="IllegalCatch">
+			<property name="id" value="illegalCatchTest"/>
 			<property name="illegalClassNames" value="Error, Throwable, java.lang.Error, java.lang.Throwable"/>
 		</module>
 		<!-- Spring and Cucumber instantiate these configuration classes, so they cannot hide the constructor. -->

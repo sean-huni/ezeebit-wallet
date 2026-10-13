@@ -25,21 +25,23 @@
 		</Or>
 	</Match>
 
-	<!-- Every argument at these calls goes through LogText.oneLine (LogTextTest); FSB cannot see that sanitiser. -->
+	<!-- Arguments here go through LogText.oneLine (LogTextTest), which FSB cannot see. Filters stop at method level. -->
 	<Match>
 		<Bug pattern="CRLF_INJECTION_LOGS"/>
+		<Priority value="3"/>
 		<Or>
 			<And>
-				<Class name="~io\.ezeebit\.(conversion|ledger)\.api\.advice\.BusinessExceptionHandler"/>
-				<Method name="business"/>
+				<Class name="io.ezeebit.conversion.api.advice.BusinessExceptionHandler"/>
+				<Method name="business" params="io.ezeebit.conversion.exception.ConversionException"
+						returns="org.springframework.http.ProblemDetail"/>
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerClient"/>
-				<Method name="call"/>
+				<Method name="call" params="java.util.function.Supplier" returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>
-				<Method name="fetch"/>
+				<Method name="fetch" params="java.lang.String,java.lang.String" returns="io.ezeebit.conversion.domain.MarketRate"/>
 			</And>
 		</Or>
 	</Match>

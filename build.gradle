@@ -173,22 +173,38 @@ configure(services) {
 		enabled = false
 	}
 
-	tasks.named('spotbugsMain') {
+	def spotbugsMain = tasks.named('spotbugsMain') {
 		reports {
 			xml.required = true
 			html.required = true
 		}
-		// A plugin jar on the classpath is not a loaded detector: read what the analyser loaded out of its report.
+	}
+	def spotbugsXml = spotbugsMain.flatMap { it.reports.getByName('xml').outputLocation }
+
+	// Its own task with no outputs, so it reads the report on every build, including when spotbugsMain is UP-TO-DATE.
+	// A plugin jar on the classpath is not a running detector: the report must show it loaded and enabled.
+	def checkSpotbugsReport = tasks.register('checkSpotbugsReport') {
+		group = 'verification'
+		description = 'Fails unless the SpotBugs report shows Find Security Bugs enabled over a full, error-free analysis.'
+		dependsOn spotbugsMain
 		doLast {
-			def report = reports.getByName('xml').outputLocation.get().asFile
+			tasks.withType(com.github.spotbugs.snom.SpotBugsTask).each { task ->
+				def narrowed = [visitors: task.visitors.getOrElse([]), omitVisitors: task.omitVisitors.getOrElse([])].findAll { it.value }
+				def flags = task.extraArgs.getOrElse([]).findAll { it in ['-visitors', '-omitVisitors', '-chooseVisitors'] }
+				if (narrowed || flags) {
+					throw new GradleException("spotbugs(${serviceName}): ${task.name} narrows the detector set (${narrowed} ${flags})," +
+						" so a clean report does not cover every detector")
+				}
+			}
+			def report = spotbugsXml.get().asFile
 			if (!report.isFile() || report.length() == 0L) {
 				throw new GradleException("spotbugs(${serviceName}): ${report} is absent or empty, so there is no evidence of a clean run")
 			}
 			def parsed = new groovy.xml.XmlSlurper(false, false).parse(report)
-			def loaded = parsed.Project.Plugin.collect { it.@id.text() }.findAll { !it.isEmpty() }
-			if (!loaded.contains(findsecbugsPluginId)) {
-				throw new GradleException("spotbugs(${serviceName}): loaded plugins ${loaded} do not include ${findsecbugsPluginId}," +
-					" so no security detector ran and a clean report means nothing")
+			def plugins = parsed.Project.Plugin.collectEntries { [(it.@id.text()): it.@enabled.text()] }
+			if (plugins[findsecbugsPluginId] != 'true') {
+				throw new GradleException("spotbugs(${serviceName}): report lists plugins ${plugins}; ${findsecbugsPluginId} is not" +
+					" loaded with enabled=\"true\", so no security detector ran and a clean report means nothing")
 			}
 			def errors = (parsed.Errors[0].@errors.text() ?: '0') as int
 			def missing = (parsed.Errors[0].@missingClasses.text() ?: '0') as int
@@ -201,7 +217,7 @@ configure(services) {
 			if (analysed == 0) {
 				throw new GradleException("spotbugs(${serviceName}): no class files were analysed, so a clean report means nothing")
 			}
-			logger.lifecycle("spotbugs(${serviceName}): ${analysed} class files, plugins ${loaded}, 0 errors, 0 missing classes," +
+			logger.lifecycle("spotbugs(${serviceName}): ${analysed} class files, plugins ${plugins}, 0 errors, 0 missing classes," +
 				" ${parsed.BugInstance.size()} findings")
 		}
 	}
@@ -290,7 +306,7 @@ configure(services) {
 	}
 
 	tasks.named('check') {
-		dependsOn tasks.named('jacocoTestCoverageVerification'), checkCoverageFloors
+		dependsOn tasks.named('jacocoTestCoverageVerification'), checkCoverageFloors, checkSpotbugsReport
 	}
 
 	// observability/ is compiled into every service, but Sonar indexes a file once per project: ledger-svc owns it.
@@ -330,7 +346,15 @@ sonar {
 }
 
 tasks.named('sonar') {
-	dependsOn services.collect { "${it.path}:check" }
+	if (sonarConfigured) {
+		dependsOn services.collect { "${it.path}:check" }
+	}
+	onlyIf('SONAR_TOKEN is set') { sonarConfigured }
+}
+gradle.taskGraph.whenReady { graph ->
+	if (!sonarConfigured && graph.hasTask(':sonar')) {
+		logger.lifecycle('sonar: SKIPPED, nothing ran. SONAR_TOKEN is not set; export SONAR_TOKEN and SONAR_HOST_URL to analyse.')
+	}
 }
 
 tasks.register('sonarAll') {

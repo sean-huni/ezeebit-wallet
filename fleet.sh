@@ -29,8 +29,10 @@ await_healthy() {
 
 await_routed() {
   # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
-  local m=00000000-0000-0000-0000-000000000000 deadline=$(( SECONDS + 60 )) b q
+  local m deadline=$(( SECONDS + 60 )) b q
   while (( SECONDS < deadline )); do
+    # A fresh merchant per attempt: the limiter charges these probes, and one fixed id drains its bucket.
+    m=$(uuidgen | tr 'A-Z' 'a-z')
     b=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/balances")
     q=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/conversions/$m")
     [[ $b == 200 && $q == 404 ]] && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }

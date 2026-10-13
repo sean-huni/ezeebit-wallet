@@ -26,22 +26,19 @@ The job has 14 steps. Nine are `run` steps, in this order; the other five (`chec
 | 3 | The running JDK is the pinned one | `$JAVA_HOME/release` not saying `Temurin-25+36`, or `java` on the PATH not being `$JAVA_HOME/bin/java` |
 | 4 | Derive the Gradle dependency cache key | no build file matching, which would make the key the digest of nothing |
 | 5 | `./gradlew --no-build-cache --rerun-tasks clean build` | any test in any tier, a SpotBugs or Checkstyle finding, a coverage floor, `checkSecrets`, `checkDashboards` (generated dashboards or alert rules out of date) |
-| 6 | Every service's test tasks ran | a service in `settings.gradle` with no `:test` line in the log, a `tieredServices` service missing `:integrationTest` or `:acceptanceTest`, any of them leaving no JUnit XML, or any `FROM-CACHE` line |
+| 6 | Every service's test tasks ran | a service in `settings.gradle` with no `:test` line in the log, a `tieredServices` service missing `:integrationTest`, a `cucumberServices` service missing `:acceptanceTest`, any of them leaving no JUnit XML, or any `FROM-CACHE` line |
 | 7 | `./gradlew bootBuildImageAll checkSupplyChain` | the supply-chain verdict ([supply-chain.md](supply-chain.md)) or an image that does not build |
 | 8 | `./gradlew sonarAll`, skipped without `SONAR_TOKEN` | the SonarQube quality gate; with no token it prints why it skipped and exits 0 |
 | 9 | Collect test XMLs and reports (`when: always`) | nothing: a red run is when the reports matter |
 
-Step 6 reads the service list from `settings.gradle` and the three-tier list from `tieredServices`
-in `build.gradle`, so neither list is typed into the config. It went red when the
-`:services:ledger-svc:acceptanceTest` line was removed from a log, and again when one `FROM-CACHE` line
-was added (both when `tieredServices` held two services). The Gradle cache holds only the wrapper
-distribution and the module cache, never task output.
-
-**Known defect: step 6 now fails on every run.** `tieredServices` is `ledger-svc`, `conversion-svc` and
-`gateway-svc`, so step 6 expects 11 test tasks for 5 services (5 `test`, 3 `integrationTest`, 3
-`acceptanceTest`). The build registers `acceptanceTest` only for `cucumberServices` (`ledger-svc`,
-`conversion-svc`), so it runs 10, and `services:gateway-svc:acceptanceTest` is reported missing. Step 6
-must read `cucumberServices` for the third tier.
+Step 6 reads the service list from `settings.gradle`, the integration tier from `tieredServices` and the
+acceptance tier from `cucumberServices` in `build.gradle`, so no list is typed into the config. Today it
+expects 10 test tasks: 5 `test`, 3 `integrationTest`, 2 `acceptanceTest`. Run against a real gate log
+(`--no-build-cache --rerun-tasks clean build`, 538 tests, 2026-10-13) it finds all 10 and exits 0; with the
+`:services:ledger-svc:acceptanceTest` line removed from that log it fails naming it. An earlier version
+took the acceptance tier from `tieredServices` and failed every green build once `gateway-svc` joined
+that list (fixed in `bugfix-ci-test-tasks`). A `FROM-CACHE` line also fails it. The Gradle cache holds
+only the wrapper distribution and the module cache, never task output.
 
 ## The JDK
 

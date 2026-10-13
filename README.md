@@ -67,7 +67,9 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ```sh
 ./fleet.sh up       # Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other three together,
                     # each waited until healthy, then a routing check, then Grafana LGTM
-./fleet.sh status   # port and /actuator/health HTTP code per service (000 = not answering)
+./fleet.sh status   # per service: port and /actuator/health HTTP code (000 = not answering); per container: compose
+                    # health; Grafana, then Prometheus, Loki, Tempo and Pyroscope through Grafana's datasource health
+                    # check, then the OTLP collector. Exits 1 if anything is not healthy
 ./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down (data volumes are kept)
 ```
 

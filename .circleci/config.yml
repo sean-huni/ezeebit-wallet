@@ -9,11 +9,11 @@ jobs:
     machine:
       # A dated tag, never ':current'. Newest listed on the CircleCI ubuntu-2604 image page, 2026-10-13.
       image: ubuntu-2604:2026.07.1
-    # Measured, see README "Continuous integration": the gate peaked at 2.2 GiB across 12 JVMs and
-    # 3 containers, a third of medium's 7.5 GB. Its 2 vCPUs are not measured: go large if it is slow.
+    # Measured, see docs/ci.md: the gate peaked at 2.2 GiB across 12 JVMs and
+    # 3 containers, a third of medium's 7.5 GB. Its 2 vCPUs are not measured, so large until a real run shows medium holds.
     resource_class: large
     environment:
-      # Derived copies of .sdkmanrc's java=25-tem, which resolves to Temurin 25+36; step 2 compares them.
+      # Derived copies of .sdkmanrc's java=25-tem, which resolves to Temurin 25+36; the first run step compares them.
       JDK_SDKMANRC_ID: 25-tem
       JDK_RELEASE: jdk-25+36
       JDK_URL: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25%2B36/OpenJDK25U-jdk_x64_linux_hotspot_25_36.tar.gz
@@ -99,8 +99,8 @@ jobs:
             - ~/.gradle/wrapper/dists
             - ~/.gradle/caches/modules-2
 
-      # A green build is not proof every suite ran. Services come from settings.gradle and the
-      # three-tier ones from build.gradle's tieredServices, so neither list is typed here.
+      # A green build is not proof every suite ran. Services come from settings.gradle, integration
+      # tiers from build.gradle's tieredServices and acceptance from cucumberServices: no list is typed here.
       - run:
           name: Every service's test tasks ran
           command: |
@@ -108,12 +108,15 @@ jobs:
             services="$(sed -n "s|^[[:space:]]*include[[:space:]]*'services:\([A-Za-z0-9_-]*\)'.*|\1|p" settings.gradle)"
             tiered="$(sed -n "s|^def tieredServices = \[\(.*\)\]|\1|p" build.gradle | tr -d "' " | tr ',' '\n')"
             [ -n "$services" ] || { echo "FAIL: settings.gradle includes no service"; exit 1; }
+            cucumber="$(sed -n "s|^def cucumberServices = \[\(.*\)\]|\1|p" build.gradle | tr -d "' " | tr ',' '\n')"
             [ -n "$tiered" ] || { echo "FAIL: build.gradle declares no tieredServices"; exit 1; }
-            echo "services: $(echo $services)   three-tier: $(echo $tiered)"
+            [ -n "$cucumber" ] || { echo "FAIL: build.gradle declares no cucumberServices"; exit 1; }
+            echo "services: $(echo $services)   integration: $(echo $tiered)   acceptance: $(echo $cucumber)"
             missing=""
             for s in $services; do
               tasks="test"
-              if printf '%s\n' $tiered | grep -qx -- "$s"; then tasks="test integrationTest acceptanceTest"; fi
+              if printf '%s\n' $tiered | grep -qx -- "$s"; then tasks="$tasks integrationTest"; fi
+              if printf '%s\n' $cucumber | grep -qx -- "$s"; then tasks="$tasks acceptanceTest"; fi
               for t in $tasks; do
                 ran="$(awk -v want="> Task :services:$s:$t" '$0==want{n++} END{print n+0}' /tmp/gate.log)"
                 xml="$(find "services/$s/build/test-results/$t" -name 'TEST-*.xml' 2>/dev/null | awk 'END{print NR}')"

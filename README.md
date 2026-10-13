@@ -35,11 +35,11 @@ the root `build.gradle` (a service opts in by being added to its `tieredServices
 
 | Gradle task | Source | What it is | ledger-svc | conversion-svc |
 |---|---|---|---|---|
-| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle; no Spring context, no Docker | 50 | 81 |
+| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle, business-metric tags and when they are counted; no Spring context, no Docker | 55 | 95 |
 | `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses; for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the LAN address | 16 | 11 |
-| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance | 57 scenarios | 40 scenarios |
+| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance; `business-metrics.feature` checks that the counters move on the real path | 59 scenarios | 44 scenarios |
 
-The other three services have one `test` task each (4 tests). Total: 259 tests. The Spring tiers
+The other three services have one `test` task each (4 tests). Total: 284 tests. The Spring tiers
 start `postgres:18.6-alpine` containers through Testcontainers, so Docker must be running. They run
 under the `acceptance` profile and boot each service alone, with the config server, the registry and
 OTLP export switched off. conversion-svc's acceptance tier also runs the **real ledger-svc jar** as
@@ -202,15 +202,28 @@ Folder **Ezeebit** holds four provisioned dashboards (read-only, from `docker/lg
 
 | Dashboard | Shows |
 |---|---|
-| Fleet Overview | UP/DOWN tile per service, request rate, 5xx ratio, p95 latency, JVM heap |
+| Fleet Overview | UP/DOWN tile per service, request rate, 5xx ratio, p95 latency, JVM heap; a **Money** row (below) |
 | Traces | latest traces for the selected services; click a trace ID to open it |
 | Logs | logs by service and level; a line logged inside a request carries its `trace_id` |
-| Alerts | the two alert rules below, in every state |
+| Alerts | the four alert rules below, in every state |
 
 Each JVM is its own series: the OpenTelemetry resource attribute `service.instance.id` is
 `${HOSTNAME:localhost}:<port>` (Prometheus label `instance`), and `service.name` is the
 application name (label `job`). The shared OTLP settings live in `observability/`, which the root
 `build.gradle` compiles into every service jar.
+
+The **Money** row of Fleet Overview shows what the services do with money, from business metrics
+the ledger and conversion-svc export beside their HTTP and JVM metrics (names and tags in
+ARCHITECTURE.md section 3):
+
+| Panel | Shows |
+|---|---|
+| Deposits per minute by currency | posted, replayed and refused deposits, a refusal with its code (`BALANCE_LIMIT_EXCEEDED` is the balance-limit refusal) |
+| Conversions by outcome | conversions settled COMPLETED or REJECTED (by reason), each counted once; conversions left PENDING by their first ledger answer, as a separate line; and the ledger's conversion postings by outcome |
+| Quote refusals per minute by reason | refused quotes by code; `RATE_REJECTED` also names the rate rule broken (`RATE_STALE`, `RATE_OUT_OF_BAND`, `RATE_JUMP`, ...) |
+| Rate service p95 latency | conversion-svc's calls to the exchange-rate service, by outcome |
+| Overdue PENDING conversions | PENDING conversions the sweeper should already have resolved, counted in the database |
+| Sweeper actions | what the sweeper did with each overdue conversion: completed, voided, refused, unresolved |
 
 Alert rules (`docker/lgtm/alerting/rules.yaml`, Grafana-managed):
 
@@ -218,6 +231,8 @@ Alert rules (`docker/lgtm/alerting/rules.yaml`, Grafana-managed):
 |---|---|
 | ServiceDown | a service has exported no metrics for 30 s, for 1 min; one alert per service |
 | HighErrorRate | more than 5% of a service's requests answer 5xx over 1 min, for 2 min |
+| RateFeedRefusing | quotes for one pair refused for the rate (`RATE_UNAVAILABLE` or `RATE_REJECTED`) in the last minute: more than 2, or at least 1 that is half or more of that pair's quotes; for 2 min; one alert per pair |
+| ConversionsStuckPending | at least one PENDING conversion is overdue for the sweeper, for 5 min |
 
 `fleet.sh` starts lgtm only after every service is healthy and stops it first on `down`, so
 neither booting nor a deliberate stop can page. Notifications go to Slack only when

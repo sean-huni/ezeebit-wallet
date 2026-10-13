@@ -12,6 +12,7 @@ public enum ErrorCode {
 	AMOUNT_TOO_LARGE("error.amount.too.large", 400),
 	UNSUPPORTED_API_VERSION("error.api.version.unsupported", 400),
 	NOT_FOUND("error.not.found", 404),
+	POSTING_NOT_FOUND("error.posting.not.found", 404),
 	METHOD_NOT_ALLOWED("error.method.not.allowed", 405),
 	UNSUPPORTED_MEDIA_TYPE("error.media.type.unsupported", 415),
 	SAME_CURRENCY("error.currency.same", 400),

@@ -42,6 +42,16 @@ Feature: The ledger posts a conversion in one transaction
       | currency | balance |
       | ZAR      | 2000.00 |
 
+  Scenario: A refused conversion id sent with a different body is a reused key, not a replayed refusal
+    When conversion "c-1" for "Acme" sells "1500.00" ZAR for "81.000000" USDT with a deadline 1 minute away
+    Then the request is refused with 422 INSUFFICIENT_FUNDS
+    When conversion "c-1" for "Acme" sells "1400.00" ZAR for "75.000000" USDT with a deadline 1 minute away
+    Then the request is refused with 422 IDEMPOTENCY_KEY_REUSED
+    And conversion "c-1" of "Acme" is recorded as REFUSED with no entries
+    And "Acme" holds exactly:
+      | currency | balance |
+      | ZAR      | 1000.00 |
+
   Scenario: Voiding a refused conversion answers its refusal
     When conversion "c-1" for "Acme" sells "1500.00" ZAR for "81.000000" USDT with a deadline 1 minute away
     And the sweeper voids conversion "c-1" for "Acme"
@@ -100,7 +110,11 @@ Feature: The ledger posts a conversion in one transaction
   Scenario: The sweeper can ask whether a conversion was posted
     Given conversion "c-1" for "Acme" has sold "184.32" ZAR for "10.000000" USDT
     Then looking up conversion "c-1" for "Acme" shows status POSTED
-    And looking up conversion "c-2" for "Acme" is refused with 404 NOT_FOUND
+    And looking up conversion "c-2" for "Acme" is refused with 404 POSTING_NOT_FOUND
+
+  Scenario: A path the ledger does not serve is not a missing posting
+    When the path "/internal/v1/conversion-posting/c-1" is requested
+    Then the request is refused with 404 NOT_FOUND
 
   Scenario: A conversion between one currency and itself is refused
     When conversion "c-1" for "Acme" sells "10.00" ZAR for "10.00" ZAR with a deadline 1 minute away

@@ -75,6 +75,10 @@ Feature: A ledger that does not answer leaves the conversion PENDING, never gues
     Given the ledger refuses every posting with 422 IDEMPOTENCY_KEY_REUSED
     When "Acme" accepts quote "q1" with key "k1"
     Then the conversion is PENDING
+    When the posting deadline of the conversion has passed
+    And the sweeper runs
+    Then the conversion shows status REJECTED because VOIDED
+    And the ledger holds exactly 0 conversions for "Acme"
 
   Scenario: Two sweepers running at once settle each conversion exactly once
     Given the ledger does not answer in time

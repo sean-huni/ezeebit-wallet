@@ -44,6 +44,10 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 			java.srcDir rootProject.file('observability/src/main/java')
 			resources.srcDir rootProject.file('observability/src/main/resources')
 		}
+		// One copy of the dependency-injection gate run by every service's `test`; see architecture/.
+		test {
+			java.srcDir rootProject.file('architecture/src/test/java')
+		}
 	}
 
 	dependencies {

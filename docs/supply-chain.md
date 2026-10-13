@@ -66,10 +66,10 @@ quoting an older console.
 
 ## State
 
-PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run at commit `eae19eb` with the trivy database of
-2026-10-13. **That verdict is stale:** since `eae19eb` the images gained Bucket4j and Lettuce (gateway-svc's
-Redis rate limiter), springdoc-openapi and `spring-boot-starter-validation`, and no later full `checkSupplyChain`
-run is recorded. The first run failed on nine Common Vulnerabilities and Exposures (CVE) entries in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
+PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run on 2026-10-13 at commit `d538b32` after
+`bootBuildImageAll` rebuilt all 5 images, with the trivy database updated 2026-10-13T01:09:18Z. Its console and
+per-scanner exit codes are committed as [2026-10-13-supply-chain-console.txt](evidence/security/2026-10-13-supply-chain-console.txt)
+and [2026-10-13-supply-chain-status.txt](evidence/security/2026-10-13-supply-chain-status.txt). The first run failed on nine Common Vulnerabilities and Exposures (CVE) entries in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
 of Boot's own properties in the root `build.gradle` (`tomcat.version`, `jackson-bom.version`,
 `jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties`: Tomcat 11.0.26,
 Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders with it, so it is

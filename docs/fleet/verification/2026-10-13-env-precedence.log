@@ -1,0 +1,11 @@
+env precedence, 2026-10-13T20:08:02Z, fixture .env in a scratch worktree holding exactly: REDIS_PORT=7000
+
+$ REDIS_PORT=6390 ./fleet-old.sh status   (fleet.sh at d538b32, before the fix)
+    redis              Docker container   7000  -      NOT RUNNING  no container
+$ ./fleet-old.sh status   (no caller value)
+    redis              Docker container   7000  -      NOT RUNNING  no container
+
+$ REDIS_PORT=6390 ./fleet.sh status   (fleet.sh at this commit)
+    redis              Docker container   6390  -      NOT RUNNING  no container
+$ ./fleet.sh status   (no caller value)
+    redis              Docker container   7000  -      NOT RUNNING  no container

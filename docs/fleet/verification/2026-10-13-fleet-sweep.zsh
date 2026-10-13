@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Sweep test of fleet.sh: every outcome of up, down and status, each asserted on its exit code and its words.
 # Run from anywhere: zsh docs/fleet/verification/2026-10-13-fleet-sweep.zsh
-# About 15 minutes: it starts the fleet four times. Leaves the fleet down. Needs ports 8081 and 16399 free.
+# About 20 minutes: it starts the fleet six times. Leaves the fleet down. Needs ports 8081 and 16399 free.
 set -u
 cd "${0:A:h}/../../.."
 # 6379 is held by another project's Redis on the machine this was written on.
@@ -36,7 +36,11 @@ pids() { print -r -- ${(o)$(cat .fleet/*.pid(N) 2>/dev/null)}; }
 listener() { lsof -nP -t -iTCP:$1 -sTCP:LISTEN 2>/dev/null; }
 case_() { print "\n=== CASE $1: $2"; }
 
-print "fleet.sh sweep, $(date -u '+%Y-%m-%dT%H:%M:%SZ'), commit $(git rev-parse --short HEAD), REDIS_PORT=$REDIS_PORT"
+# The log is evidence for one commit only, so a modified fleet.sh or sweep refuses to run.
+if [[ -n $(git status --porcelain -- fleet.sh docs/fleet/verification/2026-10-13-fleet-sweep.zsh) ]]; then
+  print -u2 "fleet.sh or this sweep has uncommitted changes; commit them first so the log names what ran"; exit 2
+fi
+print "fleet.sh sweep, $(date -u '+%Y-%m-%dT%H:%M:%SZ'), commit $(git rev-parse --short HEAD), fleet.sh blob $(git hash-object fleet.sh), REDIS_PORT=$REDIS_PORT"
 case_ 0 "setup: whatever is running stops (not asserted)"
 run ./fleet.sh down
 
@@ -118,6 +122,46 @@ rm -rf $shim
 case_ 11 "cleanup: down after the failed up"
 run ./fleet.sh down
 want_rc 0; want "fleet down: no fleet JVM, container or port left"
+
+case_ 12 "a fresh start fails once and recovers: exactly one bounce, then exit 0"
+shim=$(mktemp -d); touch $shim/fail
+# wiremock reads unhealthy until the bounce's docker compose down, then the real answer comes back.
+print -r -- "#!/bin/zsh
+[[ \$* == *'compose down'* ]] && rm -f $shim/fail
+[[ -f $shim/fail && \$* == *'compose ps'*'{{.Health}}'*wiremock ]] && { print 'running|unhealthy|0'; exit 0; }
+exec $(whence -p docker) \"\$@\"" > $shim/docker
+chmod +x $shim/docker
+run env PATH=$shim:$PATH FLEET_SETTLE_SECONDS=20 ./fleet.sh up
+want_rc 0; lines_with 1 "bouncing the whole stack once"; want_line wiremock UNHEALTHY; want "RESULT: healthy"; never "after one bounce"
+rm -r $shim
+
+case_ 13 "a JVM that ignores SIGTERM: down kills it after 30 s and still verifies"
+run ./fleet.sh down
+want_rc 0
+zsh -c 'trap "" TERM; while :; do sleep 1; done' $PWD/services/config-svc/build/libs/sweep-ignores-term.jar &
+stubborn=$!
+mkdir -p .fleet; print $stubborn > .fleet/config-svc.pid
+run ./fleet.sh down
+want_rc 0; want "killed config-svc ($stubborn): no graceful stop within 30s"; want "fleet down: no fleet JVM, container or port left"
+if kill -0 $stubborn 2> /dev/null; then ko "pid $stubborn survived"; kill -9 $stubborn; else ok "pid $stubborn is gone"; fi
+
+case_ 14 "a stale pid file naming another program's process: down and status leave it alone"
+sleep 300 &
+bystander=$!
+print $bystander > .fleet/ledger-svc.pid
+run ./fleet.sh down
+want_rc 0; want "left ledger-svc's stale pid $bystander alone"
+if kill -0 $bystander 2> /dev/null; then ok "bystander $bystander still alive"; else ko "bystander $bystander was killed"; fi
+print $bystander > .fleet/ledger-svc.pid
+run ./fleet.sh status
+want_line ledger-svc "$LEDGER  -      DOWN" "nothing listening"; never "$bystander  UP"
+kill $bystander; print -n > .fleet/ledger-svc.pid
+
+case_ 15 "a failed build never bounces"
+run env JAVA_HOME=/nonexistent ./fleet.sh up
+want_rc 1; want "build"; never "bouncing"
+run ./fleet.sh down
+want_rc 0
 
 print "\nSWEEP: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))

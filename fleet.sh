@@ -1,9 +1,17 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres, WireMock, Redis and Grafana LGTM in Docker, every service as a JVM.
+# Runs the whole fleet on this host: Postgres, WireMock, Redis and Grafana LGTM in Docker, every service as a
+# Java virtual machine (JVM).
 # Usage: ./fleet.sh up | down | status
 set -u
 cd "${0:A:h}"
-[[ -f .env ]] && { set -a; source ./.env; set +a; }
+if [[ -f .env ]]; then
+  # The caller's environment wins over .env, as it does for docker compose.
+  typeset -A CALLER
+  for line in ${(f)"$(env)"}; do CALLER[${line%%=*}]=${line#*=}; done
+  set -a; source ./.env; set +a
+  for line in ${(k)CALLER}; do export "$line=${CALLER[$line]}"; done
+  unset CALLER line
+fi
 
 RUN=.fleet
 SETTLE=${FLEET_SETTLE_SECONDS:-90}
@@ -19,6 +27,15 @@ typeset -A PORT
 typeset -a BAD
 PROJECT= CODE= WHY= ROUTES= ROWS=0 NOCONT=
 
+ours() {
+  # A pid file outlives its process, and the pid can be reused: only a JVM of this checkout counts.
+  [[ $(ps -o command= -p $2 2>/dev/null) == *"$PWD/services/$1/build/libs/"* ]]
+}
+
+live_pid() {
+  [[ -f $RUN/$1.pid ]] && ours $1 $(<$RUN/$1.pid) && print $(<$RUN/$1.pid)
+}
+
 port_of() {
   # Each service's own application.yml is the only home of its port; fleet.sh ignores SERVER_PORT.
   grep -oE 'SERVER_PORT:[0-9]+' "services/$1/src/main/resources/application.yml" | cut -d: -f2
@@ -28,9 +45,10 @@ load_ports() {
   # compose.yaml is the only home of the host ports; this reads them resolved against the environment.
   local json key val
   json=$(docker compose config --format json) || { print -u2 "docker compose config failed"; return 1; }
-  PROJECT=$(jq -r .name <<< $json)
+  PROJECT=$(jq -r .name <<< $json) && [[ -n $PROJECT ]] || { print -u2 "jq could not read docker compose config"; return 1; }
   jq -r '.services | to_entries[] | .key as $s | .value.ports[]? | "\($s):\(.target) \(.published)"' <<< $json |
     while read key val; do PORT[$key]=$val; done
+  (( ${#PORT} )) || { print -u2 "docker compose config lists no published ports"; return 1; }
 }
 
 port_var() {
@@ -105,15 +123,16 @@ row() {
 }
 
 core_row() {
-  local svc=$1 port=$(port_of $1) pid=- state detail
-  [[ -f $RUN/$svc.pid ]] && kill -0 $(<$RUN/$svc.pid) 2>/dev/null && pid=$(<$RUN/$svc.pid)
+  local svc=$1 port=$(port_of $1) pid state detail
+  pid=$(live_pid $svc) || pid=-
   probe "http://localhost:$port/actuator/health"
   case $CODE in
     200) state=UP detail="/actuator/health 200" ;;
     '') state=DOWN detail=$WHY ;;
     *) state=DOWN detail="/actuator/health answered $CODE" ;;
   esac
-  [[ $state == UP && $pid == - ]] && detail+="; not started by fleet.sh"
+  # Something else answering on a fleet port is not the fleet, however healthy it says it is.
+  [[ $state == UP && $pid == - ]] && { state=UNMANAGED; detail+=", but not a JVM fleet.sh started"; }
   [[ $state == DOWN && $pid != - ]] && detail+="; process $pid alive (starting or hung)"
   if [[ $svc == gateway-svc && $state == UP ]]; then
     routes_once && detail="routes to ledger-svc and conversion-svc" || { state=DEGRADED; detail="health 200 but $ROUTES"; }
@@ -122,7 +141,7 @@ core_row() {
 }
 
 container_row() {
-  local name=${1%%:*} st h code state detail
+  local name=${1%%:*} st h code state detail port=${PORT[$1]:--} published
   IFS='|' read -r st h code <<< "$(docker compose ps -a --format '{{.State}}|{{.Health}}|{{.ExitCode}}' $name 2>/dev/null)"
   case $st in
     running)
@@ -137,7 +156,13 @@ container_row() {
     '') state="NOT RUNNING" detail=$NOCONT ;;
     *) state=${(U)st} detail="container state $st" ;;
   esac
-  row $name "Docker container" ${PORT[$1]:--} - $state $detail
+  if [[ $st == running ]]; then
+    published=$(docker compose port $name ${1##*:} 2>/dev/null); published=${published##*:}
+    if [[ -n $published && $published != $port ]]; then
+      state=MISMATCH detail="published on $published, but the environment now says $port"; port=$published
+    fi
+  fi
+  row $name "Docker container" $port - $state $detail
 }
 
 observability_rows() {
@@ -149,7 +174,8 @@ observability_rows() {
     if (( ! grafana )); then row $name "inside lgtm" - - SKIPPED "Grafana not answering, so its datasource check cannot run"; continue; fi
     body=$(curl -s --max-time 5 "http://localhost:$g/api/datasources/uid/$name/health")
     if [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]]; then row $name "inside lgtm" - - UP "datasource health OK"
-    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-no reply within 5s}"; fi
+    elif [[ -z $body ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s"
+    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}"; fi
   done
   # An empty export is the cheapest request only a live collector answers with 200.
   probe -X POST -H 'Content-Type: application/json' -d '{}' "http://localhost:$o/v1/metrics"
@@ -198,6 +224,9 @@ preflight() {
     who=$(foreign_holder $(port_of $svc)) && { print -u2 "  port $(port_of $svc) ($svc) is held by $who"; bad=1; }
   done
   for entry in ${(k)PORT}; do
+    for svc in $SERVICES; do
+      [[ ${PORT[$entry]} == $(port_of $svc) ]] && { print -u2 "  port ${PORT[$entry]} is configured for both ${entry%%:*} and $svc"; bad=1; }
+    done
     who=$(foreign_holder ${PORT[$entry]}) || continue
     var=$(port_var ${entry%%:*})
     print -u2 "  port ${PORT[$entry]} (${entry%%:*}) is held by $who${var:+; set $var to a free port (.env or the environment)}"
@@ -209,12 +238,14 @@ preflight() {
 
 start() {
   local svc=$1
-  java -jar services/$svc/build/libs/$svc-*.jar > "$RUN/$svc.log" 2>&1 &
+  java -jar $PWD/services/$svc/build/libs/$svc-*.jar > "$RUN/$svc.log" 2>&1 &
   print $! > "$RUN/$svc.pid"
 }
 
 up_once() {
   # Returns 2 when a bounce cannot help (the build), 1 when a service did not come up healthy.
+  # lgtm left running from an earlier run would watch the JVMs boot and page ServiceDown.
+  docker compose stop lgtm > /dev/null 2>&1
   print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter)"
   docker compose up -d --wait postgres wiremock redis || return 1
   print "build"
@@ -234,8 +265,8 @@ up_once() {
 up() {
   mkdir -p $RUN
   load_ports || return 1
-  local f running=0 bounces=1 rc
-  for f in $RUN/*.pid(N); do kill -0 $(<$f) 2>/dev/null && running=1; done
+  local svc running=0 bounces=1 rc
+  for svc in $SERVICES; do live_pid $svc > /dev/null && running=1; done
   if (( running )); then
     # A second start would fail to bind and orphan the running JVMs, so a running fleet is checked instead.
     fleet_status && { print "fleet already up and healthy"; return 0; }
@@ -268,7 +299,9 @@ down() {
   for svc in ${(Oa)SERVICES}; do
     [[ -f $RUN/$svc.pid ]] || continue
     pid=$(<$RUN/$svc.pid)
-    if kill $pid 2>/dev/null; then
+    if ! ours $svc $pid; then
+      kill -0 $pid 2>/dev/null && print "left $svc's stale pid $pid alone: that process is not a JVM of this checkout"
+    elif kill $pid 2>/dev/null; then
       # Graceful shutdown takes a few seconds; returning early leaves the port bound for the next up.
       local deadline=$(( SECONDS + 30 ))
       while kill -0 $pid 2>/dev/null && (( SECONDS < deadline )); do sleep 0.5; done
@@ -284,6 +317,7 @@ down() {
     who=$(foreign_holder $(port_of $svc)) && left+=("port $(port_of $svc) ($svc) still held by $who")
   done
   for svc in ${(f)"$(docker compose ps -a --format '{{.Name}}' 2>/dev/null)"}; do left+=("container $svc still present"); done
+  for pid in ${(f)"$(pgrep -f "$PWD/services/[a-z-]+/build/libs/" 2>/dev/null)"}; do left+=("fleet JVM $pid still running: $(ps -o command= -p $pid | cut -c1-120)"); done
   if (( ${#left} )); then
     print -u2 "fleet NOT fully down:"
     print -u2 -l -- "  "${^left}

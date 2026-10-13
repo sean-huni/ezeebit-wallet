@@ -73,7 +73,8 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ```
 
 `status` (and the end of `up` and `down`) prints one row per service, grouped as core (one Java virtual machine (JVM) each) or supporting
-and by role. Every state is a word, and DETAIL says why, so a service that is not answering reads
+and by role, with the OpenTelemetry Protocol (OTLP) collector and the other backends inside lgtm listed under
+Observability. Every state is a word, and DETAIL says why, so a service that is not answering reads
 `nothing listening (connection refused)` rather than an HTTP code of `000`:
 
 ```
@@ -114,8 +115,12 @@ What `up` and `down` guarantee:
 - **A fresh start that does not come up healthy** (a container, a JVM, the routing check or a backend
   inside lgtm) is bounced exactly once. A second failure exits 1, prints the table and leaves the
   stack running for diagnosis. A failed build never bounces.
-- **`down` verifies**: a JVM that ignores SIGTERM for 30 s is killed, then no fleet port may still be
-  held and no compose container may remain, or it exits 1 naming what survived.
+- **`down` verifies**: a JVM that ignores the terminate signal (SIGTERM) for 30 s is killed, then no
+  fleet port, fleet JVM or compose container may remain, or it exits 1 naming what survived.
+- **A pid file is trusted only for a JVM of this checkout.** A stale file whose process id (PID) now
+  belongs to another program is reported and left alone, never stopped.
+- **The caller's environment wins over `.env`**, as it does for docker compose, so
+  `REDIS_PORT=6390 ./fleet.sh up` works whatever `.env` says.
 
 `FLEET_SETTLE_SECONDS` (default 90) is how long `up` waits for lgtm's backends after the container
 reports healthy. The sweep test [docs/fleet/verification/](docs/fleet/verification/) drives every one
@@ -243,7 +248,7 @@ Without that, `OpenApiContractIT` fails `./gradlew build` and names the file tha
 | eureka-svc | 8761 | Eureka service registry (dashboard at http://localhost:8761) |
 | wiremock | 8089 | Stand-in for the exchange-rate service (`docker/wiremock/mappings/rates.json`) |
 | redis | 6379 | The gateway's rate-limit buckets, shared by every gateway replica |
-| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry Protocol (OTLP) collector |
+| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Loki, Tempo, Pyroscope and an OTLP collector |
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
 `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there.

@@ -96,7 +96,8 @@ CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 lgtm:3000)
 BACKENDS=(prometheus loki tempo pyroscope)
 
 container_health() {
-  # The compose healthcheck verdict: postgres runs SELECT 1 per database, redis an authenticated PING.
+  # The compose healthcheck verdict: postgres runs SELECT 1 per database, redis an authenticated PING,
+  # lgtm waits for its own readiness file, wiremock uses the HEALTHCHECK its image ships.
   local h=$(docker compose ps --format '{{.Health}}' $1 2>/dev/null)
   print ${h:-down}
 }
@@ -130,6 +131,7 @@ fleet_status() {
     done
   else
     bad=1
+    for name in $BACKENDS; do printf '  %-15s %-6s %s\n' $name '' 'skipped (grafana not answering)'; done
   fi
   # An empty export is the cheapest request only a live collector answers with 200.
   state=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 -X POST -H 'Content-Type: application/json' \

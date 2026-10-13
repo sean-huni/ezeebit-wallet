@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Then;
-import io.ezeebit.ledger.common.LedgerMetrics;
+import io.ezeebit.ledger.common.metrics.LedgerMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;

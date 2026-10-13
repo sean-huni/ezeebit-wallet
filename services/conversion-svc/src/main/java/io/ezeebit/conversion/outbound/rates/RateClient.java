@@ -2,8 +2,8 @@ package io.ezeebit.conversion.outbound.rates;
 
 import java.time.Duration;
 
-import io.ezeebit.conversion.common.ConversionMetrics;
-import io.ezeebit.conversion.common.LogText;
+import io.ezeebit.conversion.common.log.LogText;
+import io.ezeebit.conversion.common.metrics.ConversionMetrics;
 import io.ezeebit.conversion.domain.MarketRate;
 import io.ezeebit.conversion.domain.RateRejection;
 import io.ezeebit.conversion.domain.RateValidator;

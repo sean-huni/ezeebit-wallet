@@ -2,7 +2,7 @@ package io.ezeebit.ledger.dto.req;
 
 import java.util.UUID;
 
-import io.ezeebit.ledger.common.StrictStringDeserializer;
+import io.ezeebit.ledger.api.json.StrictStringDeserializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

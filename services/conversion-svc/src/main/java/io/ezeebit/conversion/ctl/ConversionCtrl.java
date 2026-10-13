@@ -5,7 +5,7 @@ import java.util.UUID;
 import io.ezeebit.conversion.dto.req.ConversionReq;
 import io.ezeebit.conversion.dto.resp.ApiResponse;
 import io.ezeebit.conversion.dto.resp.ConversionResp;
-import io.ezeebit.conversion.service.ConversionService;
+import io.ezeebit.conversion.service.conversion.ConversionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

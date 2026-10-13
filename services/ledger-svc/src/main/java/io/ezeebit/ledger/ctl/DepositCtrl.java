@@ -3,7 +3,7 @@ package io.ezeebit.ledger.ctl;
 import io.ezeebit.ledger.dto.req.DepositReq;
 import io.ezeebit.ledger.dto.resp.ApiResponse;
 import io.ezeebit.ledger.dto.resp.DepositResp;
-import io.ezeebit.ledger.service.DepositService;
+import io.ezeebit.ledger.service.deposit.DepositService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

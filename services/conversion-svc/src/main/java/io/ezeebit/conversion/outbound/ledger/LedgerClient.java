@@ -3,7 +3,7 @@ package io.ezeebit.conversion.outbound.ledger;
 import java.util.Map;
 import java.util.UUID;
 
-import io.ezeebit.conversion.common.LogText;
+import io.ezeebit.conversion.common.log.LogText;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

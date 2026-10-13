@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.ezeebit.conversion.service.PendingResolver;
+import io.ezeebit.conversion.service.sweep.PendingResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

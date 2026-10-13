@@ -1,7 +1,7 @@
 package io.ezeebit.conversion.dto.req;
 
+import io.ezeebit.conversion.api.json.StrictStringDeserializer;
 import io.ezeebit.conversion.api.validation.ExactlyOneAmount;
-import io.ezeebit.conversion.common.StrictStringDeserializer;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import org.jspecify.annotations.Nullable;

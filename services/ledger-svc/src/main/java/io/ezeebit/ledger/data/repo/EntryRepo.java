@@ -11,8 +11,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import io.ezeebit.ledger.data.model.EntryEntity;
-import io.ezeebit.ledger.data.model.StatementFilter;
 import io.ezeebit.ledger.data.model.StatementLineEntity;
+import io.ezeebit.ledger.data.repo.query.StatementFilter;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 

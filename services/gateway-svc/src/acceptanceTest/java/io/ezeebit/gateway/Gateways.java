@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import io.ezeebit.gateway.common.RateLimitMetrics;
+import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.builder.SpringApplicationBuilder;

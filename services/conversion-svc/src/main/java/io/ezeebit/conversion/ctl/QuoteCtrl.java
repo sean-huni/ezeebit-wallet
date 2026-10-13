@@ -5,7 +5,7 @@ import java.util.UUID;
 import io.ezeebit.conversion.dto.req.QuoteReq;
 import io.ezeebit.conversion.dto.resp.ApiResponse;
 import io.ezeebit.conversion.dto.resp.QuoteResp;
-import io.ezeebit.conversion.service.QuoteService;
+import io.ezeebit.conversion.service.quote.QuoteService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import io.ezeebit.gateway.api.filter.RateLimitFilter;
-import io.ezeebit.gateway.common.RateLimitMetrics;
+import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
 import io.ezeebit.gateway.scheduler.StorePingScheduler;
 import io.ezeebit.gateway.service.MerchantBuckets;

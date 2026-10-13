@@ -5,7 +5,7 @@ import java.util.UUID;
 import io.ezeebit.ledger.dto.req.StatementReq;
 import io.ezeebit.ledger.dto.resp.ApiResponse;
 import io.ezeebit.ledger.dto.resp.StatementResp;
-import io.ezeebit.ledger.service.StatementService;
+import io.ezeebit.ledger.service.statement.StatementService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

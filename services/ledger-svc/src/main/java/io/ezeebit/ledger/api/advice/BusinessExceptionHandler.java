@@ -1,6 +1,6 @@
 package io.ezeebit.ledger.api.advice;
 
-import io.ezeebit.ledger.common.LogText;
+import io.ezeebit.ledger.common.log.LogText;
 import io.ezeebit.ledger.exception.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

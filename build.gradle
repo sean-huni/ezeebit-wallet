@@ -1,0 +1,50 @@
+plugins {
+	id 'org.springframework.boot' version "${springBootVersion}" apply false
+	id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
+}
+
+// services/* only: the intermediate :services project is a folder, not an application.
+configure(subprojects.findAll { it.parent != rootProject }) {
+	apply plugin: 'java'
+	apply plugin: 'org.springframework.boot'
+	apply plugin: 'io.spring.dependency-management'
+
+	group = 'io.ezeebit'
+	version = '0.0.1-SNAPSHOT'
+
+	java {
+		sourceCompatibility = JavaVersion.VERSION_25
+		targetCompatibility = JavaVersion.VERSION_25
+	}
+
+	repositories {
+		mavenCentral()
+	}
+
+	dependencyManagement {
+		imports {
+			mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+		}
+	}
+
+	dependencies {
+		implementation 'org.springframework.boot:spring-boot-starter-actuator'
+		testImplementation 'org.springframework.boot:spring-boot-starter-test'
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	}
+
+	tasks.named('test') {
+		useJUnitPlatform()
+		// Tests boot each service alone: no config server, no registry.
+		systemProperty 'spring.cloud.config.enabled', 'false'
+		systemProperty 'CONFIG_IMPORT_OPTIONALITY', 'optional:'
+		if (project.name != 'eureka-svc') {
+			// The registry's own server beans hang off the client config, so it keeps it.
+			systemProperty 'eureka.client.enabled', 'false'
+		}
+	}
+
+	tasks.named('jar') {
+		enabled = false
+	}
+}

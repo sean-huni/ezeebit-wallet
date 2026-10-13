@@ -1,0 +1,12 @@
+server:
+  port: ${SERVER_PORT:8761}
+spring:
+  application:
+    name: eureka-svc
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    # Default 30s: a freshly registered service stays invisible to the gateway that long.
+    response-cache-update-interval-ms: 5000

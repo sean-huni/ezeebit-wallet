@@ -1,0 +1,22 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+
+### VS Code ###
+.vscode/
+
+### macOS ###
+.DS_Store
+
+### Local environment overrides (secrets live here, never in git) ###
+.env
+
+### Fleet run state (pids, logs) ###
+.fleet/

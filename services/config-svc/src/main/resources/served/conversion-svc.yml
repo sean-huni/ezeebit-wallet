@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/conversion}
+    username: ${DB_USER:conversion}
+    password: ${DB_PASSWORD:conversion}

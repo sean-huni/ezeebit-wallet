@@ -1,0 +1,9 @@
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: conversion-svc
+  config:
+    import: "${CONFIG_IMPORT_OPTIONALITY:}configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml

@@ -1,0 +1,19 @@
+# The published route table: only these paths reach a service. /internal/** is never routed.
+spring:
+  cloud:
+    loadbalancer:
+      cache:
+        # Its own 35s instance cache on top of the 5s registry fetch keeps dead instances routable.
+        enabled: false
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: ledger
+              uri: lb://ledger-svc
+              predicates:
+                - Path=/api/v1/merchants/*/balances/**,/api/v1/merchants/*/entries/**
+            - id: conversion
+              uri: lb://conversion-svc
+              predicates:
+                - Path=/api/v1/merchants/*/quotes/**,/api/v1/merchants/*/conversions/**

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: 'postgres:18.6-alpine'
+    environment:
+      - 'POSTGRES_USER=${POSTGRES_USER:-postgres}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}'
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      # Runs only on an empty data volume; after editing it, `docker compose down -v`.
+      - './docker/postgres/initdb:/docker-entrypoint-initdb.d:ro'
+      # Postgres 18 keeps PGDATA under /var/lib/postgresql/18; mounting .../data is a silent no-op.
+      - 'pgdata:/var/lib/postgresql'
+    healthcheck:
+      # psql into both databases: pg_isready reports ready before the init script has created them.
+      test: ['CMD-SHELL', 'psql -U ledger -d ledger -c "SELECT 1" >/dev/null && psql -U conversion -d conversion -c "SELECT 1" >/dev/null']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

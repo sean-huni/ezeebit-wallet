@@ -1,0 +1,13 @@
+server:
+  port: ${SERVER_PORT:8888}
+spring:
+  application:
+    name: config-svc
+  profiles:
+    include: native
+  cloud:
+    config:
+      server:
+        native:
+          # Not classpath:/config: Spring Boot loads that folder as THIS server's own config.
+          search-locations: ${CONFIG_SEARCH_LOCATIONS:classpath:/served}

@@ -69,7 +69,8 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ./fleet.sh up       # port check, Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other
                     # three, a routing check, Grafana LGTM, then waits until every row below is UP or HEALTHY
 ./fleet.sh status   # the table below; exits 1 if any row is not UP or HEALTHY
-./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down (data volumes are kept); then proves it
+./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down --remove-orphans (data volumes are kept); then proves it
+./fleet.sh purge    # down, then removes the data volumes and .fleet/ too: every ledger and conversion row is deleted
 ```
 
 `status` (and the end of `up` and `down`) prints one row per service, grouped as core (one Java virtual machine (JVM) each) or supporting
@@ -149,7 +150,7 @@ docker compose up -d --wait lgtm      # optional: Grafana at http://localhost:30
 
 Give the gateway about 10 seconds after the last service is healthy before calling it: it learns
 instances from the registry on a 5 s cycle. To stop:
-`docker compose stop lgtm; kill $(cat .fleet/*.pid); docker compose down` (lgtm first, so a deliberate stop never pages).
+`docker compose stop lgtm; kill $(cat .fleet/*.pid); docker compose down --remove-orphans` (lgtm first, so a deliberate stop never pages); add `--volumes` to release the data volumes as `purge` does.
 
 ## Demo: deposit, quote, convert, read back
 
@@ -383,7 +384,7 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 | `POSTGRES_PORT` | 5432 | Host port for Postgres, and the port in both services' default Java Database Connectivity (JDBC) Uniform Resource Locator (URL) |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD` | postgres / postgres | Postgres superuser in the container |
 | `DB_URL` | `jdbc:postgresql://localhost:${POSTGRES_PORT}/<ledger or conversion>` | JDBC URL |
-| `DB_USER`, `DB_PASSWORD` | `ledger`/`ledger`, `conversion`/`conversion` | Database credentials. The roles are created in `docker/postgres/initdb/01-databases.sql`: an override needs a matching change there plus `docker compose down -v` |
+| `DB_USER`, `DB_PASSWORD` | `ledger`/`ledger`, `conversion`/`conversion` | Database credentials. The roles are created in `docker/postgres/initdb/01-databases.sql`: an override needs a matching change there plus `./fleet.sh purge` |
 | `SERVER_PORT` | per service | HTTP port of one service started by hand; `fleet.sh` ignores it |
 | `SERVER_ADDRESS` | 127.0.0.1 | Address every service binds and registers. Loopback on purpose: `/internal/**` moves money and has no authentication |
 | `CONFIG_SERVER_URL` | http://localhost:8888 | Where ledger, conversion and gateway fetch config |
@@ -423,7 +424,8 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | `up` says `fleet still not healthy after one bounce` | The table above that line names each failing row and why. The stack is left running for diagnosis; `./fleet.sh down` when done |
 | `down` says `fleet NOT fully down` | The lines below it name the port holder or container that survived; stop it before the next `up` |
 | Every merchant call answers 503 `RATE_LIMITER_UNAVAILABLE` | Redis is not running: `docker compose up -d --wait redis` |
-| Edited `01-databases.sql`, nothing changed | The init script runs only on an empty volume: `docker compose down -v`, then `./fleet.sh up` (this wipes the data) |
+| Edited `01-databases.sql`, nothing changed | The init script runs only on an empty volume: `./fleet.sh purge`, then `./fleet.sh up` (this wipes the data) |
+| `down` leaves containers in `docker container ls` | Check the NAMES column: `down` removes only this project's containers (`docker compose ps -a` lists them). Another project's container holding a fleet port, such as `merchant-svc-redis-1` on 6379, is never touched; move the fleet's port instead (`REDIS_PORT=6390`) |
 | A service is not healthy after 90 s | Read `.fleet/<svc>.log` |
 | Build fails in ledger, conversion or gateway tests | Docker is not running (Testcontainers) |
 | Quotes answer 503 `RATE_UNAVAILABLE` | The `wiremock` container is not running: `docker compose up -d --wait wiremock` |

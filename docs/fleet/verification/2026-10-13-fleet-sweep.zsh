@@ -1,11 +1,13 @@
 #!/usr/bin/env zsh
 # Sweep test of fleet.sh: every outcome of up, down and status, each asserted on its exit code and its words.
 # Run from anywhere: zsh docs/fleet/verification/2026-10-13-fleet-sweep.zsh
-# About 20 minutes: it starts the fleet six times. Leaves the fleet down. Needs ports 8081 and 16399 free.
+# About 22 minutes: it starts the fleet seven times. Leaves the fleet down. Needs ports 8081 and 16399 free.
 set -u
 cd "${0:A:h}/../../.."
 # 6379 is held by another project's Redis on the machine this was written on.
 export REDIS_PORT=${REDIS_PORT:-6390}
+# Its own compose project, so its containers and volumes (case 16 deletes them) are never the developer's.
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-ezeebit-wallet-sweep}
 
 PASS=0 FAIL=0 OUT= RC=
 LEDGER=$(grep -oE 'SERVER_PORT:[0-9]+' services/ledger-svc/src/main/resources/application.yml | cut -d: -f2)
@@ -162,6 +164,17 @@ run env JAVA_HOME=/nonexistent ./fleet.sh up
 want_rc 1; want "build"; never "bouncing"
 run ./fleet.sh down
 want_rc 0
+
+case_ 16 "purge releases every container, the network and both data volumes"
+run ./fleet.sh up
+want_rc 0
+vols=$(docker volume ls -q --filter label=com.docker.compose.project=$COMPOSE_PROJECT_NAME)
+if [[ -n $vols ]]; then ok "control: volumes exist before purge (${(f)vols})"; else ko "control: no volumes before purge"; fi
+run ./fleet.sh purge
+want_rc 0; want "fleet down: no fleet JVM, container or port left"; want "removing volumes:"; want "fleet purged"
+if [[ -z $(docker volume ls -q --filter label=com.docker.compose.project=$COMPOSE_PROJECT_NAME) ]]; then ok "no volume of $COMPOSE_PROJECT_NAME left"; else ko "volumes left"; fi
+if [[ -z $(docker network ls -q --filter label=com.docker.compose.project=$COMPOSE_PROJECT_NAME) ]]; then ok "no network of $COMPOSE_PROJECT_NAME left"; else ko "network left"; fi
+if [[ ! -d .fleet ]]; then ok ".fleet/ removed"; else ko ".fleet/ still present"; fi
 
 print "\nSWEEP: $PASS passed, $FAIL failed"
 (( FAIL == 0 ))

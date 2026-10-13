@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Runs the whole fleet on this host: Postgres, WireMock, Redis and Grafana LGTM in Docker, every service as a
 # Java virtual machine (JVM).
-# Usage: ./fleet.sh up | down | status
+# Usage: ./fleet.sh up | down | purge | status   (purge also deletes the data volumes)
 set -u
 cd "${0:A:h}"
 if [[ -f .env ]]; then
@@ -310,7 +310,7 @@ down() {
     fi
     rm -f $RUN/$svc.pid
   done
-  docker compose down
+  docker compose down --remove-orphans
   fleet_status rows
   # Verified rather than assumed: anything still holding a port makes the next up fail.
   for svc in $SERVICES; do
@@ -326,9 +326,23 @@ down() {
   print "fleet down: no fleet JVM, container or port left"
 }
 
+purge() {
+  # down keeps the data volumes; purge is the one command that deletes them, so it is never implied.
+  down || return 1
+  local -a vols
+  vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})
+  print "removing volumes: ${vols:-none} (every ledger and conversion row, Prometheus and Tempo history)"
+  docker compose down --volumes --remove-orphans || return 1
+  rm -r -f -- $RUN
+  vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})
+  (( ${#vols} )) && { print -u2 "fleet NOT purged: volumes still present: $vols"; return 1; }
+  print "fleet purged: containers, network, volumes and $RUN/ released; pulled images are kept"
+}
+
 case ${1:-} in
   up) up ;;
   down) down ;;
+  purge) purge ;;
   status) load_ports && fleet_status ;;
-  *) print -u2 "usage: $0 up|down|status"; exit 2 ;;
+  *) print -u2 "usage: $0 up|down|purge|status"; exit 2 ;;
 esac

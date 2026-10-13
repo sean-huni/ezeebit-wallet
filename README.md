@@ -25,6 +25,7 @@ Walkthrough video: link to be added.
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
 | [docs/observability-evidence.md](docs/observability-evidence.md) | Screenshots of the dashboards, an end-to-end trace, trace-correlated logs, alert timings |
+| [docs/fleet/verification/](docs/fleet/verification/) | The `fleet.sh` sweep test (every outcome of `up`, `down` and `status`) and its last run log |
 | [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
 
 **This README**
@@ -44,7 +45,7 @@ migration belongs.
 |---|---|
 | Java Development Kit (JDK) 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
 | Docker, running | Postgres, WireMock, Redis and Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image for the fleet; Testcontainers (Postgres, Redis) and the secrets scanners during the build |
-| zsh and curl | `./fleet.sh` is a zsh script (default shell on macOS). Without zsh, use the manual commands below |
+| zsh, curl, jq and lsof | `./fleet.sh` is a zsh script (default shell on macOS); jq ships with macOS 15 and later, otherwise `brew install jq`. Without zsh, use the manual commands below |
 | Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888 |
 
 No Gradle install is needed: the repository ships the Gradle 9.8.1 wrapper. Stack: Java 25, Spring
@@ -65,29 +66,62 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ## Run the fleet
 
 ```sh
-./fleet.sh up       # Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other three together,
-                    # each waited until healthy, then a routing check, then Grafana LGTM
-./fleet.sh status   # per service: port and /actuator/health HTTP code (000 = not answering); per container: compose
-                    # health; Grafana, then Prometheus, Loki, Tempo and Pyroscope through Grafana's datasource health
-                    # check, then the OTLP collector. Exits 1 if anything is not healthy
-./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down (data volumes are kept)
+./fleet.sh up       # port check, Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other
+                    # three, a routing check, Grafana LGTM, then waits until every row below is UP or HEALTHY
+./fleet.sh status   # the table below; exits 1 if any row is not UP or HEALTHY
+./fleet.sh down     # stop lgtm, then the JVMs, then docker compose down (data volumes are kept); then proves it
 ```
 
-The tail of `up` (Docker's own progress lines left out):
+`status` (and the end of `up` and `down`) prints one row per service, grouped as core (one Java virtual machine (JVM) each) or supporting
+and by role. Every state is a word, and DETAIL says why, so a service that is not answering reads
+`nothing listening (connection refused)` rather than an HTTP code of `000`:
 
 ```
-  config-svc UP on :8888
-  eureka-svc UP on :8761
-  ledger-svc UP on :8081
-  conversion-svc UP on :8082
-  gateway-svc UP on :8080
-  gateway routes to ledger-svc and conversion-svc
-lgtm
-fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  63645  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  63688  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  63938  UP           /actuator/health 200
+    conversion-svc     Java microservice  8082  63939  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  63940  UP           routes to ledger-svc and conversion-svc
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 15 checks passed
 ```
 
-`up` refuses to start while a fleet from `.fleet/*.pid` is still running. If it stops part way, run
-`./fleet.sh down` before retrying so no Java virtual machine (JVM) keeps a port.
+What `up` and `down` guarantee:
+
+- **A taken port stops `up` before anything starts**, naming the holder and the variable that moves
+  the port (`port 6379 (redis) is held by container merchant-svc-redis-1 (compose project
+  merchant-svc); set REDIS_PORT to a free port`). A bounce would not free it, so none is tried.
+- **`up` on a running fleet** reports `fleet already up and healthy` and changes nothing; if any row is
+  not healthy it prints the table and bounces the whole stack (`down`, then a fresh start).
+- **A fresh start that does not come up healthy** (a container, a JVM, the routing check or a backend
+  inside lgtm) is bounced exactly once. A second failure exits 1, prints the table and leaves the
+  stack running for diagnosis. A failed build never bounces.
+- **`down` verifies**: a JVM that ignores SIGTERM for 30 s is killed, then no fleet port may still be
+  held and no compose container may remain, or it exits 1 naming what survived.
+
+`FLEET_SETTLE_SECONDS` (default 90) is how long `up` waits for lgtm's backends after the container
+reports healthy. The sweep test [docs/fleet/verification/](docs/fleet/verification/) drives every one
+of these outcomes against a real fleet and asserts each on its exit code and its words: 75 checks
+passed, 0 failed, on 2026-10-13
+([run log](docs/fleet/verification/2026-10-13-fleet-sweep-run.log)).
 
 ### Without zsh
 
@@ -232,7 +266,7 @@ ezeebit-wallet/
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
 ├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
 ├── observability/          OTLP settings, logback appender wiring; compiled into every service
-├── fleet.sh                up | status | down
+├── fleet.sh                up | status | down; its sweep test is docs/fleet/verification/
 └── services/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry
@@ -330,8 +364,11 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 
 | Symptom | Fix |
 |---|---|
-| Port 5432 already in use | `POSTGRES_PORT=55432 ./fleet.sh up` (or set it in `.env`); the services follow it |
-| Port 6379 already in use | `REDIS_PORT=6380 ./fleet.sh up`; the gateway follows it |
+| `up` says `port 5432 (postgres) is held by ...` | `POSTGRES_PORT=55432 ./fleet.sh up` (or set it in `.env`); the services follow it |
+| `up` says `port 6379 (redis) is held by ...` | `REDIS_PORT=6390 ./fleet.sh up` (or set it in `.env`); the gateway follows it |
+| `up` says `port 8081 (ledger-svc) is held by process ...` | A JVM from an earlier run, or another program, holds a service port: stop it (the line gives its process id) |
+| `up` says `fleet still not healthy after one bounce` | The table above that line names each failing row and why. The stack is left running for diagnosis; `./fleet.sh down` when done |
+| `down` says `fleet NOT fully down` | The lines below it name the port holder or container that survived; stop it before the next `up` |
 | Every merchant call answers 503 `RATE_LIMITER_UNAVAILABLE` | Redis is not running: `docker compose up -d --wait redis` |
 | Edited `01-databases.sql`, nothing changed | The init script runs only on an empty volume: `docker compose down -v`, then `./fleet.sh up` (this wipes the data) |
 | A service is not healthy after 90 s | Read `.fleet/<svc>.log` |
@@ -340,8 +377,8 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | Quote accepted after 15 s answers 409 `QUOTE_EXPIRED` | Expected: re-quote and accept within 15 s |
 | Port 3000, 4317 or 4318 already in use | Stop the other Grafana or collector; these ports are fixed |
 | A dashboard shows no data right after `up` | Metrics export every 10 s; wait one step |
-| `./fleet.sh status` shows a container `down` or `unhealthy` | Start it: `docker compose up -d --wait <name>`; if it stays unhealthy, read `docker compose logs <name>` |
-| `./fleet.sh status` shows a datasource line `FAIL` | That backend inside lgtm is not answering: read `docker compose logs lgtm` |
-| `./fleet.sh status` shows backends `skipped (grafana not answering)`, or grafana or otlp-collector at `000` | lgtm is not running: `docker compose up -d --wait lgtm` |
+| `./fleet.sh status` shows any row not `UP` or `HEALTHY` | `./fleet.sh up` bounces the whole stack once; the row's DETAIL says what failed |
+| `./fleet.sh status` shows a container `UNHEALTHY` | Read `docker compose logs <name>` |
+| `./fleet.sh status` shows a backend `DOWN` with a datasource message | That backend inside lgtm is not answering: read `docker compose logs lgtm` |
 
 Run state (pids and logs) lives in `.fleet/`, which is gitignored.

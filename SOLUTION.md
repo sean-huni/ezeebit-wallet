@@ -28,6 +28,7 @@ of it:
 | SAST and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
 | Supply-chain gate: secrets scanning, Paketo images, SBOMs, trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
+| Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
 
 Each landed as its own `feat-*` merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means
@@ -63,13 +64,13 @@ What exists:
   container stands in for the rate service.
 
 **Tests.** `./gradlew clean build --rerun-tasks` on 2026-10-13, counted from the JUnit XML reports:
-**308 tests, 0 failures, 0 skipped.**
+**386 tests, 0 failures, 0 skipped.**
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 63 | 16 | 61 |
-| conversion-svc | 107 | 11 | 44 |
-| gateway-svc | 4 | | |
+| ledger-svc | 67 | 23 | 61 |
+| conversion-svc | 111 | 17 | 44 |
+| gateway-svc | 39 | 22 | |
 | config-svc | 1 | | |
 | eureka-svc | 1 | | |
 
@@ -114,7 +115,7 @@ Two domain services, each owning its own database, behind one gateway. Details i
 | PostgreSQL | MySQL (Ezeebit's stack) | The design only uses portable features: exact `NUMERIC`, `SELECT ... FOR UPDATE`, unique and `CHECK` constraints. I picked Postgres for transactional DDL (a failed migration rolls back cleanly) and one identical image (`postgres:18.6-alpine`) in tests and compose. Moving to MySQL 8 is a driver, datasource and dialect change, not a redesign. |
 | All services in one repository | One repository per service (12-factor) | The deliverable is one repository that builds and runs with one command. Argued in [ARCHITECTURE.md section 8](ARCHITECTURE.md#8-single-repository-and-the-12-factor-trade-off). |
 | Eureka, Config Server and Gateway for two domain services | Fixed URLs, no gateway | Real overhead: three extra processes, a boot order, registry caches to tune. Kept because the platform will grow into payouts, chain listening and settlement, and the gateway is one route table and one place to keep `/internal/**` unreachable. If the fleet stayed this small, I would drop Eureka and the Config Server first. |
-| No Redis, no rate limiting | Redis-backed limits at the gateway | Nothing in Tasks 1 and 2 needs it: idempotency and concurrency live in the database, the only state replicas must agree on. |
+| Redis-backed rate limit per merchant at the gateway, failing closed | No limiter; or in-heap buckets per gateway | Not needed by Tasks 1 and 2 (idempotency and concurrency live in the database). Added beyond the brief because a payday burst from one merchant should not starve the rest. In-heap buckets would multiply the limit by the replica count. Failing closed makes Redis part of the edge's critical path: without it no merchant call succeeds, which I prefer to an edge that silently stops limiting. |
 | Merchant identity as a path variable | A token carrying the merchant id | The brief says to assume the merchant is identified by an ID in the request. In production it would come from the verified token, never from the path. |
 
 ## 4. Assumptions
@@ -190,7 +191,19 @@ This is the single list; the other documents link here.
 **Security and deployment**
 
 - `/internal/**` has no authentication. Locally every service binds loopback; production needs a
-  network policy or mTLS before these endpoints are deployable.
+  network policy or mTLS before these endpoints are deployable. The gateway proof header does not
+  cover it.
+- The gateway proof header (`X-Ezeebit-Gateway`) is a shared secret, not authentication: it travels
+  in clear over plain HTTP, every service and anyone who can read config-svc's served files holds
+  it, and the committed default is public. It only stops a direct call to a service that does not
+  know it. Production needs network policy or mTLS between the gateway and the services, and the
+  secret rotated per environment.
+- Redis runs as one unreplicated container with no persistence; it holds only rate-limit buckets,
+  so a restart resets every merchant's bucket to full. Because the limiter fails closed, Redis being
+  down stops every merchant call (paged as RateLimiterUnavailable).
+- The rate-limit key is the merchant id from the path, which the client chooses. With no
+  authentication a caller can spread load over many merchant ids; a limit keyed on the verified
+  caller needs the token the brief puts out of scope. Only the shape of the key is bounded (a UUID).
 - One Postgres container hosts both databases: logically separate, one shared failure domain.
 - config-svc and eureka-svc run as single instances.
 - CircleCI has never run: no project reads the config until the repository is pushed and connected
@@ -222,6 +235,8 @@ This is the single list; the other documents link here.
   not with two running conversion-svc instances.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
+- RateLimiterUnavailable was rehearsed once locally; its rule has no unit test (no `promtool` in the
+  build), like the other rules.
 
 **Not built**
 

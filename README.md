@@ -16,9 +16,9 @@ Walkthrough video: link to be added.
 | Need | Notes |
 |---|---|
 | JDK 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
-| Docker, running | Postgres, WireMock and Grafana LGTM for the fleet; Testcontainers and the secrets scanners during the build |
+| Docker, running | Postgres, WireMock, Redis and Grafana LGTM for the fleet; Testcontainers (Postgres, Redis) and the secrets scanners during the build |
 | zsh and curl | `./fleet.sh` is a zsh script (default shell on macOS). Without zsh, use the manual commands below |
-| Free ports | 5432 (Postgres), 8089 (WireMock), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888 |
+| Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888 |
 
 No Gradle install is needed: the repository ships the Gradle 9.8.1 wrapper. Stack: Java 25, Spring
 Boot 4.1.1, Spring Cloud 2025.1.3.
@@ -30,7 +30,7 @@ Boot 4.1.1, Spring Cloud 2025.1.3.
 ```
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
-HTTP), the static analysis and coverage gates, and a secrets scan (about 151 s on an 18-core laptop with dependencies and images cached; the
+HTTP), the static analysis and coverage gates, and a secrets scan (about 160 s on an 18-core laptop with dependencies and images cached; the
 first run also downloads them).
 Test counts are in [SOLUTION.md](SOLUTION.md#1-tasks-chosen-and-status); the tiers and gates are
 described in [docs/quality-gates.md](docs/quality-gates.md).
@@ -38,7 +38,7 @@ described in [docs/quality-gates.md](docs/quality-gates.md).
 ## Run the fleet
 
 ```sh
-./fleet.sh up       # Postgres + WireMock, bootJar, config-svc and eureka-svc first, then the other three together,
+./fleet.sh up       # Postgres + WireMock + Redis, bootJar, config-svc and eureka-svc first, then the other three together,
                     # each waited until healthy, then a routing check, then Grafana LGTM
 ./fleet.sh status   # port and /actuator/health HTTP code per service (000 = not answering)
 ./fleet.sh down     # stop the JVMs, then docker compose down (data volumes are kept)
@@ -65,7 +65,7 @@ fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana
 The same steps by hand, in any POSIX shell from the repository root:
 
 ```sh
-docker compose up -d --wait postgres wiremock
+docker compose up -d --wait postgres wiremock redis
 ./gradlew bootJar
 mkdir -p .fleet
 for svc in config-svc eureka-svc ledger-svc conversion-svc gateway-svc; do
@@ -127,6 +127,11 @@ Also worth trying:
 
 ```sh
 curl -i localhost:8080/internal/v1/deposits     # 404 from the gateway: unrouted
+curl -i localhost:8082/v1/merchants/$M/quotes   # 403 GATEWAY_REQUIRED: a service answers public routes only via the gateway
+seq 130 | xargs -P 20 -I{} curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/api/v1/merchants/$M/balances | sort | uniq -c
+                                                # about 100 x 200 (plus what refills during the burst), the rest 429 RATE_LIMITED
+docker compose stop redis                       # then any merchant call answers 503 RATE_LIMITER_UNAVAILABLE
+docker compose start redis                      # admitted again within about a second
 curl -s -X POST localhost:8089/__admin/mappings -d \
   '{"priority":1,"request":{"urlPath":"/rates"},"response":{"status":200,"fixedDelayMilliseconds":3000,"body":"{}"}}'
                                                 # a slow rate feed: the next quote is refused with 503 RATE_UNAVAILABLE in about 2 s
@@ -141,12 +146,13 @@ Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#
 
 | Service | Port | Role |
 |---|---|---|
-| gateway-svc | 8080 | The single client-facing entry: Spring Cloud Gateway (Server WebMVC), routes by registry name |
+| gateway-svc | 8080 | The single client-facing entry: Spring Cloud Gateway (Server WebMVC), routes by registry name, limits each merchant's request rate |
 | ledger-svc | 8081 | Task 1: balances, internal deposits, double-entry journal. Own database `ledger` |
 | conversion-svc | 8082 | Task 2: quotes and conversions. Own database `conversion` |
 | config-svc | 8888 | Spring Cloud Config Server, native backend |
 | eureka-svc | 8761 | Eureka service registry (dashboard at http://localhost:8761) |
 | wiremock | 8089 | Stand-in for the exchange-rate service (`docker/wiremock/mappings/rates.json`) |
+| redis | 6379 | The gateway's rate-limit buckets, shared by every gateway replica |
 | lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Tempo, Loki and an OTLP collector |
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
@@ -164,7 +170,7 @@ ezeebit-wallet/
 ├── config/                 checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
 ├── security/               scanners.lock, trivy-ignore.yaml, scan.sh and report.py: the supply-chain gate
 ├── .circleci/config.yml    the CI job: the same Gradle commands as a laptop
-├── compose.yaml            Postgres 18.6 (alpine) with both databases; WireMock rate service; Grafana LGTM
+├── compose.yaml            Postgres 18.6 (alpine) with both databases; WireMock rate service; Redis 8.10 (alpine); Grafana LGTM
 ├── docker/lgtm/            dashboards, alert rules, Slack route, container start script
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
 ├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
@@ -173,7 +179,7 @@ ezeebit-wallet/
 └── services/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry
-    ├── gateway-svc/        edge routing; api/advice/UpstreamUnavailableAdvice maps upstream failures to 503/504
+    ├── gateway-svc/        edge routing and rate limiting; api/advice/UpstreamUnavailableAdvice maps upstream failures to 503/504
     ├── ledger-svc/         Task 1; changesets in db/changelog/2026/10/; src/acceptanceTest holds the Spring and Cucumber tiers
     └── conversion-svc/     Task 2; changesets in db/changelog/2026/10/; outbound/ holds the rate and ledger clients
 ```
@@ -188,9 +194,33 @@ Only these paths reach a service; everything else is answered by the gateway its
 | `/api/v1/merchants/*/quotes/**`, `/api/v1/merchants/*/conversions/**` | conversion-svc |
 | `/internal/**` | never routed (service-to-service only) |
 
+The gateway rewrites `/api/v1/...` to `/v1/...`; the services serve only `/v1/merchants/...` (and
+`/internal/v1/...`), so a call straight to a service under `/api/...` is 404. It also replaces any
+client-sent `X-Ezeebit-Gateway` header with its own secret, and ledger-svc and conversion-svc answer
+their public routes with **403 `GATEWAY_REQUIRED`** without it. That header is defence in depth, not
+authentication ([ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology)).
+
 An upstream that is down or refuses the connection answers **503 `UPSTREAM_UNAVAILABLE`**; one that
 resets or gives no answer within 10 s answers **504 `UPSTREAM_OUTCOME_UNKNOWN`**, because the
 request may have been processed. Problem details name no service.
+
+### Rate limiting
+
+Every merchant route is limited per merchant id, in one Redis bucket that every gateway replica
+shares: a burst of **100** requests is admitted, then **20 a second** (1200 a minute). The limits are
+served from `gateway-svc.yml` and overridable by the variables below.
+
+| Answer | When |
+|---|---|
+| 200 with `X-RateLimit-Remaining` | admitted and forwarded |
+| **429 `RATE_LIMITED`**, `Retry-After` in whole seconds | the merchant's bucket is empty; nothing was forwarded |
+| **503 `RATE_LIMITER_UNAVAILABLE`**, `Retry-After: 1` | Redis did not answer within 250 ms (down, unreachable or stalled). The limiter fails closed: nothing is forwarded unlimited |
+| **400 `INVALID_MERCHANT_ID`** | the merchant id in the path is not a UUID, checked before Redis is touched |
+| **400 `MALFORMED_PATH`** | a path under `/api/` that is not in canonical form (`;params`, `%xx`, dot segments, `//`), which could otherwise route while being charged to another bucket |
+
+A refusal (429 or 503) is never forwarded. The `ezeebit_gateway_ratelimit_total{outcome}` counter
+counts allowed, limited and unavailable decisions, and the RateLimiterUnavailable alert pages on any
+unavailable one ([docs/observability.md](docs/observability.md#alert-rules)).
 
 ## Configuration
 
@@ -212,25 +242,33 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 | `RATES_URL` | `http://localhost:${RATES_PORT}` | Base URL of the exchange-rate service |
 | `EUREKA_URL` | http://localhost:8761/eureka/ | Registry address for the clients |
 | `OTLP_URL` | http://localhost:4318 | OTLP/HTTP base URL for metrics, traces and logs |
+| `REDIS_PORT` | 6379 | Host port for Redis, and the port the gateway dials |
+| `REDIS_HOST` | localhost | Where the gateway's rate limiter finds Redis |
+| `REDIS_PASSWORD` | redis-local | Redis `requirepass` in compose and the gateway's credential. Override outside local runs |
+| `REDIS_TIMEOUT` | 250ms | Connect and command timeout for the limiter; past it the request is 503 |
+| `RATE_LIMIT_CAPACITY`, `RATE_LIMIT_REFILL_TOKENS`, `RATE_LIMIT_REFILL_PERIOD` | 100, 20, 1s | Per-merchant burst, and the tokens refilled per period |
+| `GATEWAY_SHARED_SECRET` | local-gateway-proof | The `X-Ezeebit-Gateway` value the gateway adds and the services require. Override outside local runs |
 | `SLACK_WEBHOOK_URL` | empty (no Slack) | Slack incoming webhook for alerts. A secret: `.env` only |
 
 `DB_URL`, `DB_USER`, `DB_PASSWORD` and `SERVER_PORT` carry the same name in every service: set them
 per process when starting a service by hand, not in `.env`, or every service picks up the same value.
 
 Served configuration lives in `services/config-svc/src/main/resources/served/`: `application.yml`
-(shared by all clients), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
+(shared by all clients, including the gateway proof secret), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
 policy: quote TTL, posting grace, sweeper timing, rate-service timeouts and freshness, jump limit,
-currency scales, per-pair band and spread) and `gateway-svc.yml` (the route table and proxy read
-timeout).
+currency scales, per-pair band and spread) and `gateway-svc.yml` (the route table with its path rewrite and proof
+header, the proxy read timeout, and the rate limits and Redis connection).
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
 | Port 5432 already in use | `POSTGRES_PORT=55432 ./fleet.sh up` (or set it in `.env`); the services follow it |
+| Port 6379 already in use | `REDIS_PORT=6380 ./fleet.sh up`; the gateway follows it |
+| Every merchant call answers 503 `RATE_LIMITER_UNAVAILABLE` | Redis is not running: `docker compose up -d --wait redis` |
 | Edited `01-databases.sql`, nothing changed | The init script runs only on an empty volume: `docker compose down -v`, then `./fleet.sh up` (this wipes the data) |
 | A service is not healthy after 90 s | Read `.fleet/<svc>.log` |
-| Build fails in ledger or conversion tests | Docker is not running (Testcontainers) |
+| Build fails in ledger, conversion or gateway tests | Docker is not running (Testcontainers) |
 | Quotes answer 503 `RATE_UNAVAILABLE` | The `wiremock` container is not running: `docker compose up -d --wait wiremock` |
 | Quote accepted after 15 s answers 409 `QUOTE_EXPIRED` | Expected: re-quote and accept within 15 s |
 | Port 3000, 4317 or 4318 already in use | Stop the other Grafana or collector; these ports are fixed |

@@ -5,16 +5,17 @@ Back to [README](../README.md). The supply-chain half (secrets, images, SBOMs) i
 
 ## Test tiers
 
-`./gradlew clean build` runs every tier. ledger-svc and conversion-svc have three, wired as a shared
-convention in the root `build.gradle` (a service opts in by being listed in `tieredServices`):
+`./gradlew clean build` runs every tier. ledger-svc and conversion-svc have three, gateway-svc the
+first two, wired as a shared convention in the root `build.gradle` (a service opts in by being
+listed in `tieredServices`, and to Cucumber by `cucumberServices`):
 
 | Gradle task | Source | What it is |
 |---|---|---|
 | `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle, business-metric tags; no Spring context, no Docker |
-| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses; for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the LAN address |
+| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each DB constraint proven by the row it refuses, the gateway proof header; for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the LAN address. For gateway-svc: real gateway contexts on Testcontainers Redis (the pinned compose image) against a stub upstream: the rate limit, two gateways sharing one bucket, Redis stopped, paused and absent, the path rewrite and the proof header |
 | `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that the books balance; `business-metrics.feature` checks that the counters move on the real path |
 
-The other three services have one `test` task each. Counts per tier are in
+config-svc and eureka-svc have one `test` task each. Counts per tier are in
 [SOLUTION.md](../SOLUTION.md#1-tasks-chosen-and-status).
 
 The Spring tiers start `postgres:18.6-alpine` through Testcontainers, so Docker must be running.

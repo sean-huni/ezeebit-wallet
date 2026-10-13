@@ -15,7 +15,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 	apply plugin: 'io.spring.dependency-management'
 
 	group = 'io.ezeebit'
-	version = '0.0.1-SNAPSHOT'
+	version = '0.1.0'
 
 	java {
 		sourceCompatibility = JavaVersion.VERSION_25

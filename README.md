@@ -107,7 +107,10 @@ visible within a few seconds.
 ## Observability
 
 `compose.yaml` runs `grafana/otel-lgtm:0.36.0`: Grafana, Prometheus, Tempo, Loki and an
-OpenTelemetry collector in one container, data in the `lgtmdata` volume. Every service exports
+OpenTelemetry collector in one container; metrics, traces and logs persist in the `lgtmdata`
+volume. Grafana's own database is on tmpfs and resets on every start by design: dashboards, alert
+rules and the contact point re-provision from files, and no stale alert state survives a restart
+to page on the next boot. Every service exports
 metrics (every 10 s), traces (100% sampled) and logs over OTLP/HTTP to `localhost:4318`. Grafana
 is at http://localhost:3000 with **anonymous Admin access: local use only**.
 
@@ -134,7 +137,7 @@ Alert rules (`docker/lgtm/alerting/rules.yaml`, Grafana-managed):
 
 On `up`, ServiceDown is briefly Pending while the JVMs boot (about 30 s, measured) and clears once
 each service exports; it fires only after 1 min. Notifications go to Slack only when
-`SLACK_WEBHOOK_URL` is set (shell or `.env`). The container installs the Slack contact point at
+`SLACK_WEBHOOK_URL` is set in the root `.env` (gitignored, never committed). The container installs the Slack contact point at
 start only in that case, because Grafana refuses to start on a Slack contact point with an empty
 URL; without it the route is removed again and alerts stay visible in Grafana only. The URL is
 expanded by Grafana from its environment and is never written to a file.

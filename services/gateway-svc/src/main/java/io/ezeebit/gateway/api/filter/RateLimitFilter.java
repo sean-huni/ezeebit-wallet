@@ -54,8 +54,10 @@ public final class RateLimitFilter extends OncePerRequestFilter {
 
 	private void limit(final String key, final HttpServletRequest request, final HttpServletResponse response,
 			final FilterChain chain) throws ServletException, IOException {
-		Admission admission = admit(key);
-		metrics.record(admission.outcome());
+		Admission admission = metrics.decide(() -> admit(key));
+		if (admission.outcome() != LimitOutcome.ALLOWED) {
+			LOG.info("merchant request refused at the edge: {}", admission.outcome());
+		}
 		switch (admission.outcome()) {
 			case ALLOWED -> {
 				response.setHeader(REMAINING, Long.toString(admission.remaining()));

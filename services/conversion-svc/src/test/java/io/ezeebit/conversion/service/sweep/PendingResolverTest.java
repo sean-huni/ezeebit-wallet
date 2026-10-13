@@ -25,6 +25,7 @@ import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
 import io.ezeebit.conversion.service.quote.QuoteReader;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionSystemException;
@@ -37,7 +38,7 @@ class PendingResolverTest {
 	private static final Instant NOW = Instant.parse("2026-10-13T10:00:00Z");
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-	private final ConversionMetrics metrics = new ConversionMetrics(registry);
+	private final ConversionMetrics metrics = new ConversionMetrics(registry, ObservationRegistry.NOOP);
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerClient ledger = mock(LedgerClient.class);
 	private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -59,7 +60,7 @@ class PendingResolverTest {
 	void aCommittedSweepCountsItsActionAndTheOutcome() {
 		givenTheLedgerPostedIt();
 
-		assertThat(resolver(new CommitSucceeds()).resolveNext(List.of())).contains(due.id());
+		assertThat(resolver(new CommitSucceeds()).resolveNext(List.of())).contains(new PendingResolver.Swept(due.id(), "completed"));
 
 		assertThat(registry.get(ConversionMetrics.SWEEPS).tag("action", "completed").counter().count()).isEqualTo(1.0);
 		assertThat(registry.get(ConversionMetrics.OUTCOMES).tag("status", "COMPLETED").counter().count())

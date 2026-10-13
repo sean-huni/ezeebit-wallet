@@ -19,12 +19,17 @@ import io.ezeebit.ledger.exception.LedgerException;
 import io.ezeebit.ledger.mapper.ConversionPostingMapper;
 import io.ezeebit.ledger.service.CurrencyCatalog;
 import io.ezeebit.ledger.service.idempotency.RequestFingerprint;
+import io.micrometer.observation.Observation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 // Not transactional itself: a duplicate identity must be caught outside the transaction it rolled back.
 @Service
 public class ConversionPostingService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(ConversionPostingService.class);
 
 	private static final String VOID = "VOID";
 
@@ -56,7 +61,7 @@ public class ConversionPostingService {
 	}
 
 	public ConversionPostingResp post(final ConversionPostingReq request) {
-		return counted(() -> postOrReplay(request), new MerchantId(request.merchantId()), request.conversionId());
+		return counted("post", () -> postOrReplay(request), new MerchantId(request.merchantId()), request.conversionId());
 	}
 
 	private Outcome postOrReplay(final ConversionPostingReq request) {
@@ -90,7 +95,7 @@ public class ConversionPostingService {
 
 	public ConversionPostingResp voidPosting(final UUID conversionId, final UUID merchantId) {
 		MerchantId merchant = new MerchantId(merchantId);
-		return counted(() -> voidOrReplay(merchant, conversionId), merchant, conversionId);
+		return counted("void", () -> voidOrReplay(merchant, conversionId), merchant, conversionId);
 	}
 
 	private Outcome voidOrReplay(final MerchantId merchant, final UUID conversionId) {
@@ -105,17 +110,26 @@ public class ConversionPostingService {
 		}
 	}
 
-	// Every answer is counted once: its outcome, or the code of the refusal it gave (a replayed refusal included).
-	private ConversionPostingResp counted(final Supplier<Outcome> action, final MerchantId merchant,
+	// Every answer is counted once, on its span too: its outcome, or the code of the refusal it gave (a replayed
+	// refusal included).
+	private ConversionPostingResp counted(final String operation, final Supplier<Outcome> action, final MerchantId merchant,
 			final UUID conversionId) {
+		Observation span = metrics.postingSpan(operation);
+		return metrics.observe(span, () -> answer(span, operation, action, merchant, conversionId));
+	}
+
+	private ConversionPostingResp answer(final Observation span, final String operation, final Supplier<Outcome> action,
+			final MerchantId merchant, final UUID conversionId) {
 		try {
 			Outcome outcome = action.get();
 			ConversionPostingResp answer = read(merchant, conversionId);
-			metrics.conversionPosting(outcome, null);
+			metrics.conversionPosting(span, outcome, null);
+			LOG.info("conversion {} {}", operation, outcome);
 			return answer;
 		}
 		catch (LedgerException refusal) {
-			metrics.conversionPosting(Outcome.REFUSED, refusal.code());
+			metrics.conversionPosting(span, Outcome.REFUSED, refusal.code());
+			LOG.info("conversion {} refused: {}", operation, refusal.code());
 			throw refusal;
 		}
 	}

@@ -7,6 +7,7 @@ import java.time.Duration;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.domain.RateRules;
 import io.ezeebit.conversion.domain.RateValidator;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.client.loadbalancer.DeferringLoadBalancerInterceptor;
 import org.springframework.context.annotation.Bean;
@@ -30,11 +31,12 @@ public class ClientConfig {
 		return new RateValidator(new RateRules(properties.rates().maxAge(), properties.rates().maxJumpPercent()));
 	}
 
-	// Not load-balanced: the rate service is an external URL, not a registry name.
+	// Not load-balanced: the rate service is an external URL, not a registry name. Observed, so each call is a client
+	// span that sends the caller's trace on (traceparent) and an http.client.requests timer.
 	@Bean
-	RestClient rateRestClient(final ConversionProperties properties) {
+	RestClient rateRestClient(final ConversionProperties properties, final ObservationRegistry observations) {
 		ConversionProperties.Rates rates = properties.rates();
-		return RestClient.builder().baseUrl(rates.url())
+		return RestClient.builder().baseUrl(rates.url()).observationRegistry(observations)
 				.requestFactory(factory(rates.connectTimeout(), rates.readTimeout())).build();
 	}
 
@@ -42,9 +44,9 @@ public class ClientConfig {
 	// would pick that builder up and try to resolve the registry's address through itself.
 	@Bean
 	RestClient ledgerRestClient(final DeferringLoadBalancerInterceptor loadBalancer,
-			final ConversionProperties properties) {
+			final ConversionProperties properties, final ObservationRegistry observations) {
 		ConversionProperties.Ledger ledger = properties.ledger();
-		return RestClient.builder().baseUrl(ledger.url()).requestInterceptor(loadBalancer)
+		return RestClient.builder().baseUrl(ledger.url()).requestInterceptor(loadBalancer).observationRegistry(observations)
 				.requestFactory(factory(ledger.connectTimeout(), ledger.readTimeout())).build();
 	}
 

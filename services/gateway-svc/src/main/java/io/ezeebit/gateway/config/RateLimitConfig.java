@@ -20,6 +20,7 @@ import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.DefaultClientResources;
 import io.lettuce.core.resource.Delay;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -72,10 +73,15 @@ class RateLimitConfig {
 	}
 
 	@Bean
-	FilterRegistrationBean<RateLimitFilter> rateLimitFilter(final MerchantBuckets merchantBuckets, final MeterRegistry registry,
+	RateLimitMetrics rateLimitMetrics(final MeterRegistry registry, final ObservationRegistry observations) {
+		return new RateLimitMetrics(registry, observations);
+	}
+
+	@Bean
+	FilterRegistrationBean<RateLimitFilter> rateLimitFilter(final MerchantBuckets merchantBuckets, final RateLimitMetrics rateLimitMetrics,
 			@Qualifier("handlerExceptionResolver") final HandlerExceptionResolver resolver) {
 		FilterRegistrationBean<RateLimitFilter> registration =
-				new FilterRegistrationBean<>(new RateLimitFilter(merchantBuckets, new RateLimitMetrics(registry), resolver));
+				new FilterRegistrationBean<>(new RateLimitFilter(merchantBuckets, rateLimitMetrics, resolver));
 		registration.setOrder(FILTER_ORDER);
 		return registration;
 	}

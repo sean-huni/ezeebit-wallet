@@ -19,12 +19,17 @@ import io.ezeebit.conversion.exception.ConversionException;
 import io.ezeebit.conversion.exception.ErrorCode;
 import io.ezeebit.conversion.mapper.ConversionMapper;
 import io.ezeebit.conversion.service.quote.QuoteReader;
+import io.micrometer.observation.Observation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 // Not transactional itself: a duplicate key must be caught outside the transaction it rolled back.
 @Service
 public class ConversionService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(ConversionService.class);
 
 	private final ConversionRepo conversions;
 	private final QuoteRepo quoteRepo;
@@ -51,12 +56,35 @@ public class ConversionService {
 	}
 
 	public ConversionResp accept(final UUID merchantId, final String key, final ConversionReq request) {
+		Observation span = metrics.spans().accept();
+		return metrics.spans().observe(span, () -> acceptAndTag(span, merchantId, key, request));
+	}
+
+	private ConversionResp acceptAndTag(final Observation span, final UUID merchantId, final String key,
+			final ConversionReq request) {
+		try {
+			ConversionResp answer = acceptOnce(span, merchantId, key, request);
+			metrics.spans().accepted(span, answer.status());
+			LOG.info("conversion accepted for {}/{}: {}", answer.sellCurrency(), answer.buyCurrency(), answer.status());
+			return answer;
+		}
+		catch (ConversionException refusal) {
+			metrics.spans().acceptRefused(span, refusal);
+			LOG.info("conversion refused: {}", refusal.code());
+			throw refusal;
+		}
+	}
+
+	private ConversionResp acceptOnce(final Observation span, final UUID merchantId, final String key,
+			final ConversionReq request) {
 		Optional<ConversionEntity> existing = conversions.findByKey(merchantId, key);
 		if (existing.isPresent()) {
+			metrics.spans().pair(span, existing.get().quote().sellCurrency(), existing.get().quote().buyCurrency());
 			return replay(existing.get(), request.quoteId());
 		}
 		QuoteEntity quote = quoteRepo.findForMerchant(request.quoteId(), merchantId)
 				.orElseThrow(() -> new ConversionException(ErrorCode.QUOTE_NOT_FOUND, "quoteId", request.quoteId()));
+		metrics.spans().pair(span, quote.sellCurrency(), quote.buyCurrency());
 		Quote priced = quotes.of(quote);
 		if (priced.expired(clock.instant())) {
 			throw new ConversionException(ErrorCode.QUOTE_EXPIRED, "quoteId", request.quoteId());

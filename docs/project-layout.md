@@ -13,7 +13,7 @@ ezeebit-wallet/
 ├── docs/            quality gates, supply chain, CI, observability, and this layout
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
 ├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml
-├── docker/          local backing services: Postgres init SQL, WireMock rate feed, Grafana LGTM
+├── docker/          local backing services: Postgres init SQL, WireMock rate feed, Grafana LGTM (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OTLP settings and the logback appender, compiled into every service
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
 ├── build.gradle     shared conventions: test tiers, quality gates, image builds
@@ -43,7 +43,7 @@ each one:
 | `mapper/` | entity and domain to response | `*Mapper` |
 | `outbound/<context>/` | one anti-corruption layer per called service: client, caller-owned DTOs, translation | `*Client`, `*Dto`, `*Mapper` |
 | `scheduler/` | timed triggers that delegate to a service | `*Sweeper`, `*Scheduler` |
-| `common/log/`, `common/metrics/` | cross-cutting: log-safe text, Micrometer counters and gauges | `*Metrics` |
+| `common/log/`, `common/metrics/` | cross-cutting: log-safe text, Micrometer counters and gauges, business spans | `*Metrics`, `*Spans` |
 | `config/` (+ `config/properties/`) | Spring wiring and bound configuration | `*Config`, `*Properties` |
 
 How to read each service: the tree lists every main class beside its package, with a note in
@@ -127,12 +127,12 @@ service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2)
 | `data.repo.query` | statement query parameters | `StatementFilter` |
 | `data.model` | row records | `JournalEntity`, `EntryEntity`, `AccountEntity`, `CurrencyEntity`, `StatementLineEntity` |
 | `common.log` | make caller text safe for one log line | `LogText` |
-| `common.metrics` | ledger counters | `LedgerMetrics` |
+| `common.metrics` | ledger counters and the deposit and ledger-posting spans | `LedgerMetrics` |
 | `config` | API versioning, proof filter registration, the two spec groups | `ApiVersionConfig`, `GatewayProofConfig`, `OpenApiConfig` |
 
 ## conversion-svc
 
-73 classes in 25 packages. Each called service has its own anti-corruption layer under
+74 classes in 25 packages. Each called service has its own anti-corruption layer under
 `outbound/`, which owns the translation both ways; nothing else imports another context's shape.
 
 ```text
@@ -163,7 +163,7 @@ io.ezeebit.conversion  ConversionApplication
 │   └── repo/          ConversionRepo, QuoteRepo, Timestamps
 ├── common/
 │   ├── log/           LogText (log-safe caller and upstream text)
-│   └── metrics/       ConversionMetrics
+│   └── metrics/       ConversionMetrics, ConversionSpans
 └── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig, OpenApiConfig
     └── properties/    ConversionProperties (served pricing policy)
 ```
@@ -175,7 +175,7 @@ api.advice         -> common.log(2), exception(6)
 api.doc            -> api.advice(1), exception(28)
 api.filter         -> exception(2)
 api.validation     -> dto.req(1)
-common.metrics     -> domain(4), exception(2)
+common.metrics     -> domain(4), exception(3)
 config             -> api.doc(2), api.filter(1), config.properties(1), domain(2)
 ctl                -> dto.req(2), dto.resp(4), service.conversion(1), service.quote(1)
 data.repo          -> data.model(2)
@@ -184,7 +184,7 @@ dto.req            -> api.json(1), api.validation(1)
 mapper             -> data.model(2), domain(6), dto.resp(2)
 outbound.ledger    -> common.log(1), domain(4)
 outbound.rates     -> common.log(1), common.metrics(1), domain(6), exception(2)
-scheduler          -> service.sweep(1)
+scheduler          -> common.metrics(2), service.sweep(2)
 service            -> config.properties(1), domain(2), exception(2)
 service.conversion -> common.metrics(2), config.properties(1), data.model(3), data.repo(5), domain(6), dto.req(1), dto.resp(1), exception(2), mapper(1), outbound.ledger(1), service.quote(2)
 service.quote      -> common.metrics(1), config.properties(1), data.model(1), data.repo(1), domain(10), dto.req(1), dto.resp(1), exception(1), mapper(2), outbound.rates(1), service(2)
@@ -213,7 +213,7 @@ service.sweep      -> common.metrics(1), config.properties(2), data.model(1), da
 | `data.repo` | SQL over quotes and conversions | `QuoteRepo`, `ConversionRepo`, `Timestamps` |
 | `data.model` | row records | `QuoteEntity`, `ConversionEntity` |
 | `common.log` | make caller and upstream text safe for one log line | `LogText` |
-| `common.metrics` | conversion counters | `ConversionMetrics` |
+| `common.metrics` | conversion counters; the quote, conversion-accept and sweep spans, reached through `ConversionMetrics.spans()` | `ConversionMetrics`, `ConversionSpans` |
 | `config`, `config.properties` | HTTP clients, API versioning, proof filter; served pricing policy | `ClientConfig`, `ApiVersionConfig`, `GatewayProofConfig`; `ConversionProperties` |
 
 ## gateway-svc
@@ -255,7 +255,7 @@ service        -> config.properties(1), domain(1)
 | `scheduler` | report whether Redis answers | `StorePingScheduler` |
 | `domain` | the limiter's decisions | `Admission`, `LimitOutcome` |
 | `exception` | the refusal and its code | `EdgeRefusalException`, `ErrorCode` |
-| `common.metrics` | rate-limit counters | `RateLimitMetrics` |
+| `common.metrics` | rate-limit counters and the limiter decision span | `RateLimitMetrics` |
 | `config`, `config.properties` | limiter wiring; served limits | `RateLimitConfig`; `RateLimitProperties` |
 
 `ErrorCode` here still carries its HTTP status. Only the web layer (`api.filter`, `api.advice`)
@@ -413,7 +413,7 @@ moving the call site later is a local change.
 | a new use case | a new `service/<use case>/` subpackage; shared helpers stay in `service/` | its controller method; its metric |
 | a query | a method on the `*Repo` in `data/repo/`; a parameter shape with several fields goes in `data/repo/query/`; a new row type in `data/model/` as `*Entity` | the integration tier (`src/acceptanceTest`) if it is new SQL |
 | an outbound client | `outbound/<called service>/`: the `*Client`, caller-owned `*Dto` records, and the `*Mapper` that translates both ways | the client bean in `config/ClientConfig`; callers pass domain values, never DTOs |
-| a metric | the service's `common/metrics/*Metrics` (bounded tags only) | `docs/observability.md` metric table; a panel in `docker/lgtm/dashboards/` if it should be charted |
+| a metric or a business span | the service's `common/metrics/*Metrics` (bounded tags only; a span's tags become its timer's tags) | `docs/observability.md` metric table; a panel in `docker/lgtm/generate.py`, then `python3 docker/lgtm/generate.py` (never edit the JSON) |
 | an error code | a constant in `exception/ErrorCode` with its message key | its status in `api/advice/ErrorStatus` (compilation fails until you do), the row in `ErrorStatusTest`, the text in `i18n/messages.properties`, the operations that can answer it in `api/doc/OperationErrors` (`OpenApiContractIT` fails while no operation lists it), then `./gradlew generateOpenApiSnapshots` |
 | a migration | a new numbered changeset in `src/main/resources/db/changelog/2026/10/` (or a new month folder), included from `db.changelog-2026-10.xml` | never edit an applied changeset |
 | configuration a service reads | `config/properties/*Properties` bound from `config-svc/.../served/<service>.yml` | the served file is where the values live; config-svc serves it to every replica |

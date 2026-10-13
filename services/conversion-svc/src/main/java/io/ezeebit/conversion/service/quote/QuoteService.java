@@ -23,11 +23,16 @@ import io.ezeebit.conversion.exception.ConversionException;
 import io.ezeebit.conversion.mapper.QuoteMapper;
 import io.ezeebit.conversion.outbound.rates.RateClient;
 import io.ezeebit.conversion.service.CurrencyCatalog;
+import io.micrometer.observation.Observation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 // A quote moves no money: validate the pair, fetch and check the rate, price it, store it with a short life.
 @Service
 public class QuoteService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(QuoteService.class);
 
 	private final CurrencyCatalog catalog;
 	private final RateClient rates;
@@ -53,13 +58,22 @@ public class QuoteService {
 
 	public QuoteResp quote(final UUID merchantId, final QuoteReq request) {
 		String pair = pairTag(request);
+		Observation span = metrics.spans().quote(pair);
+		return metrics.spans().observe(span, () -> issue(span, pair, merchantId, request));
+	}
+
+	private QuoteResp issue(final Observation span, final String pair, final UUID merchantId, final QuoteReq request) {
 		try {
 			QuoteResp quote = price(merchantId, request);
 			metrics.quoteIssued(pair);
+			metrics.spans().quoteIssued(span);
+			LOG.info("quote issued for {}", pair);
 			return quote;
 		}
 		catch (ConversionException refusal) {
 			metrics.quoteRefused(pair, refusal);
+			metrics.spans().quoteRefused(span, refusal);
+			LOG.info("quote refused for {}: {}", pair, refusal.code());
 			throw refusal;
 		}
 	}

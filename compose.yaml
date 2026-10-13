@@ -60,6 +60,7 @@ services:
       - './docker/lgtm:/ezeebit:ro'
       - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'
       - './docker/lgtm/alerting/rules.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml:ro'
+      - './docker/lgtm/datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml:ro'
       - 'lgtmdata:/data'
     tmpfs:
       # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted

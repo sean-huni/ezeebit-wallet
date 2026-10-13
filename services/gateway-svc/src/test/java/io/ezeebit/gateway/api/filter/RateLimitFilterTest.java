@@ -1,6 +1,9 @@
 package io.ezeebit.gateway.api.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -8,10 +11,15 @@ import java.util.List;
 
 import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
+import io.ezeebit.gateway.domain.Admission;
 import io.ezeebit.gateway.exception.EdgeRefusalException;
 import io.ezeebit.gateway.exception.ErrorCode;
 import io.ezeebit.gateway.service.MerchantBuckets;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.tck.TestObservationRegistry;
+import io.micrometer.observation.tck.TestObservationRegistryAssert;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -23,6 +31,7 @@ class RateLimitFilterTest {
 			new RateLimitProperties.Store("localhost", 6379, "p", Duration.ofMillis(250), Duration.ofSeconds(10)));
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+	private final TestObservationRegistry observations = TestObservationRegistry.create();
 	private final List<Exception> resolved = new ArrayList<>();
 
 	// A failure nobody anticipated in the limiter path is still a counted 503, never a 500 and never forwarded.
@@ -31,7 +40,8 @@ class RateLimitFilterTest {
 		MerchantBuckets broken = new MerchantBuckets(() -> {
 			throw new IllegalStateException("not a store error anyone classified");
 		}, LIMITS, System::nanoTime);
-		RateLimitFilter filter = new RateLimitFilter(broken, new RateLimitMetrics(registry), (request, response, handler, ex) -> {
+		RateLimitMetrics metrics = new RateLimitMetrics(registry, observations);
+		RateLimitFilter filter = new RateLimitFilter(broken, metrics, (request, response, handler, ex) -> {
 			resolved.add(ex);
 			return null;
 		});
@@ -44,6 +54,30 @@ class RateLimitFilterTest {
 		assertThat(resolved).singleElement().isInstanceOfSatisfying(EdgeRefusalException.class,
 				refusal -> assertThat(refusal.code()).isEqualTo(ErrorCode.RATE_LIMITER_UNAVAILABLE));
 		assertThat(registry.get(RateLimitMetrics.NAME).tag("outcome", "unavailable").counter().count()).isEqualTo(1);
+		TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat()
+				.hasNameEqualTo(RateLimitMetrics.DECISION).hasContextualNameEqualTo("rate limit").hasBeenStopped()
+				.hasLowCardinalityKeyValue("outcome", "unavailable").hasOnlyKeys("outcome");
+	}
+
+	// The decision is its own span inside the request's, and it closes before the request is forwarded.
+	@Test
+	void anAdmittedRequestIsOneDecisionSpanThatEndsBeforeItIsForwarded() throws Exception {
+		MerchantBuckets admitting = mock(MerchantBuckets.class);
+		when(admitting.tryConsume(anyString())).thenReturn(Admission.allowed(9));
+		RateLimitFilter filter = new RateLimitFilter(admitting, new RateLimitMetrics(registry, observations),
+				(request, response, handler, ex) -> null);
+		MockFilterChain chain = new MockFilterChain() {
+			@Override
+			public void doFilter(final ServletRequest request, final ServletResponse response) {
+				TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat().hasBeenStopped();
+			}
+		};
+
+		filter.doFilter(new MockHttpServletRequest("GET", "/api/v1/merchants/7f9c2a1e-3b4d-4c5e-8f6a-0b1c2d3e4f5a/balances"),
+				new MockHttpServletResponse(), chain);
+
+		TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat()
+				.hasLowCardinalityKeyValue("outcome", "allowed");
 	}
 
 }

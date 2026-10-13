@@ -1,0 +1,75 @@
+# Replaces the image's grafana-datasources.yaml (same uids). Added to its defaults: a 10s step to match the services'
+# export interval, trace-to-metrics, and trace-to-logs filtered by trace id. $$ is a literal $ in provisioning.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    url: http://127.0.0.1:9090
+    editable: false
+    jsonData:
+      timeInterval: 10s
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+          urlDisplayLabel: 'Trace: $${__value.raw}'
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://127.0.0.1:3200
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{$${__tags}} | trace_id = "$${__trace.traceId}"'
+        tags:
+          - key: service.name
+            value: service_name
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        tags:
+          - key: service.name
+            value: job
+        queries:
+          - name: Request rate
+            query: 'sum(rate(http_server_requests_milliseconds_count{$$__tags}[1m]))'
+          - name: p95 latency
+            query: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{$$__tags}[1m])))'
+          - name: 5xx ratio
+            query: 'sum(rate(http_server_requests_milliseconds_count{$$__tags, status=~"5.."}[1m])) / sum(rate(http_server_requests_milliseconds_count{$$__tags}[1m]))'
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: loki
+
+  - name: Loki
+    type: loki
+    uid: loki
+    url: http://127.0.0.1:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          url: '$${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: 'Trace: $${__value.raw}'
+
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    uid: pyroscope
+    url: http://127.0.0.1:4040

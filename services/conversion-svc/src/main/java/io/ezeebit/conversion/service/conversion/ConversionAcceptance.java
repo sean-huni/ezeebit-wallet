@@ -8,17 +8,17 @@ import java.util.function.BiConsumer;
 import io.ezeebit.conversion.data.model.QuoteEntity;
 import io.ezeebit.conversion.dto.req.ConversionReq;
 import io.ezeebit.conversion.dto.resp.ConversionResp;
-import io.ezeebit.conversion.service.quote.QuoteRedeemer;
+import io.ezeebit.conversion.service.quote.QuoteLookup;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ConversionAcceptance {
 
 	private final ConversionReplayer replayer;
-	private final QuoteRedeemer quotes;
+	private final QuoteLookup quotes;
 	private final ConversionOpener opener;
 
-	public ConversionAcceptance(final ConversionReplayer replayer, final QuoteRedeemer quotes, final ConversionOpener opener) {
+	public ConversionAcceptance(final ConversionReplayer replayer, final QuoteLookup quotes, final ConversionOpener opener) {
 		this.replayer = replayer;
 		this.quotes = quotes;
 		this.opener = opener;
@@ -30,7 +30,7 @@ public class ConversionAcceptance {
 		if (replayed.isPresent()) {
 			return replayed.get();
 		}
-		QuoteEntity quote = quotes.quote(merchantId, request.quoteId());
+		QuoteEntity quote = quotes.find(merchantId, request.quoteId());
 		tagPair.accept(quote.sellCurrency(), quote.buyCurrency());
 		Instant deadline = quotes.postingDeadline(quote, request.quoteId());
 		return opener.open(merchantId, key, quote.id(), deadline);

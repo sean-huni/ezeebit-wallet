@@ -22,7 +22,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 
-class ConversionSettlerTest {
+class ConversionLedgerPosterTest {
 
 	private static final Instant NOW = Instant.parse("2026-10-13T10:00:00Z");
 

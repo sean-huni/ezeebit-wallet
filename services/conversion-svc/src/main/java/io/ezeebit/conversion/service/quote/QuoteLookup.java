@@ -12,19 +12,19 @@ import org.springframework.stereotype.Component;
 
 // Two steps, so the caller can tag the pair on its span before an expiry refusal.
 @Component
-public class QuoteRedeemer {
+public class QuoteLookup {
 
 	private final QuoteRepo quotes;
 	private final QuoteReader reader;
 	private final ConversionProperties properties;
 
-	public QuoteRedeemer(final QuoteRepo quotes, final QuoteReader reader, final ConversionProperties properties) {
+	public QuoteLookup(final QuoteRepo quotes, final QuoteReader reader, final ConversionProperties properties) {
 		this.quotes = quotes;
 		this.reader = reader;
 		this.properties = properties;
 	}
 
-	public QuoteEntity quote(final UUID merchantId, final UUID quoteId) {
+	public QuoteEntity find(final UUID merchantId, final UUID quoteId) {
 		return quotes.findForMerchant(quoteId, merchantId)
 				.orElseThrow(() -> new ConversionException(ErrorCode.QUOTE_NOT_FOUND, "quoteId", quoteId));
 	}

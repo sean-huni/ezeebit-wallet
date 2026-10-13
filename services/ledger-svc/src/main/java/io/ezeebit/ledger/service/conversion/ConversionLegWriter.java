@@ -17,8 +17,9 @@ import io.ezeebit.ledger.exception.ErrorCode;
 import io.ezeebit.ledger.exception.LedgerException;
 import io.ezeebit.ledger.service.posting.EntryWriter;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-// Runs inside ConversionPoster's transaction: four entries and both merchant balances.
 @Component
 public class ConversionLegWriter {
 
@@ -33,6 +34,7 @@ public class ConversionLegWriter {
 		this.entries = entries;
 	}
 
+	@Transactional(propagation = Propagation.MANDATORY)
 	public void write(final UUID journalId, final ConversionPostingCommand command) {
 		UUID merchantId = command.merchant().value();
 		String sellCurrency = command.sell().currency().value();

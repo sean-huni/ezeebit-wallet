@@ -8,8 +8,9 @@ import io.ezeebit.ledger.domain.PostingLine;
 import io.ezeebit.ledger.mapper.EntryMapper;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-// Runs inside the caller's posting transaction.
 @Component
 public class EntryWriter {
 
@@ -21,6 +22,7 @@ public class EntryWriter {
 		this.mapper = mapper;
 	}
 
+	@Transactional(propagation = Propagation.MANDATORY)
 	public void write(final UUID journalId, final PostingLine line, @Nullable final Money balanceAfter) {
 		entries.insert(mapper.toEntity(journalId, line, balanceAfter));
 	}

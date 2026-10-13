@@ -7,8 +7,9 @@ import java.util.UUID;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.service.sweep.PendingLedgerCheck.Resolution;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-// Runs inside PendingResolver's transaction: the claimed row stays locked while the ledger is asked.
 @Component
 public class PendingClaimer {
 
@@ -22,6 +23,7 @@ public class PendingClaimer {
 		this.check = check;
 	}
 
+	@Transactional(propagation = Propagation.MANDATORY)
 	public Optional<Resolution> claimAndResolve(final List<UUID> skip) {
 		return conversions.claimDue(cutoff.deadlineBefore(), skip).map(check::resolve);
 	}

@@ -72,7 +72,8 @@ public class LedgerSteps {
 				.withBody("{\"status\":%d,\"code\":\"%s\"}".formatted(status, code))));
 	}
 
-	@When("{string} accepts quote {string} with key {string}, and while that answer is on its way {string} {word} arrives and {string} sends the same request again")
+	@When("{string} accepts quote {string} with key {string}, and while that answer is on its way"
+			+ " {string} {word} arrives and {string} sends the same request again")
 	public void raceWithDeposit(final String merchant, final String quote, final String key, final String amount,
 			final String currency, final String sameMerchant) {
 		UUID merchantId = state.merchant(merchant);

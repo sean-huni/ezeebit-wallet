@@ -161,7 +161,8 @@ public class ConversionPostingSteps {
 	private static String body(final UUID conversionId, final UUID merchantId, final String sellCurrency,
 			final String sellAmount, final String buyCurrency, final String buyAmount, final Instant deadline) {
 		return """
-				{"conversionId":"%s","merchantId":"%s","sellCurrency":"%s","sellAmount":"%s","buyCurrency":"%s","buyAmount":"%s","deadline":"%s"}"""
+				{"conversionId":"%s","merchantId":"%s","sellCurrency":"%s","sellAmount":"%s",\
+				"buyCurrency":"%s","buyAmount":"%s","deadline":"%s"}"""
 				.formatted(conversionId, merchantId, sellCurrency, sellAmount, buyCurrency, buyAmount, deadline);
 	}
 

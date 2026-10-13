@@ -430,7 +430,7 @@ Also proven: the merchant gets exactly the quoted amounts (balances and statemen
 
 All five services live in one repository with one Gradle build root. That departs from 12-factor's "one codebase per app" (https://12factor.net/codebase). It was chosen because the deliverable is a single repository that must build and run with one command. The cost is contained: services share no business code, no database and no runtime, and each ships as its own jar. The one shared code is `observability/` (a logback-to-OpenTelemetry bridge class and its config), compiled into each jar rather than published as a library. The root `build.gradle` holds shared build conventions only; each `services/<svc>/build.gradle` lists only its dependencies. Splitting into one repository per service later is a mechanical move.
 
-Static analysis and coverage are part of that one convention rather than copied per service: SpotBugs with Find Security Bugs on compiled main classes, Checkstyle on every source set, and JaCoCo floors per service over a report merged across all test tiers, all run by `check`; SonarQube runs only when `SONAR_TOKEN` is set. Configuration lives once under `config/`, and README "Quality gates" says what each gate fails on.
+Static analysis and coverage are part of that one convention rather than copied per service: SpotBugs with Find Security Bugs on compiled main classes, Checkstyle on every source set, and JaCoCo floors per service over a report merged across all test tiers, all run by `check`; SonarQube runs only when `SONAR_TOKEN` is set. Configuration lives once under `config/`, and README "Quality gates" says what each gate fails on. The supply-chain half sits in the same root build: `checkSecrets` on every `check`, and `checkSupplyChain` over Paketo images (no Dockerfile), with its scanners pinned once in `security/scanners.lock` (README "Supply-chain gate").
 
 The rest of 12-factor is followed: config comes from the environment with committed working defaults (a clean clone runs with no `.env`), backing services are attached by URL (`DB_URL`, `CONFIG_SERVER_URL`, `EUREKA_URL`), and processes hold no state of their own (quotes live in the database, not in memory).
 
@@ -452,6 +452,8 @@ The rest of 12-factor is followed: config comes from the environment with commit
 - Alerts reach one Slack channel and there is no on-call rota: a 3am alert reaches a channel, not a person.
 - Nothing watches the monitoring stack: rules are evaluated inside the same lgtm container, so if it dies nothing pages.
 - HighErrorRate has no minimum-traffic guard: one 500 in a quiet minute reads as 100%. It was seen firing once, in a local forced-5xx run with Slack disconnected (ledger-svc stopped, gateway answering 503): Pending t+20s, Alerting t+140s on gateway-svc.
+- Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear fixable CVEs (`gradle.properties`); each override must be dropped once Boot catches up, or it will hold a version back.
+- trivy has no compose checks, so the misconfiguration stage reads `compose.yaml` and `docker/` and recognises none of them: it reports, it does not yet inspect.
 - No OpenAPI schema.
 - One Postgres container hosts both databases: logically separate, but one shared failure domain.
 - config-svc and eureka-svc run as single instances.

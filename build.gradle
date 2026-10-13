@@ -32,6 +32,12 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		}
 	}
 
+	// Property names from spring-boot-dependencies-4.1.1.pom; gradle.properties names the CVEs each one clears.
+	ext['tomcat.version'] = tomcatVersion
+	ext['jackson-bom.version'] = jackson3Version
+	ext['jackson-2-bom.version'] = jackson2Version
+	ext['freemarker.version'] = freemarkerVersion
+
 	// One copy of the OTLP wiring compiled into each service jar; see observability/.
 	sourceSets {
 		main {
@@ -370,4 +376,54 @@ tasks.register('sonarAll') {
 			logger.lifecycle('sonarAll: SKIPPED, nothing ran. SONAR_TOKEN is not set; export SONAR_TOKEN and SONAR_HOST_URL to analyse.')
 		}
 	}
+}
+
+// Supply chain. README "Supply-chain gate" says what each stage reads and what fails the verdict.
+// Paketo is the only image path: no Dockerfile exists to drift from it.
+configure(services) {
+	tasks.named('bootBuildImage') {
+		builder = paketoBuilder
+		runImage = paketoRunImage
+		imageName = "ezeebit/${project.name}:${project.version}"
+		// The Paketo default JVM line is not 25, so leaving this out ships an older runtime.
+		environment = ['BP_JVM_VERSION': '25']
+	}
+}
+
+apply plugin: 'base'
+
+tasks.register('bootBuildImageAll') {
+	group = 'supply chain'
+	description = "Builds one OCI image per service with Paketo: ${services*.name.join(', ')}."
+	dependsOn services.collect { "${it.path}:bootBuildImage" }
+}
+
+// The service list and image version come from the project model, so scan.sh holds neither.
+def supplyChainEnv = [
+	SERVICES     : services*.name.sort().join(' '),
+	IMAGE_VERSION: services.first().version.toString(),
+	OUT_DIR      : layout.buildDirectory.dir('supply-chain').get().asFile.path,
+	CONSOLE_FILE : layout.buildDirectory.file('reports/supply-chain/console.txt').get().asFile.path,
+]
+
+// Cheap and image-free, so it runs on every build; a credential fails the developer, not a later job.
+def checkSecrets = tasks.register('checkSecrets', Exec) {
+	group = 'supply chain'
+	description = 'gitleaks over all history and the tree, trivy over the tree. Fails on a finding or on missing evidence.'
+	inputs.file 'security/scanners.lock'
+	environment supplyChainEnv
+	commandLine './security/scan.sh', 'secretgate'
+}
+
+tasks.named('check') {
+	dependsOn checkSecrets
+}
+
+tasks.register('checkSupplyChain', Exec) {
+	group = 'supply chain'
+	description = 'Secrets, SBOMs, image SCA and misconfiguration over the bootBuildImageAll images, then the verdict.'
+	dependsOn 'bootBuildImageAll'
+	inputs.file 'security/scanners.lock'
+	environment supplyChainEnv
+	commandLine './security/scan.sh', 'all'
 }

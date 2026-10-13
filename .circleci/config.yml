@@ -11,7 +11,7 @@ jobs:
       image: ubuntu-2604:2026.07.1
     # Measured, see README "Continuous integration": the gate peaked at 2.2 GiB across 12 JVMs and
     # 3 containers, a third of medium's 7.5 GB. Its 2 vCPUs are not measured: go large if it is slow.
-    resource_class: medium
+    resource_class: large
     environment:
       # Derived copies of .sdkmanrc's java=25-tem, which resolves to Temurin 25+36; step 2 compares them.
       JDK_SDKMANRC_ID: 25-tem

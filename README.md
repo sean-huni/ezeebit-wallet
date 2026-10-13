@@ -232,7 +232,7 @@ the calling uid and gid, and hands the trivy cache volume to that uid first. Thi
 Linux in a throwaway Docker-in-Docker daemon, running as uid 1001. Before the change, `secretgate`
 left 3 of 13 entries owned by root. After it, 0 of 13 were, and the full `all` run left 0 of 46.
 
-**Resource class: `medium` (2 vCPU, 7.5 GB), measured.** The gate command below was run locally
+**Resource class: `large` (4 vCPU, 15 GB); memory measured, CPU chosen for headroom.** The gate command below was run locally
 on 2026-10-13 with a fresh Gradle daemon, sampled every 2 to 3 seconds:
 
 | Command | Wall time (18-core laptop) | Peak JVMs | Peak JVM resident memory | Peak containers | Peak container memory |
@@ -240,10 +240,11 @@ on 2026-10-13 with a fresh Gradle daemon, sampled every 2 to 3 seconds:
 | `--no-build-cache --rerun-tasks clean build` | 151 s, 82 of 82 tasks executed | 12 | 2,153 MiB | 3 | 122 MiB |
 | `bootBuildImageAll checkSupplyChain` | 76 s | 8 | 233 MiB, a lower bound: the reused daemon was not counted | 1 | 28 MiB |
 
-The peak is about 2.2 GiB, under a third of medium's memory, and `large` would only buy CPU. The
-2 vCPUs are not measured. The suite has timing-bound tests (a 15 s quote expiry, 2 s rate-service
-timeouts, concurrent deposits), so a slow or flaky first run on `medium` means switching to
-`large`, a one-line change. A 2-second sampler can also miss a short spike.
+The peak is about 2.2 GiB, so `medium` (2 vCPU, 7.5 GB) has the memory. `large` is chosen for CPU:
+the suite has timing-bound tests (a 15 s quote expiry, 2 s rate-service timeouts, concurrent
+deposits) and 2 vCPUs were never measured, so a flaky first run would cost more than the larger
+class. Dropping to `medium` is a one-line change once a real run shows the timings hold. A
+2-second sampler can also miss a short spike.
 
 **On a laptop, the same thing.** Steps 5, 7 and 8 are plain Gradle commands with no CI-only flags
 beyond `--console=plain`:

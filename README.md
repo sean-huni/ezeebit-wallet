@@ -11,6 +11,13 @@ container stands in for it. Design, trade-offs, scope, known gaps and AI usage n
 
 Walkthrough video: link to be added.
 
+## Find your way around
+
+[docs/project-layout.md](docs/project-layout.md) is the map: the repository to service level, then
+each service's packages with every class in them, what each package is for, the measured
+dependencies between packages, and where a new endpoint, rule, query, client, metric, error code or
+migration belongs.
+
 ## Prerequisites
 
 | Need | Notes |
@@ -163,7 +170,7 @@ Each service port is defined once, in that service's `src/main/resources/applica
 ```
 ezeebit-wallet/
 ├── README.md, ARCHITECTURE.md, SOLUTION.md
-├── docs/                   quality gates, supply chain, CI, observability
+├── docs/                   project layout, quality gates, supply chain, CI, observability
 ├── build.gradle            shared build conventions for every service
 ├── settings.gradle         the five service projects
 ├── gradle.properties       Spring Boot, Spring Cloud, quality-tool and override versions; Paketo pins

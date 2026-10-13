@@ -2,7 +2,8 @@
 
 How the system is shaped and why. [README.md](README.md) covers running it;
 [SOLUTION.md](SOLUTION.md) covers task choice, trade-offs, how Tasks 3 to 6 slot in, and the single
-list of known gaps.
+list of known gaps. [docs/project-layout.md](docs/project-layout.md) maps every package and class in
+each service, with the measured dependencies between packages.
 
 Everything described here is built and tested unless it says otherwise. A WireMock container stands
 in for the exchange-rate service the brief says already exists.

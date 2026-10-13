@@ -1,0 +1,18 @@
+ok   traffic  driven  {"deposit 201":4,"deposit replay 201":4,"deposit refused 400":1,"quote ZAR/USDT 201":3,"conversion ZAR/USDT 201 COMPLETED":3,"quote ZAR/USDC 201":3,"conversion ZAR/USDC 201 COMPLETED":3,"quote NGN/USDT 201":3,"conversion NGN/USDT 201 COMPLETED":3,"quote KES/USDC 201":3,"conversion KES/USDC 201 COMPLETED":3,"probe quote 201":1,"probe conversion 201":1,"quote ZAR/NGN unsupported 400":1,"conversion insufficient funds 422 INSUFFICIENT_FUNDS":1,"probe quote USDT/ZAR stale rate 502":1,"balances burst 200":102,"balances burst 429":78}
+ok   prometheus  one series per JVM  {"config-svc":1,"gateway-svc":1,"conversion-svc":1,"ledger-svc":1,"eureka-svc":1}
+ok   tempo  one trace spans three services  852df0d08e5ecfe718bbfe32f5298e5a: 8 spans from conversion-svc, gateway-svc, ledger-svc; http post | http post /{version:v\d+}/merchants/{merchantId}/conversions | conversion accept | rate limit | http post | http post /api/v1/merchants/*/conversions/** | http post /internal/{version}/conversion-postings | ledger posting
+ok   tempo  business span 'rate limit' in the trace  852df0d08e5ecfe718bbfe32f5298e5a
+ok   tempo  business span 'conversion accept' in the trace  852df0d08e5ecfe718bbfe32f5298e5a
+ok   tempo  business span 'ledger posting' in the trace  852df0d08e5ecfe718bbfe32f5298e5a
+<anonymous_script>:1
+
+
+SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>)
+    at parseJSONFromBytes (node:internal/deps/undici/undici:4227:19)
+    at successSteps (node:internal/deps/undici/undici:6875:27)
+    at readAllBytes (node:internal/deps/undici/undici:5798:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.0.0
+exit=1

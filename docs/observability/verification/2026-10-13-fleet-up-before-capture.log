@@ -1,0 +1,63 @@
+postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter)
+ Network ezeebit-wallet_default Creating 
+ Network ezeebit-wallet_default Creating 
+ Network ezeebit-wallet_default Created 
+ Network ezeebit-wallet_default Created 
+ Container ezeebit-wallet-wiremock-1 Creating 
+ Container ezeebit-wallet-redis-1 Creating 
+ Container ezeebit-wallet-postgres-1 Creating 
+ Container ezeebit-wallet-wiremock-1 Created 
+ Container ezeebit-wallet-postgres-1 Created 
+ Container ezeebit-wallet-redis-1 Created 
+ Container ezeebit-wallet-redis-1 Starting 
+ Container ezeebit-wallet-postgres-1 Starting 
+ Container ezeebit-wallet-wiremock-1 Starting 
+ Container ezeebit-wallet-redis-1 Started 
+ Container ezeebit-wallet-postgres-1 Started 
+ Container ezeebit-wallet-wiremock-1 Started 
+ Container ezeebit-wallet-postgres-1 Waiting 
+ Container ezeebit-wallet-wiremock-1 Waiting 
+ Container ezeebit-wallet-redis-1 Waiting 
+ Container ezeebit-wallet-wiremock-1 Healthy 
+ Container ezeebit-wallet-redis-1 Healthy 
+ Container ezeebit-wallet-postgres-1 Healthy 
+build
+  config-svc UP on :8888
+  eureka-svc UP on :8761
+  ledger-svc UP on :8081
+  conversion-svc UP on :8082
+  gateway-svc UP on :8080
+  gateway routes to ledger-svc and conversion-svc
+lgtm
+ Container ezeebit-wallet-lgtm-1 Creating 
+ Container ezeebit-wallet-lgtm-1 Created 
+ Container ezeebit-wallet-lgtm-1 Starting 
+ Container ezeebit-wallet-lgtm-1 Started 
+ Container ezeebit-wallet-lgtm-1 Waiting 
+ Container ezeebit-wallet-lgtm-1 Healthy 
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  74923  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  74973  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  75017  UP           /actuator/health 200
+    conversion-svc     Java microservice  8082  75018  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  75019  UP           routes to ledger-svc and conversion-svc
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 15 checks passed
+fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000

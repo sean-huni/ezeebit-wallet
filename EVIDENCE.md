@@ -14,10 +14,10 @@ How to reproduce each section:
 
 | Section | Command | Detail |
 |---|---|---|
-| Monitoring and observability | `REDIS_PORT=6390 ./fleet.sh up`, then `cd docs/observability/verification && npm install && node 2026-10-13-dashboards-playwright.mjs` | [docs/observability.md](docs/observability.md#verifying-the-dashboards-playwright); the run log is [2026-10-13-dashboards-playwright-run.log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log) |
-| SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md) |
-| SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md) |
-| SAST and SCA images | serve the root with `python3 -m http.server 8765 --bind 127.0.0.1`, then from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> http://127.0.0.1:8765 ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) renders the reports and writes the images to `docs/evidence/security/` |
+| Monitoring and observability | `REDIS_PORT=6390 ./fleet.sh up`, then `cd docs/observability/verification && npm install && node 2026-10-13-dashboards-playwright.mjs` | [docs/observability.md](docs/observability.md#verifying-the-dashboards-playwright); the run log is [2026-10-13-dashboards-playwright-run.log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log). The suite made 12 of the 15 monitoring images. The other 3 come from two small Playwright scripts beside it, run the same way: `alerts-rule-list.png` and `alerts-state-history.png` from [2026-10-13-alert-pages-capture.mjs](docs/observability/verification/2026-10-13-alert-pages-capture.mjs) (opens each page, waits 7 s), and `traces-service-map.png` from [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs) (scrolls to the Service map, clicks its zoom-out button once) |
+| SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
+| SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
+| SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
 
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
 [Metrics](#metrics) · [Traces](#traces) · [Logs](#logs) · [Alerts](#alerts)) ·
@@ -27,14 +27,17 @@ Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet 
 ## Monitoring and observability
 
 The fleet ran one Java virtual machine (JVM) per service, with Grafana 13.2.3 in
-`grafana/otel-lgtm:0.36.0`. The Playwright suite drove two traffic runs, at about 21:04 and 21:10,
-which is why most rate panels show two spikes. The passing run started 21:10:07 and ended 21:18:58:
-65 checks passed, 0 failed, exit 0. Its traffic: 4 deposits (each replayed once) and 1 refused, 3
-quotes and 3 conversions on each of four currency pairs, an unsupported pair, a conversion refused for
-insufficient funds, a stale-rate refusal, and a burst of 180 balance reads on one merchant (102
-answered 200, 78 answered 429). The currencies are the South African rand (ZAR), Kenyan shilling
-(KES) and Nigerian naira (NGN), against the stablecoins Tether (USDT) and United States dollar coin
-(USDC).
+`grafana/otel-lgtm:0.36.0`. The currencies are the South African rand (ZAR), Kenyan shilling (KES)
+and Nigerian naira (NGN), against the stablecoins Tether (USDT) and United States dollar coin (USDC).
+The Playwright suite drove two traffic runs, at about 21:04 and 21:10, which is why most rate panels
+show two spikes. The passing run started 21:10:07 and ended 21:18:58: 65 checks passed, 0 failed,
+exit 0. Its traffic, from the run log's first line and
+[traffic.mjs](docs/observability/verification/traffic.mjs): 4 deposits (each replayed once) and 1
+refused; 3 quotes and 3 conversions on each of four currency pairs (ZAR/USDT, ZAR/USDC, NGN/USDT,
+KES/USDC), so 12 completed; one probe quote and conversion on ZAR/USDT (the traced one), so 13
+completed in all; an unsupported ZAR/NGN quote; one oversized KES/USDT quote whose conversion was
+refused for insufficient funds; a stale-rate USDT/ZAR quote refused with 502; and a burst of 180
+balance reads on one merchant (102 answered 200, 78 answered 429).
 
 | Fact | Number | Universe | Command |
 |---|---|---|---|
@@ -45,6 +48,17 @@ answered 200, 78 answered 429). The currencies are the South African rand (ZAR),
 | Content floor | fleet 19 panels 0 empty; money 13 panels 1 empty; traces 6 panels 0 empty; logs 3 panels 0 empty; alerts 11 panels 2 empty | desktop, every board scrolled | suite check |
 | Time picker | 1800 s to 300 s on every board | fleet 14, money 17, traces 9, logs 6, alerts 6 datasource requests | suite check |
 | Provisioned alert rules | 9 | Grafana provisioning application programming interface (API) | `curl -s http://localhost:3000/api/v1/provisioning/alert-rules` |
+
+Sources: the suite, metric identity, correlation, content floor and time picker rows, and the 4
+alert annotations, are in the committed
+[run log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log); the end time
+21:18:58 was that file's modification time when it was written. The 15 of 15 fleet checks at `up` are in
+[2026-10-13-fleet-up-before-capture.log](docs/observability/verification/2026-10-13-fleet-up-before-capture.log), and the
+crashed first run (exit 1 after 6 checks) in
+[2026-10-13-dashboards-playwright-run1-crashed.log](docs/observability/verification/2026-10-13-dashboards-playwright-run1-crashed.log). These numbers have **no committed source**, because they
+were read from terminal output or a live system that was not saved to the repository: the start time 21:10:07, the 9 provisioned rules and their holds, the Alerts to Slack
+timings and counter, the 32 of 173 trace ids of the crashed first run, and trace
+`1da752b225ab41c41cb44000e260f031`.
 
 ### Fleet Overview
 
@@ -64,8 +78,11 @@ Pending.
 
 ![Fleet Overview: limiter, Redis and the database pool](docs/observability/evidence/fleet-overview-limiter-pool.png)
 
-The edge rate limiter row: allowed 2.64 req/s (max 3.00), contention 0, limited 1.56 req/s (max 1.63),
-with bursts at about 21:04 and 21:10. Limiter decision p95 (the Redis round trip): allowed 2.75 ms
+The edge rate limiter row. "Limiter decisions by outcome" stacks its series (stacking `normal` in
+`docker/lgtm/dashboards/fleet-overview.json`), so the top line, drawn in red and peaking near 4.7
+req/s at about 21:04 and 21:10, is the stacked total; its own legend row is below the panel's frame.
+Legend rows in frame: allowed 2.64 req/s (max 3.00), contention 0, limited 1.56 req/s (max 1.63).
+Limiter decision p95 (the Redis round trip): allowed 2.75 ms
 (max 11.6), limited 0.975 ms, with exemplars. Redis reachable reads `UP`. The Hikari database pool row:
 0 active connections on conversion-svc and ledger-svc, 10 idle on conversion-svc, utilisation 0%
 against a dashed 90% line, acquire p95 and timeouts 0 ms. Same board, scrolled inside Grafana's pane,
@@ -93,7 +110,7 @@ reflow to 3 plus 2, all `UP`, JVMs per service is 1 for all five, and nothing is
 Captured 21:12:07.
 
 **Proves** the board reads at phone width. At this width Grafana scrolls the document rather than its
-own pane, and the suite scrolled it in 9 steps, each of which moved.
+own pane, and the suite took 9 viewport captures of it, each scroll step moved (run log line 25).
 
 ### Metrics
 
@@ -119,7 +136,8 @@ and errors logged peak at about 3 near 21:04. Captured 21:11:05.
 
 **Proves** JVM runtime metrics (heap, garbage-collection pause, logged warnings and errors) and
 connection-pool metrics are exported per service and plotted. These two images come from the Fleet
-Overview board, because there is no separate metrics dashboard.
+Overview board: none of the five Ezeebit dashboards is metrics-only (the lgtm image also ships
+generic JVM and RED boards, which this project does not use).
 
 ![Money: deposits and quotes](docs/observability/evidence/money-deposits-quotes.png)
 
@@ -155,17 +173,18 @@ then ledger-svc, whose row is cut at the bottom of the frame (its bars show in t
 21:18:51.
 
 **Proves** one merchant conversion is one trace across gateway-svc, conversion-svc and ledger-svc,
-with the business spans `rate limit`, `conversion accept` and `ledger posting`. The suite check "trace
-view shows spans from three services" found all three names rendered, and the trace's 8 spans come
-from those 3 services.
+with the business spans `rate limit` and `conversion accept` in frame. The third business span,
+`ledger posting`, is below the frame: the suite check "business span 'ledger posting' in the trace"
+(run log line 6) confirms it, not the picture. The suite check "trace view shows spans from three
+services" found all three names rendered, and the trace's 8 spans come from those 3 services.
 
 ![Service map](docs/observability/evidence/traces-service-map.png)
 
 The Traces board's Service map after one zoom-out click. Six nodes: user; gateway-svc 6.41 ms/r;
 conversion-svc 14.49 ms/r; ledger-svc 4.60 ms/r; config-svc 6.05 ms/r; eureka-svc 1.24 ms/r. Edges run
-user to gateway-svc, config-svc, eureka-svc and conversion-svc; gateway-svc to conversion-svc and
-ledger-svc; conversion-svc to ledger-svc. Every node ring is green. Below it, span rate by service and
-status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate script, not the suite.
+user to gateway-svc, config-svc, eureka-svc and conversion-svc; gateway-svc to eureka-svc,
+conversion-svc and ledger-svc; conversion-svc to ledger-svc. Every node ring is green. Below it, span
+rate by service and status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate, uncommitted script, not the suite.
 
 **Proves** Tempo derives the call graph from spans (gateway to conversion and ledger, conversion to
 ledger), and its span metrics give rates and status per service as a cross-check on the services' own
@@ -204,7 +223,8 @@ Alerting, Alert rules, list view filtered to the "Ezeebit alerts" folder. Each v
 Provisioned, on the Prometheus datasource: ServiceDown ("{{ $labels.job }} has exported no metrics for
 30s"), HighErrorRate, RateFeedRefusing, ConversionsStuckPending, RateLimiterUnavailable,
 RateLimiterStoreDown, LatencySLOBurn and DbPoolSaturated (cut at the bottom). The ninth,
-LedgerInvariantBroken, is below the fold. Captured 21:20:54.
+LedgerInvariantBroken, is below the fold. Captured 21:20:54 by a separate, uncommitted script, not
+the suite.
 
 **Proves** the provisioned rules load and evaluate, and each summary names its service or pair. The
 provisioning API lists 9 rules, with holds of 1m (ServiceDown, RateLimiterUnavailable,
@@ -213,12 +233,22 @@ RateLimiterStoreDown, DbPoolSaturated), 2m (HighErrorRate, RateFeedRefusing, Lat
 
 ![Rule inputs with their state changes](docs/observability/evidence/alerts-inputs-annotations.png)
 
-The Alerts board's rule-input grid. ServiceDown: config-svc and conversion-svc at 1 from 20:45 to about
-21:03. HighErrorRate: conversion-svc max 0.0333. RateFeedRefusing: USDT/ZAR max 1, with two dashed
-annotation pairs at about 21:04 and 21:10. RateLimiterStoreDown: "store down" flapping between 1 and 0
-from 20:45 to about 21:03, then 0. ConversionsStuckPending and RateLimiterUnavailable at 0.
+The Alerts board's rule-input grid, scrolled so the top row's titles are out of view. By the board's
+layout in `docker/lgtm/dashboards/alerts.json`, the top row is ServiceDown (left), HighErrorRate
+(middle) and RateFeedRefusing (right). ServiceDown: config-svc and conversion-svc at 1 from 20:45 to
+about 21:03. HighErrorRate: conversion-svc max 0.0333. RateFeedRefusing: USDT/ZAR max 1, with two
+dashed annotation pairs at about 21:04 and 21:10. RateLimiterStoreDown: "store down" flapping between
+1 and 0 from 20:45 to about 21:03, then 0. ConversionsStuckPending and RateLimiterUnavailable at 0.
 DbPoolSaturated: two ledger-svc series at 0. LatencySLOBurn and LedgerInvariantBroken: No data.
 Captured 21:11:58.
+
+The 20:45 to 21:03 inputs, and the heap spike at about 20:52 on the JVM row, are consistent with the
+`fleet.sh` sweep test, which deliberately stops and starts the fleet: it stops wiremock, kills
+ledger-svc, bounces the whole stack and stops it. Its committed log,
+[2026-10-13-fleet-sweep-run.log](docs/fleet/verification/2026-10-13-fleet-sweep-run.log), starts at
+2026-10-13T18:51:44Z (20:51:44 here), and an earlier run of the same sweep,
+whose log is not committed, preceded it that evening. The committed log does not timestamp each
+case, so it cannot place every flap.
 
 **Proves** each rule's expression is plotted against its threshold, with state changes as annotations.
 RateFeedRefusing went Pending at each stale-rate quote and back to Normal; Grafana stores 4 alert
@@ -229,7 +259,7 @@ and new JVM as two series across the 21:03 restart.
 
 The RateFeedRefusing rule (evaluated every 10 s, severity warning, pending period 2m) on its History
 tab for pair USDT/ZAR: Pending at 21:04:25 (A=1), Normal at 21:05:25 (A=0), Pending at 21:10:25 (A=1),
-Normal at 21:11:25 (A=0). Captured 21:21:01.
+Normal at 21:11:25 (A=0). Captured 21:21:01 by a separate, uncommitted script, not the suite.
 
 **Proves** Grafana keeps state history for the rule, with the value of A at each transition. One
 stale-rate refusal holds the rule Pending for 1 minute, less than its 2-minute hold, so it does not
@@ -254,18 +284,27 @@ Delivery is read from Grafana's own notifier counter rather than from a log line
 `grafana_alerting_notifications_total{integration="slack"}` read **2** after the rehearsal (the page
 and the all-clear), and no `grafana_alerting_notifications_failed_total` series existed, so no delivery
 failed. That rehearsal's state history no longer exists in Grafana: `fleet.sh up` recreated the lgtm
-container at 21:03:51, which wiped it.
+container at 21:03:51, and Grafana's own database is on a tmpfs mount (`compose.yaml`), so the
+recreate wiped it.
 
 ## Static application security testing (SAST)
 
 SAST reads this repository's own code for defects without running it. Here that is SpotBugs 4.10.5
 with the Find Security Bugs plugin over the compiled classes, and Checkstyle 14.3.0 over every Java
-source set, both failing the build on any finding; see [docs/quality-gates.md](docs/quality-gates.md).
+source set, both failing the build on any finding outside their filters; see
+[docs/quality-gates.md](docs/quality-gates.md). SpotBugs runs with the exclusion filter
+`config/spotbugs/exclude.xml` (6 `<Match>` entries, each preceded by a comment giving its reason, as
+`docs/quality-gates.md` requires), and Checkstyle with `config/checkstyle/checkstyle.xml` (2
+suppressions: one limits the main-code catch rule to main sources, one exempts gateway-svc's
+`RateLimitFilter`, the limiter's fail-closed line, with its reason). "Zero findings" below means zero
+outside those filters.
 The architecture and coverage images below are gates from the same build, not SAST.
 
 | Fact | Number | Universe | Command |
 |---|---|---|---|
-| Full gate | exit 0, 86 of 86 tasks executed, 2m 57s | all 5 services, no build cache | `./gradlew --console=plain --no-build-cache --rerun-tasks clean build` |
+| Full gate | `BUILD SUCCESSFUL`, 86 of 86 tasks executed, 2m 57s (the shell exit code was not logged) | all 5 services, no build cache | `./gradlew --console=plain --no-build-cache --rerun-tasks clean build`; result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
+| SpotBugs exclusions | 6 `<Match>` entries, 6 with a reason comment | `config/spotbugs/exclude.xml` | `python3 -c "import xml.etree.ElementTree as E; print(len(E.parse('config/spotbugs/exclude.xml').getroot().findall('{https://github.com/spotbugs/filter/3.0.0}Match')))"` |
+| Checkstyle suppressions | 2 `SuppressionSingleFilter` modules | `config/checkstyle/checkstyle.xml` | read the file; both sit at its top |
 | Tests | 538 passed, 0 failed, 0 errors, 0 skipped | every tier: config-svc 14, conversion-svc 210, eureka-svc 14, gateway-svc 119, ledger-svc 181 | sum of `services/*/build/test-results/*/*.xml` |
 | SpotBugs findings | 0 | 222 class files: config-svc 2, conversion-svc 100, eureka-svc 2, gateway-svc 19, ledger-svc 99 | `BugInstance` count in `services/<svc>/build/reports/spotbugs/main.xml` |
 | Find Security Bugs | enabled in 5 of 5, 0 analysis errors, 0 missing classes | same reports | `checkSpotbugsReport` |
@@ -286,7 +325,8 @@ from the Extensible Markup Language (XML) report.
 The Metrics, Summary and Warnings sections: "1762 lines of code analyzed, in 99 classes, in 26
 packages", high and medium priority warnings 0, total warnings 0.
 
-**Proves** zero SpotBugs (with Find Security Bugs) findings over 99 analysed classes in ledger-svc.
+**Proves** zero SpotBugs (with Find Security Bugs) findings outside the exclusion filter over 99
+analysed classes in ledger-svc.
 
 ![Checkstyle report for ledger-svc](docs/evidence/security/sast-checkstyle-ledger-svc.png)
 
@@ -348,15 +388,15 @@ code); SHARED layers come from the buildpack base.
 
 | Fact | Number | Universe | Command |
 |---|---|---|---|
-| Gate | PASSED, exit 0 | every scanner in `build/supply-chain/status.txt` exited 0 | `./gradlew --console=plain checkSupplyChain` |
-| Images | rebuilt, exit 0 | 5 `ezeebit/<svc>:0.1.0` images | `./gradlew --console=plain bootBuildImageAll` |
+| Gate | PASSED; every scanner exited 0 | the 14 scanner stages in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) | `./gradlew --console=plain checkSupplyChain`; console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt) |
+| Images | rebuilt, `BUILD SUCCESSFUL` (the shell exit code was not logged) | 5 `ezeebit/<svc>:0.1.0` images | `./gradlew --console=plain bootBuildImageAll`; result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | Secrets | 0 | 83 of 83 commits; 432 files for gitleaks and for trivy | `checkSupplyChain` secrets stage |
 | Gating image findings | 0 | 5 images | console per-image table |
 | SERVICE-layer findings | 1 distinct, `MEDIUM` Common Vulnerabilities and Exposures (CVE) entry CVE-2020-13956 in httpclient 4.5.3 | 3 of 5 images | console |
 | SHARED-layer findings | 47 distinct | 5 images | console |
 | `CRITICAL` / `HIGH` | 0 / 9 per image, all 9 fixable and in SHARED layers | 5 images, distinct by vulnerability, package and version | trivy JavaScript Object Notation (JSON) in `build/supply-chain/images/<svc>.json` |
 | SBOM components | config 177, conversion 233, eureka 232, gateway 235, ledger 233 | one CycloneDX document per image | `build/supply-chain/sbom/` |
-| Misconfiguration | trivy recognised 0 of 17 files | `compose.yaml` and `docker/` | reported, never gating |
+| Misconfiguration | trivy recognised 0 of 17 files | `compose.yaml`, `docker/` and `Dockerfile*` | reported, never gating |
 | Suppressions | 0 | the whole gate | console |
 
 The trivy vulnerability database was updated at 2026-10-13T01:09:18Z.
@@ -399,21 +439,24 @@ the console; the distinct totals match the console's distinct column.
   tree with uncommitted changes, not a clean checkout of `d538b32`.
 - **Continuous integration (CI) has never run.** No CircleCI project reads `.circleci/config.yml` yet
   ([docs/ci.md](docs/ci.md)), so none of these gates has run anywhere but this laptop.
-- **`fleet.sh up` recreates the lgtm container.** That drops Tempo's in-flight traces and Grafana's
-  alert state history and annotations, which is why the 16:23 rehearsal history is gone and only 4
-  annotations exist, all after 21:04. Whether ServiceDown or RateLimiterStoreDown fired between 20:45
-  and 21:03, when their inputs read 1, cannot be read back.
+- **A recreate of the lgtm container loses Grafana's own database.** `compose.yaml` puts
+  `/data/grafana/data` on tmpfs, so every recreate (as `fleet.sh up` did at 21:03:51) drops alert
+  state history and annotations. That is why the 16:23 rehearsal history is gone and only 4
+  annotations exist, all after 21:04. Prometheus metrics and stored Tempo traces persist on the
+  `lgtmdata` volume. Whether ServiceDown or RateLimiterStoreDown fired between 20:45 and 21:03, when
+  their inputs read 1 during the `fleet.sh` sweep test, cannot be read back.
 - **The first suite run crashed** (exit 1 after 6 checks): it fetched spans for gateway-svc log lines
   written before the lgtm restart, Tempo answered 404 with an empty body, and the suite's `spansOf()`
   threw on it instead of recording a failure. 32 of 173 trace ids from 20:55:27 to 20:59:29 were
   missing. The passing run waited until those lines left its 10-minute window. A run within 10 minutes
   of `fleet.sh up` will crash the same way until the suite is fixed.
 - **The suite's content floor misses empty tables.** The Traces board's "Slow merchant requests" table
-  rendered "No rows", yet the suite reported 0 empty panels for that board.
-- **Two images frame less than the claim.** `trace-three-services.png` cuts off the ledger-svc row;
-  ledger-svc is confirmed by the suite check and the overview bars, not a readable label.
-  `traces-service-map.png` was taken after a manual zoom-out by a separate script, because the default
-  zoom clips the bottom row of nodes.
+  rendered "No rows" (no image of it is committed, so this rests on the capturing session's
+  observation), yet the suite reported 0 empty panels for that board.
+- **Two images frame less than the claim.** `trace-three-services.png` cuts off the ledger-svc row
+  and the `ledger posting` span. ledger-svc is confirmed by a suite check and the overview bars, and
+  `ledger posting` by suite check line 6 of the run log, not by a readable label. `traces-service-map.png` was taken by a separate, uncommitted script that clicked
+  the map's zoom-out button once, because the default zoom clips the bottom row of nodes.
 - **A cosmetic dashboard defect.** The Money board's "Ledger posting p95" axis labels read 40.824562 ms,
   40.82456 ms, 40.824558 ms, because a near-flat series auto-scales to microsecond precision.
 - **Zero findings is not a red-proof.** The SpotBugs and Checkstyle reports show a clean result, not
@@ -425,7 +468,8 @@ the console; the distinct totals match the console's distinct column.
   analysed.
 - **The severity table does not split layers.** It counts SERVICE and SHARED together; the layer split
   comes only from the console.
-- **The running fleet still uses its earlier images.** `bootBuildImageAll` rebuilt the tags, and the
-  next `fleet.sh up` picks them up.
-- **[docs/supply-chain.md](docs/supply-chain.md) still calls its verdict stale.** This run is a fresh
-  PASSED at `d538b32` with the trivy database of 2026-10-13.
+- **The scanned images are not what produced the monitoring evidence.** `fleet.sh` runs each service
+  as a JVM from its `bootJar` on the host (`java -jar services/<svc>/build/libs/...`); it never runs
+  the `ezeebit/<svc>:0.1.0` images. Those images are what would ship, and `bootBuildImageAll` built
+  them only for the supply-chain scan. The SCA verdict covers the images; the monitoring evidence
+  covers the host jars.

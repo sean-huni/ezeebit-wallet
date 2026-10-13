@@ -28,6 +28,7 @@ of it:
 | SAST and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
 | Supply-chain gate: secrets scanning, Paketo images, SBOMs, trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
+| OpenAPI: per-service specs with derived problem responses, one Swagger UI on the gateway, snapshots checked in `check` | `feat-openapi` | [README](README.md#api-reference), [ARCHITECTURE.md](ARCHITECTURE.md#openapi) |
 | Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
 
 Each landed as its own `feat-*` merge on `dev`, so `git show --stat <merge>` shows exactly what it
@@ -64,13 +65,13 @@ What exists:
   container stands in for the rate service.
 
 **Tests.** `./gradlew clean build --rerun-tasks` on 2026-10-13, counted from the JUnit XML reports:
-**412 tests, 0 failures, 0 skipped.**
+**452 tests, 0 failures, 0 skipped.**
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 67 | 23 | 61 |
-| conversion-svc | 111 | 17 | 44 |
-| gateway-svc | 49 | 38 | |
+| ledger-svc | 68 | 33 | 61 |
+| conversion-svc | 112 | 27 | 44 |
+| gateway-svc | 51 | 54 | |
 | config-svc | 1 | | |
 | eureka-svc | 1 | | |
 

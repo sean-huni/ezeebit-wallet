@@ -135,6 +135,33 @@ configure(subprojects.findAll { it.name in tieredServices }) {
 	}
 }
 
+// The services that publish an OpenAPI spec. OpenApiContractIT (integrationTest, so in `check`) fails when a spec
+// drifts from its snapshot in docs/openapi; generateOpenApiSnapshots runs the same test in write mode.
+def openApiServices = ['ledger-svc', 'conversion-svc']
+configure(subprojects.findAll { it.name in openApiServices }) {
+	def snapshots = rootProject.file('docs/openapi')
+	tasks.withType(Test).configureEach {
+		systemProperty 'openapi.snapshots', snapshots.absolutePath
+		inputs.files(fileTree(snapshots)).withPropertyName('openApiSnapshots').withPathSensitivity(PathSensitivity.RELATIVE)
+	}
+	tasks.register('generateOpenApiSnapshots', Test) {
+		description = 'Rewrites docs/openapi from the running service, then checks the result like integrationTest does.'
+		group = 'documentation'
+		testClassesDirs = sourceSets.acceptanceTest.output.classesDirs
+		classpath = sourceSets.acceptanceTest.runtimeClasspath
+		useJUnitPlatform { includeEngines 'junit-jupiter' }
+		filter { includeTestsMatching '*.OpenApiContractIT' }
+		systemProperty 'openapi.snapshots.write', 'true'
+		outputs.upToDateWhen { false }
+	}
+}
+
+tasks.register('generateOpenApiSnapshots') {
+	group = 'documentation'
+	description = "Regenerates docs/openapi for ${openApiServices.join(', ')}."
+	dependsOn openApiServices.collect { ":services:${it}:generateOpenApiSnapshots" }
+}
+
 // Quality gates, one convention for every service. README "Quality gates" says what each reads and fails on.
 // Floors sit a few points under a measured run; checkCoverageFloors fails when one drifts more than
 // coverageBand below it, so they ratchet up. A service with no branches declares no BRANCH floor.
@@ -240,8 +267,9 @@ configure(services) {
 		toolVersion = jacocoVersion
 	}
 
-	// One report per service, merged over every test tier it has (unit, integration, acceptance).
-	def testTasks = tasks.withType(Test)
+	// One report per service, merged over every test tier it has (unit, integration, acceptance). The snapshot writer
+	// is left out: a check must never depend on a task that rewrites committed files.
+	def testTasks = tasks.withType(Test).matching { it.name != 'generateOpenApiSnapshots' }
 	tasks.named('jacocoTestReport') {
 		dependsOn testTasks
 		executionData.setFrom(testTasks.collect { it.extensions.getByType(JacocoTaskExtension).destinationFile })

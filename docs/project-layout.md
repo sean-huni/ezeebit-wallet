@@ -53,13 +53,14 @@ to the used.
 
 ## ledger-svc
 
-78 classes in 22 packages. The three use cases each own a subpackage of `service/`; the domain
+84 classes in 23 packages. The three use cases each own a subpackage of `service/`; the domain
 depends on nothing but its own exception.
 
 ```text
 io.ezeebit.ledger     LedgerApplication
-├── ctl/              BalanceCtrl, ConversionPostingCtrl, DepositCtrl, StatementCtrl
+├── ctl/              BalanceCtrl, ConversionPostingCtrl, DepositCtrl, DocExamples, StatementCtrl
 ├── api/
+│   ├── doc/          OperationErrors, ProblemResponses, ProblemSchemas, PublishedPaths (the OpenAPI spec: error responses derived from ErrorStatus, /{version} named v1)
 │   ├── advice/       BusinessExceptionHandler, ErrorStatus, GlobalExceptionHandler, ProblemFactory, RoutingExceptionHandler, ValidationExceptionHandler, Violation, ViolationReader (RFC 9457 errors; ErrorStatus is the code-to-status table)
 │   ├── filter/       GatewayProofFilter (refuses public routes the gateway did not forward)
 │   ├── json/         StrictStringDeserializer (money only from JSON strings)
@@ -82,17 +83,18 @@ io.ezeebit.ledger     LedgerApplication
 ├── common/
 │   ├── log/          LogText (log-safe caller text)
 │   └── metrics/      LedgerMetrics
-└── config/           ApiVersionConfig, GatewayProofConfig
+└── config/           ApiVersionConfig, GatewayProofConfig, OpenApiConfig
 ```
 
 Dependencies (`from -> to(import lines)`):
 
 ```text
 api.advice         -> common.log(2), exception(6)
+api.doc            -> api.advice(1), exception(25)
 api.filter         -> exception(2)
 api.validation     -> dto.req(1)
 common.metrics     -> domain(1), exception(1)
-config             -> api.filter(1)
+config             -> api.doc(2), api.filter(1)
 ctl                -> dto.req(4), dto.resp(8), service.conversion(1), service.deposit(1), service.statement(2)
 data.repo          -> data.model(5), data.repo.query(1)
 domain             -> exception(6)
@@ -107,6 +109,7 @@ service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2)
 | Package | One job | Key classes |
 |---|---|---|
 | `ctl` | HTTP endpoints | `DepositCtrl`, `ConversionPostingCtrl` (internal), `BalanceCtrl`, `StatementCtrl` |
+| `api.doc` | shape the OpenAPI spec: each operation's error codes, their problem responses, literal v1 paths | `OperationErrors`, `ProblemResponses`, `ProblemSchemas`, `PublishedPaths` |
 | `api.advice` | render every error as RFC 9457; the one code-to-status table | `ErrorStatus`, `ProblemFactory`, `BusinessExceptionHandler`, `ValidationExceptionHandler`, `RoutingExceptionHandler`, `GlobalExceptionHandler` |
 | `api.filter` | refuse public routes not forwarded by the gateway | `GatewayProofFilter` |
 | `api.json` | read money only from JSON strings | `StrictStringDeserializer` |
@@ -125,17 +128,18 @@ service.statement  -> data.model(1), data.repo(2), data.repo.query(1), domain(2)
 | `data.model` | row records | `JournalEntity`, `EntryEntity`, `AccountEntity`, `CurrencyEntity`, `StatementLineEntity` |
 | `common.log` | make caller text safe for one log line | `LogText` |
 | `common.metrics` | ledger counters | `LedgerMetrics` |
-| `config` | API versioning, proof filter registration | `ApiVersionConfig`, `GatewayProofConfig` |
+| `config` | API versioning, proof filter registration, the two spec groups | `ApiVersionConfig`, `GatewayProofConfig`, `OpenApiConfig` |
 
 ## conversion-svc
 
-67 classes in 24 packages. Each called service has its own anti-corruption layer under
+73 classes in 25 packages. Each called service has its own anti-corruption layer under
 `outbound/`, which owns the translation both ways; nothing else imports another context's shape.
 
 ```text
 io.ezeebit.conversion  ConversionApplication
-├── ctl/               ConversionCtrl, QuoteCtrl
+├── ctl/               ConversionCtrl, DocExamples, QuoteCtrl
 ├── api/
+│   ├── doc/           OperationErrors, ProblemResponses, ProblemSchemas, PublishedPaths (the OpenAPI spec: error responses derived from ErrorStatus, /{version} named v1)
 │   ├── advice/        BusinessExceptionHandler, ErrorStatus, GlobalExceptionHandler, ProblemFactory, RoutingExceptionHandler, ValidationExceptionHandler, Violation, ViolationReader (RFC 9457 errors; ErrorStatus is the code-to-status table)
 │   ├── filter/        GatewayProofFilter (refuses public routes the gateway did not forward)
 │   ├── json/          StrictStringDeserializer (money only from JSON strings)
@@ -160,7 +164,7 @@ io.ezeebit.conversion  ConversionApplication
 ├── common/
 │   ├── log/           LogText (log-safe caller and upstream text)
 │   └── metrics/       ConversionMetrics
-└── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig
+└── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig, OpenApiConfig
     └── properties/    ConversionProperties (served pricing policy)
 ```
 
@@ -168,10 +172,11 @@ Dependencies (`from -> to(import lines)`):
 
 ```text
 api.advice         -> common.log(2), exception(6)
+api.doc            -> api.advice(1), exception(28)
 api.filter         -> exception(2)
 api.validation     -> dto.req(1)
 common.metrics     -> domain(4), exception(2)
-config             -> api.filter(1), config.properties(1), domain(2)
+config             -> api.doc(2), api.filter(1), config.properties(1), domain(2)
 ctl                -> dto.req(2), dto.resp(4), service.conversion(1), service.quote(1)
 data.repo          -> data.model(2)
 domain             -> exception(7)
@@ -189,6 +194,7 @@ service.sweep      -> common.metrics(1), config.properties(2), data.model(1), da
 | Package | One job | Key classes |
 |---|---|---|
 | `ctl` | HTTP endpoints | `QuoteCtrl`, `ConversionCtrl` |
+| `api.doc` | shape the OpenAPI spec: each operation's error codes, their problem responses, literal v1 paths | `OperationErrors`, `ProblemResponses`, `ProblemSchemas`, `PublishedPaths` |
 | `api.advice` | render every error as RFC 9457; the one code-to-status table | `ErrorStatus`, `ProblemFactory`, `BusinessExceptionHandler`, `ValidationExceptionHandler`, `RoutingExceptionHandler`, `GlobalExceptionHandler` |
 | `api.filter` | refuse public routes not forwarded by the gateway | `GatewayProofFilter` |
 | `api.json` | read money only from JSON strings | `StrictStringDeserializer` |
@@ -386,17 +392,29 @@ endpoint) would have to take the HTTP response shape or add its own mapping. It 
 both services have exactly one delivery mechanism, and the mapping itself lives in `mapper/`, so
 moving the call site later is a local change.
 
+## Where the OpenAPI wiring lives
+
+| Piece | Home |
+|---|---|
+| springdoc version | `springdocVersion` in the root `gradle.properties`; `webmvc-api` starter on ledger-svc and conversion-svc, `webmvc-ui` on gateway-svc only |
+| spec groups, title, server | `config/OpenApiConfig` per service: `public` (`/v1/merchants/**`) and, on ledger-svc only, `internal` (`/internal/**`) |
+| error responses | `api/doc/OperationErrors` lists each operation's codes; `ProblemResponses` groups them by `ErrorStatus` into problem responses |
+| springdoc settings | each service's `src/main/resources/application.yml` (`springdoc:`); the server URL is `ezeebit.openapi.public-url` in the served `application.yml` |
+| who may read a spec | `GatewayProofFilter`: the public spec needs the proof header; the internal spec follows `/internal/**` |
+| Swagger UI and doc routes | the served `gateway-svc.yml`: `springdoc.swagger-ui.urls` and the `*-api-docs` routes; the allow-list is in `RouteCoverageIT` |
+| snapshots | `docs/openapi/*.json`, written by `./gradlew generateOpenApiSnapshots`, compared by `OpenApiContractIT` in `check` |
+
 ## Where do I put X
 
 | I am adding | Put it in | Also touch |
 |---|---|---|
-| an endpoint | a method on the `*Ctrl` in `ctl/` (a new `*Ctrl` for a new resource); request and response records in `dto/req`, `dto/resp` | the gateway route in `config-svc/.../served/gateway-svc.yml` if it is public; ARCHITECTURE section 6 |
+| an endpoint | a method on the `*Ctrl` in `ctl/` (a new `*Ctrl` for a new resource); request and response records in `dto/req`, `dto/resp` | its spec annotations (`@Operation` with an `operationId` and summary, `@Parameter` examples, `@Schema` examples on the records); its codes in `api/doc/OperationErrors` (spec generation fails without them); the expected statuses in `OpenApiContractIT`; `./gradlew generateOpenApiSnapshots`; the gateway route in `config-svc/.../served/gateway-svc.yml` if it is public; ARCHITECTURE section 6 |
 | a business rule | `domain/` when it needs no I/O; otherwise the use case's `service/<use case>/` class | a test beside it under `src/test` in the same package |
 | a new use case | a new `service/<use case>/` subpackage; shared helpers stay in `service/` | its controller method; its metric |
 | a query | a method on the `*Repo` in `data/repo/`; a parameter shape with several fields goes in `data/repo/query/`; a new row type in `data/model/` as `*Entity` | the integration tier (`src/acceptanceTest`) if it is new SQL |
 | an outbound client | `outbound/<called service>/`: the `*Client`, caller-owned `*Dto` records, and the `*Mapper` that translates both ways | the client bean in `config/ClientConfig`; callers pass domain values, never DTOs |
 | a metric | the service's `common/metrics/*Metrics` (bounded tags only) | `docs/observability.md` metric table; a panel in `docker/lgtm/dashboards/` if it should be charted |
-| an error code | a constant in `exception/ErrorCode` with its message key | its status in `api/advice/ErrorStatus` (compilation fails until you do), the row in `ErrorStatusTest`, the text in `i18n/messages.properties` |
+| an error code | a constant in `exception/ErrorCode` with its message key | its status in `api/advice/ErrorStatus` (compilation fails until you do), the row in `ErrorStatusTest`, the text in `i18n/messages.properties`, the operations that can answer it in `api/doc/OperationErrors` (`OpenApiContractIT` fails while no operation lists it), then `./gradlew generateOpenApiSnapshots` |
 | a migration | a new numbered changeset in `src/main/resources/db/changelog/2026/10/` (or a new month folder), included from `db.changelog-2026-10.xml` | never edit an applied changeset |
 | configuration a service reads | `config/properties/*Properties` bound from `config-svc/.../served/<service>.yml` | the served file is where the values live; config-svc serves it to every replica |
 | a scheduled job | a trigger in `scheduler/` that only calls a service class | it must be safe on every replica at once |

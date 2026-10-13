@@ -115,8 +115,10 @@ bucket in Redis (Lettuce, compare-and-swap). The design follows from three const
   character outside letters, digits, `_`, `.`, `-` is 400 `MALFORMED_PATH`. A canonical raw path is
   exactly the decoded, normalised path the route matcher sees, so `/%61pi/...` or `/api;x=1/...`
   cannot reach a route uncharged (a review measured both reaching the ledger before this rule).
-  Every published route lives under `/api/v1/merchants/{id}/`, and `RouteCoverageIT` enumerates the
-  served route table and fails on any route the limiter would not charge.
+  Every merchant route lives under `/api/v1/merchants/{id}/`, and `RouteCoverageIT` enumerates the
+  served route table and fails on any route the limiter would not charge, except the two spec routes
+  on its allow-list (`/v3/api-docs/ledger`, `/v3/api-docs/conversion`): literal paths, GET only,
+  uncharged by design, and proven unable to match a merchant path.
 - *Bounded keys.* The key is `gateway:ratelimit:<capacity>-<refill>-<period ms>:merchant:<uuid>`,
   lower-cased, built only from a strict UUID; anything else is 400 before Redis is touched, so a
   client cannot write arbitrary keys. Keys expire 10 s after their bucket would be full again.
@@ -439,6 +441,20 @@ A path no controller maps answers 404 `NOT_FOUND`, distinct from `POSTING_NOT_FO
 any `/api/...` path sent straight to a service. An unsupported version on a service itself
 (`/v2/...`) is 400 `UNSUPPORTED_API_VERSION`; through the gateway it is 404, because the route table
 publishes v1 only.
+
+### OpenAPI
+
+Each service describes itself: springdoc reads the controllers, and `api/doc` adds what annotations
+cannot say well. Error responses are derived, not written: `OperationErrors` lists the codes each
+operation can answer and `ErrorStatus` picks each one's status, so a response is an RFC 9457 problem
+whose `code` is an enum of exactly those codes. The `public` spec (merchant routes, server
+`http://localhost:8080/api`) is served only with the gateway proof header, the same rule as the routes
+it describes; ledger-svc's `internal` spec follows `/internal/**`: loopback, never routed. The gateway
+serves one Swagger UI over both public specs through two allow-listed, uncharged routes. Three checks
+keep the description true: `OpenApiContractIT` compares each spec with the controllers' mappings and
+with the snapshot in `docs/openapi`, the acceptance runs fail on any status or code a scenario saw that
+the snapshot does not list, and a gateway test fails if a gateway code is missing from either public
+spec's description.
 
 ## 7. Failure handling
 

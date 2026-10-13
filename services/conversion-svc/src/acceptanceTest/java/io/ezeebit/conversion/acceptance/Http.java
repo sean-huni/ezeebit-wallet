@@ -26,8 +26,10 @@ public class Http {
 	}
 
 	public Reply conversion(final String method, final String path, @Nullable final String key, @Nullable final String body) {
-		return call(method, "http://127.0.0.1:%s%s".formatted(environment.getRequiredProperty("local.server.port"), path),
+		Reply reply = call(method, "http://127.0.0.1:%s%s".formatted(environment.getRequiredProperty("local.server.port"), path),
 				key, body);
+		SpecCoverage.record(method, path, reply);
+		return reply;
 	}
 
 	public Reply ledger(final String method, final String path, @Nullable final String key, @Nullable final String body) {

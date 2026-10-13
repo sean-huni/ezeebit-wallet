@@ -147,7 +147,34 @@ kill $(cat .fleet/conversion-svc.pid)           # then a quote through the gatew
 ./fleet.sh down && ./fleet.sh up                # restore the fleet afterwards
 ```
 
-Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#6-api-summary).
+Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#6-api-summary), and
+browsable in the Swagger UI below.
+
+## API reference
+
+With the fleet up, **http://localhost:8080/swagger-ui.html** is one Swagger UI over both public
+specs, picked from "Select a definition": `ledger` (balances, entries) and `conversion` (quotes,
+conversions). Its server is the gateway, so "Try it out" goes through the route table, the rate
+limiter and the proof header like any client call. Every operation lists its success body with the
+demo's values and each error as an RFC 9457 problem with the exact `code` values it can carry.
+
+| Spec | Where |
+|---|---|
+| ledger public | `GET localhost:8080/v3/api-docs/ledger` (the gateway fetches ledger-svc's `/v3/api-docs/public`) |
+| conversion public | `GET localhost:8080/v3/api-docs/conversion` |
+| ledger internal (deposits, conversion postings) | `GET localhost:8081/v3/api-docs/internal`, on the service only: never routed, the gateway answers 404 |
+
+The doc routes are not merchant routes, so they are not rate limited; each is one literal path, GET
+only. Straight to a service, the public spec answers 403 `GATEWAY_REQUIRED` without the proof header.
+
+The committed snapshots in [docs/openapi](docs/openapi) are what `check` compares the running specs
+with. After changing a controller, a DTO, a spec annotation or an error code, regenerate and commit them:
+
+```sh
+./gradlew generateOpenApiSnapshots    # boots each service on Testcontainers and rewrites docs/openapi/*.json
+```
+
+Without that, `OpenApiContractIT` fails `./gradlew build` and names the file that drifted.
 
 ## Services
 
@@ -227,8 +254,9 @@ served from `gateway-svc.yml` and overridable by the variables below.
 | **400 `MALFORMED_PATH`** | ANY request path, on any route or none, that is not canonical: a `%xx` escape, a `;param`, a `.` or `..` segment, `//`, or a character outside letters, digits, `_`, `.`, `-`. The route matcher decodes and normalises paths, so such a path could reach a route uncharged |
 
 Coverage is total by construction: once a path is canonical it is exactly the path the route matcher
-sees, every published route lives under `/api/v1/merchants/{id}/` (a test enumerates the route table
-and fails on any route outside it), and every request under `/api/v1/merchants/` is charged or refused.
+sees, every merchant route lives under `/api/v1/merchants/{id}/` (a test enumerates the route table
+and fails on any route outside it other than the two allow-listed spec routes below), and every request
+under `/api/v1/merchants/` is charged or refused.
 A refusal is never forwarded. `ezeebit_gateway_ratelimit_total{outcome}` counts `allowed`, `limited`,
 `contention`, `unavailable` and `refused_path`; RateLimiterUnavailable pages on any `unavailable`, and
 RateLimiterStoreDown pages when a gateway's own PING to Redis fails or no gateway reports

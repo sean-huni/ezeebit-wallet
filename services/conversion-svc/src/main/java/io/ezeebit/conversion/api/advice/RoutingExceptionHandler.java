@@ -1,6 +1,7 @@
 package io.ezeebit.conversion.api.advice;
 
 import io.ezeebit.conversion.exception.ErrorCode;
+import org.springdoc.api.OpenApiResourceNotFoundException;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -24,6 +25,12 @@ public class RoutingExceptionHandler {
 
 	@ExceptionHandler(NoResourceFoundException.class)
 	ProblemDetail notFound(final NoResourceFoundException ex) {
+		return problems.of(ErrorCode.NOT_FOUND);
+	}
+
+	// An unknown spec group is a path nothing serves, not a server fault.
+	@ExceptionHandler(OpenApiResourceNotFoundException.class)
+	ProblemDetail unknownSpec(final OpenApiResourceNotFoundException ex) {
 		return problems.of(ErrorCode.NOT_FOUND);
 	}
 

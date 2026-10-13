@@ -20,7 +20,8 @@ public final class GatewayProofFilter extends OncePerRequestFilter {
 
 	public static final String HEADER = "X-Ezeebit-Gateway";
 
-	private static final Pattern MERCHANT_ROUTE = Pattern.compile("^/[^/]*/merchants(/.*)?$");
+	// The public spec describes the merchant routes and is served to the gateway on the same terms.
+	private static final Pattern GUARDED = Pattern.compile("^/[^/]*/merchants(/.*)?$|^/v3/api-docs(\\.yaml)?/public$");
 
 	private final byte[] secret;
 	private final HandlerExceptionResolver refusals;
@@ -35,7 +36,7 @@ public final class GatewayProofFilter extends OncePerRequestFilter {
 
 	@Override
 	protected boolean shouldNotFilter(final HttpServletRequest request) {
-		return !MERCHANT_ROUTE.matcher(request.getServletPath()).matches();
+		return !GUARDED.matcher(request.getServletPath()).matches();
 	}
 
 	@Override

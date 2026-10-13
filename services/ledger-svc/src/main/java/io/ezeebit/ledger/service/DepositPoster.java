@@ -47,6 +47,7 @@ public class DepositPoster {
 		AccountEntity account = accounts.lockMerchant(merchantId, currency);
 		UUID clearing = accounts.platformAccount(currency, AccountType.PLATFORM_DEPOSIT_CLEARING.name());
 		Posting posting = Posting.deposit(account.id(), clearing, command.amount());
+		// plus() refuses a sum the balance column cannot hold; the exception rolls the journal back too.
 		Money balanceAfter = new Money(account.balance(), command.amount().currency()).plus(command.amount());
 		for (PostingLine line : posting.lines()) {
 			entries.insert(mapper.toEntity(journalId, line, line.accountId().equals(account.id()) ? balanceAfter : null));

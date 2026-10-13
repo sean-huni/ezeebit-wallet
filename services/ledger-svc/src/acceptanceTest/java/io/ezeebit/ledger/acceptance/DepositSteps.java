@@ -2,21 +2,20 @@ package io.ezeebit.ledger.acceptance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 public class DepositSteps {
 
 	private final LedgerClient ledger;
 	private final ScenarioState state;
-	private final JdbcClient jdbc;
 
-	public DepositSteps(final LedgerClient ledger, final ScenarioState state, final JdbcClient jdbc) {
+	public DepositSteps(final LedgerClient ledger, final ScenarioState state) {
 		this.ledger = ledger;
 		this.state = state;
-		this.jdbc = jdbc;
 	}
 
 	@Given("a merchant {string}")
@@ -28,7 +27,9 @@ public class DepositSteps {
 	public void theRailDeposits(final String amount, final String currency, final String merchant, final String key) {
 		String body = DepositBody.of(state.merchant(merchant), currency, amount, "transfer %s".formatted(key));
 		state.sent(key, body);
-		state.record(ledger.deposit(key, body));
+		Reply reply = ledger.deposit(key, body);
+		state.answered(key, reply);
+		state.record(reply);
 	}
 
 	@Given("the rail has deposited {string} {word} for {string} with key {string}")
@@ -50,6 +51,36 @@ public class DepositSteps {
 	@When("the rail sends the body {string} with key {string}")
 	public void theRailSendsTheBody(final String body, final String key) {
 		state.record(ledger.deposit(key, body));
+	}
+
+	@When("the rail deposits {string} {word} for {string} with key {string} and a reference containing a NUL character")
+	public void referenceWithNul(final String amount, final String currency, final String merchant, final String key) {
+		state.record(ledger.deposit(key, DepositBody.of(state.merchant(merchant), currency, amount, "bad\\u0000ref")));
+	}
+
+	@When("the rail deposits {string} {word} for {string} with a key containing a tab")
+	public void keyWithTab(final String amount, final String currency, final String merchant) {
+		state.record(ledger.deposit("bad\tkey", DepositBody.of(state.merchant(merchant), currency, amount, "tab key")));
+	}
+
+	@When("the rail sends an amount of {double} as a JSON number for {string} with key {string}")
+	public void amountAsNumber(final double ignored, final String merchant, final String key) {
+		String body = """
+				{"merchantId":"%s","currency":"ZAR","amount":10.00,"reference":"number"}""".formatted(state.merchant(merchant));
+		state.record(ledger.deposit(key, body));
+	}
+
+	@When("the rail sends a deposit whose merchantId is {string} with key {string}")
+	public void merchantIdOf(final String merchantId, final String key) {
+		String id = "null".equals(merchantId) ? "null" : "\"%s\"".formatted(merchantId);
+		String body = """
+				{"merchantId":%s,"currency":"ZAR","amount":"10.00","reference":"r"}""".formatted(id);
+		state.record(ledger.deposit(key, body));
+	}
+
+	@Then("the problem names the field {string}")
+	public void theProblemNamesTheField(final String field) {
+		assertThat(state.last().<List<String>>read("$.errors[*].field")).as(state.last().body()).contains(field);
 	}
 
 	@Then("the deposit is accepted")
@@ -79,12 +110,4 @@ public class DepositSteps {
 		var replies = state.replies();
 		assertThat(replies.get(replies.size() - 1)).isEqualTo(replies.get(replies.size() - 2));
 	}
-
-	@Then("exactly {int} deposit(s) is/are recorded for {string} with key {string}")
-	public void depositsRecorded(final int count, final String merchant, final String key) {
-		Integer journals = jdbc.sql("SELECT count(*) FROM journal WHERE merchant_id = :merchant AND idempotency_key = :key")
-				.param("merchant", state.merchant(merchant)).param("key", key).query(Integer.class).single();
-		assertThat(journals).isEqualTo(count);
-	}
-
 }

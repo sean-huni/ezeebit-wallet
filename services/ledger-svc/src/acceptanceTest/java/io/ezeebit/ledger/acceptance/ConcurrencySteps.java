@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +39,42 @@ public class ConcurrencySteps {
 			final String key) {
 		String body = DepositBody.of(state.merchant(merchant), currency, amount, "transfer %s".formatted(key));
 		state.recordAll(atOnce(count, i -> ledger.deposit(key, body)));
+	}
+
+	@When("the rail sends {string} {word} and {string} {word} for {string} at the same time, both with key {string}")
+	public void twoCurrenciesOneKey(final String firstAmount, final String firstCurrency, final String secondAmount,
+			final String secondCurrency, final String merchant, final String key) {
+		UUID merchantId = state.merchant(merchant);
+		String[] bodies = { DepositBody.of(merchantId, firstCurrency, firstAmount, key),
+				DepositBody.of(merchantId, secondCurrency, secondAmount, key) };
+		state.recordAll(atOnce(2, i -> ledger.deposit(key, bodies[i])));
+	}
+
+	@When("the rail sends {int} deposits of {string} {word} and {int} deposits of {string} {word} for {string} at the same time")
+	public void twoCurrenciesAtOnce(final int firstCount, final String firstAmount, final String firstCurrency,
+			final int secondCount, final String secondAmount, final String secondCurrency, final String merchant) {
+		UUID merchantId = state.merchant(merchant);
+		state.recordAll(atOnce(firstCount + secondCount, i -> {
+			boolean first = i < firstCount;
+			String key = "burst-%d".formatted(i);
+			return ledger.deposit(key, DepositBody.of(merchantId, first ? firstCurrency : secondCurrency,
+					first ? firstAmount : secondAmount, key));
+		}));
+	}
+
+	@Then("exactly one answer is accepted and the other is refused with {int} {word}")
+	public void oneAcceptedOneRefused(final int status, final String code) {
+		assertThat(state.replies()).extracting(Reply::status).containsExactlyInAnyOrder(201, status);
+		Reply refused = state.replies().stream().filter(reply -> reply.status() == status).findFirst().orElseThrow();
+		assertThat(refused.<String>read("$.code")).isEqualTo(code);
+	}
+
+	@Then("{string} holds only the accepted deposit")
+	public void holdsOnlyTheAccepted(final String merchant) {
+		Reply accepted = state.replies().stream().filter(reply -> reply.status() == 201).findFirst().orElseThrow();
+		Reply balances = ledger.get("/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
+		assertThat(balances.<List<Map<String, String>>>read("$.data")).containsExactly(Map.of(
+				"currency", accepted.read("$.data.currency"), "balance", accepted.read("$.data.amount")));
 	}
 
 	@Then("every answer is accepted")

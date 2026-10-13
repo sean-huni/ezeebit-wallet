@@ -47,9 +47,11 @@ What exists and is verified:
 - Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
   service, four provisioned dashboards, two alert rules with optional Slack delivery.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 84 tests, 0 failures. The ledger runs three tiers: 44 unit tests
-  (no Spring, no Docker), 8 Spring integration tests and 27 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. They include 50 concurrent deposits summing exactly
+- `./gradlew clean build` passes: 102 tests, 0 failures. The ledger runs three tiers: 46 unit tests
+  (no Spring, no Docker), 9 Spring integration tests and 42 Cucumber acceptance scenarios over
+  real HTTP, both on Testcontainers Postgres. The three 500s a review reached (a balance past the
+  column's 20 digits, a NUL in `reference`, a statement window outside timestamptz's range) are
+  now refused with 422 or 400, each by a scenario first seen failing. They include 50 concurrent deposits summing exactly
   and 20 concurrent copies of one deposit crediting once. Each concurrency, idempotency and
   currency-integrity test was seen failing with its control removed (row lock, unique constraint,
   composite foreign key, request-hash check) before it was trusted.

@@ -44,7 +44,10 @@ class MessagesBundleTest {
 				.flatMap(field -> Arrays.stream(field.getAnnotations()));
 		Stream<Annotation> onParameters = Arrays.stream(DepositCtrl.class.getDeclaredMethods())
 				.flatMap(method -> Arrays.stream(method.getParameterAnnotations()).flatMap(Arrays::stream));
-		var keys = Stream.concat(onRecords, onParameters).map(MessagesBundleTest::messageKey)
+		Stream<Annotation> onTypes = Stream.of(DepositReq.class, StatementReq.class)
+				.flatMap(type -> Arrays.stream(type.getAnnotations()));
+		var keys = Stream.of(onRecords, onParameters, onTypes).flatMap(stream -> stream)
+				.map(MessagesBundleTest::messageKey)
 				.filter(key -> !key.isEmpty()).toList();
 
 		assertThat(keys).isNotEmpty().allSatisfy(key -> assertThat(BUNDLE.getProperty(key)).as(key).isNotBlank());

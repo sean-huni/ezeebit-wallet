@@ -16,6 +16,11 @@
     </changeSet>
 
     <changeSet id="001-currency-checks" author="ledger-svc">
+        <!-- First applied without this guard on local volumes; ANY keeps those databases starting. -->
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_currency_kind', 'ck_currency_scale')</sqlCheck>
+        </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
         <sql>ALTER TABLE currency ADD CONSTRAINT ck_currency_kind CHECK (kind IN ('FIAT', 'STABLECOIN'));
 ALTER TABLE currency ADD CONSTRAINT ck_currency_scale CHECK (scale BETWEEN 0 AND 18);</sql>

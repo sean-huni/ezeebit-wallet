@@ -1,6 +1,8 @@
 package io.ezeebit.ledger.api.advice;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import io.ezeebit.ledger.exception.ErrorCode;
 import org.springframework.core.Ordered;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import tools.jackson.core.JacksonException.Reference;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
@@ -51,8 +55,14 @@ public class ValidationExceptionHandler {
 		return problems.invalid(List.of(violations.typeMismatch(ex.getHeaderName())));
 	}
 
+	// Valid JSON with a value of the wrong type names its field; anything else is malformed.
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ProblemDetail unreadable(final HttpMessageNotReadableException ex) {
+		if (ex.getMostSpecificCause() instanceof MismatchedInputException mismatch && !mismatch.getPath().isEmpty()) {
+			String field = mismatch.getPath().stream().map(Reference::getPropertyName).filter(Objects::nonNull)
+					.collect(Collectors.joining("."));
+			return problems.invalid(List.of(violations.typeMismatch(field)));
+		}
 		return problems.of(ErrorCode.MALFORMED_REQUEST);
 	}
 

@@ -23,6 +23,11 @@
     </changeSet>
 
     <changeSet id="003-journal-checks" author="ledger-svc">
+        <!-- First applied without this guard on local volumes; ANY keeps those databases starting. -->
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_journal_type', 'ck_journal_status')</sqlCheck>
+        </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
         <sql>ALTER TABLE journal ADD CONSTRAINT ck_journal_type CHECK (type IN ('DEPOSIT'));
 ALTER TABLE journal ADD CONSTRAINT ck_journal_status CHECK (status IN ('POSTED'));</sql>

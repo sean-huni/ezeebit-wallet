@@ -6,6 +6,7 @@ import io.ezeebit.ledger.dto.resp.DepositResp;
 import io.ezeebit.ledger.service.DepositService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +31,9 @@ public class DepositCtrl {
 	@ResponseStatus(HttpStatus.CREATED)
 	public ApiResponse<DepositResp> deposit(
 			@RequestHeader("Idempotency-Key") @NotBlank(message = "{validation.idempotencyKey.required}")
-			@Size(max = 128, message = "{validation.idempotencyKey.size}") final String idempotencyKey,
+			@Size(max = 128, message = "{validation.idempotencyKey.size}")
+			@Pattern(regexp = DepositReq.NO_CONTROL_CHARACTERS, message = "{validation.idempotencyKey.control}")
+			final String idempotencyKey,
 			@Valid @RequestBody final DepositReq request) {
 		return new ApiResponse<>(deposits.deposit(idempotencyKey, request));
 	}

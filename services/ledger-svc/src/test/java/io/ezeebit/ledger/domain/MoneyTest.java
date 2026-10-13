@@ -66,9 +66,28 @@ class MoneyTest {
 	}
 
 	@Test
-	void twentyIntegerDigitsFitTheStorage() {
-		assertThat(Money.parse("12345678901234567890.12", ZAR).amount())
-				.isEqualByComparingTo("12345678901234567890.12");
+	void sumPastTwentyIntegerDigitsIsRefusedAsBalanceLimitExceeded() {
+		Money largest = Money.parse("99999999999999999999.99", ZAR);
+
+		assertThatThrownBy(() -> largest.plus(Money.parse("0.01", ZAR)))
+				.isInstanceOf(LedgerException.class)
+				.extracting("code").isEqualTo(ErrorCode.BALANCE_LIMIT_EXCEEDED);
+	}
+
+	@Test
+	void sumThatStillFitsTwentyIntegerDigitsIsKept() {
+		Money sum = Money.parse("99999999999999999999.98", ZAR).plus(Money.parse("0.01", ZAR));
+
+		assertThat(sum.amount()).isEqualByComparingTo("99999999999999999999.99");
+	}
+
+	@Test
+	void negativeSumPastTwentyIntegerDigitsIsAlsoRefused() {
+		Money mostNegative = Money.parse("99999999999999999999.99", ZAR).negate();
+
+		assertThatThrownBy(() -> mostNegative.plus(Money.parse("0.01", ZAR).negate()))
+				.isInstanceOf(LedgerException.class)
+				.extracting("code").isEqualTo(ErrorCode.BALANCE_LIMIT_EXCEEDED);
 	}
 
 	@Test

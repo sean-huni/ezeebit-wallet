@@ -1,5 +1,7 @@
 package io.ezeebit.ledger.acceptance;
 
+import java.net.URI;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatusCode;
@@ -26,19 +28,24 @@ public class LedgerClient {
 		return reply(request.body(body).retrieve().toEntity(String.class));
 	}
 
+	// The path is sent exactly as given: callers percent-encode, so %2B stays a plus and never becomes a space.
 	public Reply get(final String path) {
-		return reply(client().get().uri(path).retrieve().toEntity(String.class));
+		URI uri = URI.create("http://127.0.0.1:%s%s".formatted(port(), path));
+		return reply(client().get().uri(uri).retrieve().toEntity(String.class));
 	}
 
 	private synchronized RestClient client() {
 		if (client == null) {
-			String port = environment.getRequiredProperty("local.server.port");
 			client = RestClient.builder()
-					.baseUrl("http://127.0.0.1:%s".formatted(port))
+					.baseUrl("http://127.0.0.1:%s".formatted(port()))
 					.defaultStatusHandler(HttpStatusCode::isError, (request, response) -> { })
 					.build();
 		}
 		return client;
+	}
+
+	private String port() {
+		return environment.getRequiredProperty("local.server.port");
 	}
 
 	private static Reply reply(final ResponseEntity<String> entity) {

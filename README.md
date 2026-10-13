@@ -34,11 +34,11 @@ Stack: Spring Boot 4.1.1, Spring Cloud 2025.1.3.
 
 | Gradle task | Source | What it is | ledger-svc tests |
 |---|---|---|---|
-| `test` | `src/test` | unit tests: domain, mapping, fingerprint, i18n bundle; no Spring context, no Docker | 44 |
-| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations, and each DB constraint proven by the row it refuses | 8 |
-| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP | 27 scenarios |
+| `test` | `src/test` | unit tests: domain, mapping, fingerprint, i18n bundle; no Spring context, no Docker | 46 |
+| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), and each DB constraint proven by the row it refuses | 9 |
+| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that every journal sums to zero | 42 scenarios |
 
-The other four services have one `test` task each (5 tests). Total: 84 tests. The ledger's
+The other four services have one `test` task each (5 tests). Total: 102 tests. The ledger's
 integration and acceptance tiers and the conversion tests start a `postgres:18.6-alpine` container
 through Testcontainers, so Docker must be running. Spring tests run under the `acceptance`
 profile, boot each service alone, with the config server, the registry and OTLP export switched
@@ -120,9 +120,9 @@ Ledger answers and errors:
 
 | Call | Success | Errors (RFC 9457 problem detail with a stable `code`) |
 |---|---|---|
-| `POST /internal/v1/deposits` | 201 `{"data":{journalId, merchantId, currency, amount, balanceAfter, reference, created}}`; a replay returns the same body | 400 `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `AMOUNT_TOO_LARGE`, `UNKNOWN_CURRENCY`, `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED`, `MALFORMED_REQUEST`; 422 `IDEMPOTENCY_KEY_REUSED` |
+| `POST /internal/v1/deposits` | 201 `{"data":{journalId, merchantId, currency, amount, balanceAfter, reference, created}}`; a replay returns the same body | 400 `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `AMOUNT_TOO_LARGE`, `UNKNOWN_CURRENCY`, `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED` (with `errors[]` naming the field: a missing or non-UUID `merchantId`, an `amount` sent as a JSON number, a control character in `reference` or `Idempotency-Key`), `MALFORMED_REQUEST` (not JSON); 422 `IDEMPOTENCY_KEY_REUSED`, `BALANCE_LIMIT_EXCEEDED` (the balance would pass 20 digits before the point) |
 | `GET /api/v1/merchants/{id}/balances` | 200 `{"data":[{currency, balance}]}`, empty for a merchant that never received money | 400 `VALIDATION_FAILED` (id not a UUID) |
-| `GET /api/v1/merchants/{id}/entries?currency=&from=&to=&limit=&after=` | 200 `{"data":{entries:[...], nextCursor}}`; `from` inclusive, `to` exclusive (ISO-8601), `limit` 1 to 500 (default 100), pass `nextCursor` back as `after` | 400 `UNKNOWN_CURRENCY`, `VALIDATION_FAILED` |
+| `GET /api/v1/merchants/{id}/entries?currency=&from=&to=&limit=&after=` | 200 `{"data":{entries:[...], nextCursor}}`; `from` inclusive, `to` exclusive (ISO-8601, years 1970 to 9999, `from` before `to`), `limit` 1 to 500 (default 100), pass `nextCursor` back as `after` | 400 `UNKNOWN_CURRENCY`, `VALIDATION_FAILED` (with `errors[]`) |
 
 Amounts with more decimals than the currency allows (ZAR, NGN, KES: 2; USDT, USDC: 6) are
 refused, never rounded. An unsupported version on ledger-svc itself (`/api/v2/...`) is 400

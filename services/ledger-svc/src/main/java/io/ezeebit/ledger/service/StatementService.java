@@ -10,8 +10,6 @@ import io.ezeebit.ledger.data.repo.EntryRepo;
 import io.ezeebit.ledger.domain.Currency;
 import io.ezeebit.ledger.dto.req.StatementReq;
 import io.ezeebit.ledger.dto.resp.StatementResp;
-import io.ezeebit.ledger.exception.ErrorCode;
-import io.ezeebit.ledger.exception.LedgerException;
 import io.ezeebit.ledger.mapper.StatementMapper;
 import org.springframework.stereotype.Service;
 
@@ -30,9 +28,6 @@ public class StatementService {
 
 	public StatementResp statement(final UUID merchantId, final StatementReq request) {
 		String currency = request.currency() == null ? null : catalog.require(request.currency()).code().value();
-		if (request.from() != null && request.to() != null && !request.from().isBefore(request.to())) {
-			throw new LedgerException(ErrorCode.VALIDATION_FAILED, "to", request.to());
-		}
 		int limit = request.limit() == null ? StatementReq.DEFAULT_LIMIT : request.limit();
 		long after = request.after() == null ? 0L : request.after();
 		List<StatementLineEntity> lines = entries.statement(

@@ -26,7 +26,7 @@ public record Money(BigDecimal amount, CurrencyCode currency) {
 		if (value.signum() <= 0) {
 			throw new LedgerException(ErrorCode.AMOUNT_NOT_POSITIVE, "amount", raw);
 		}
-		if (significant.precision() - significant.scale() > MAX_INTEGER_DIGITS) {
+		if (integerDigits(value) > MAX_INTEGER_DIGITS) {
 			throw new LedgerException(ErrorCode.AMOUNT_TOO_LARGE, "amount", raw, MAX_INTEGER_DIGITS);
 		}
 		return new Money(value, currency.code());
@@ -40,7 +40,11 @@ public record Money(BigDecimal amount, CurrencyCode currency) {
 		if (!currency.equals(other.currency)) {
 			throw new LedgerException(ErrorCode.CURRENCY_MISMATCH, null, currency.value(), other.currency.value());
 		}
-		return new Money(amount.add(other.amount), currency);
+		Money sum = new Money(amount.add(other.amount), currency);
+		if (integerDigits(sum.amount) > MAX_INTEGER_DIGITS) {
+			throw new LedgerException(ErrorCode.BALANCE_LIMIT_EXCEEDED, null, currency.value());
+		}
+		return sum;
 	}
 
 	public Money negate() {
@@ -49,6 +53,11 @@ public record Money(BigDecimal amount, CurrencyCode currency) {
 
 	public boolean isZero() {
 		return amount.signum() == 0;
+	}
+
+	private static int integerDigits(final BigDecimal value) {
+		BigDecimal significant = value.abs().stripTrailingZeros();
+		return Math.max(significant.precision() - significant.scale(), 0);
 	}
 
 }

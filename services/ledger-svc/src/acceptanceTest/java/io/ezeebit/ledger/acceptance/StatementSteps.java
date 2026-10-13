@@ -3,6 +3,8 @@ package io.ezeebit.ledger.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +36,25 @@ public class StatementSteps {
 
 	@When("{string} reads its {word} statement up to {string}")
 	public void readsStatementUpTo(final String merchant, final String currency, final String to) {
-		state.record(ledger.get("%s?currency=%s&to=%s".formatted(path(merchant), currency, to)));
+		state.record(ledger.get("%s?currency=%s&to=%s".formatted(path(merchant), currency, encode(to))));
+	}
+
+	@When("{string} reads its {word} statement from {string}")
+	public void readsStatementFrom(final String merchant, final String currency, final String from) {
+		state.record(ledger.get("%s?currency=%s&from=%s".formatted(path(merchant), currency, encode(from))));
+	}
+
+	@When("{string} reads its {word} statement from {string} up to {string}")
+	public void readsStatementBetween(final String merchant, final String currency, final String from, final String to) {
+		state.record(ledger.get("%s?currency=%s&from=%s&to=%s".formatted(path(merchant), currency, encode(from),
+				encode(to))));
+	}
+
+	@When("{string} reads its {word} statement from the time of deposit {string} up to the time of deposit {string}")
+	public void readsBetweenDeposits(final String merchant, final String currency, final String fromKey,
+			final String toKey) {
+		readsStatementBetween(merchant, currency, state.answerTo(fromKey).read("$.data.created"),
+				state.answerTo(toKey).read("$.data.created"));
 	}
 
 	@When("{string} reads its {word} statement {int} entries at a time")
@@ -73,6 +93,10 @@ public class StatementSteps {
 		Reply balances = ledger.get("/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
 		List<String> held = balances.read("$.data[?(@.currency == '%s')].balance".formatted(currency));
 		assertThat(new BigDecimal(held.getFirst())).isEqualByComparingTo(sum);
+	}
+
+	private static String encode(final String value) {
+		return URLEncoder.encode(value, StandardCharsets.UTF_8);
 	}
 
 	private String path(final String merchant) {

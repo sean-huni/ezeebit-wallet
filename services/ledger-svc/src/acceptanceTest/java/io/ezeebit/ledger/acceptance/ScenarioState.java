@@ -11,6 +11,7 @@ public class ScenarioState {
 
 	private final Map<String, UUID> merchants = new HashMap<>();
 	private final Map<String, String> sentBodies = new HashMap<>();
+	private final Map<String, Reply> answers = new HashMap<>();
 	private final List<Reply> replies = new ArrayList<>();
 
 	public UUID merchant(final String name) {
@@ -19,6 +20,14 @@ public class ScenarioState {
 
 	public void sent(final String key, final String body) {
 		sentBodies.put(key, body);
+	}
+
+	public void answered(final String key, final Reply reply) {
+		answers.put(key, reply);
+	}
+
+	public Reply answerTo(final String key) {
+		return answers.get(key);
 	}
 
 	public String bodySentWith(final String key) {

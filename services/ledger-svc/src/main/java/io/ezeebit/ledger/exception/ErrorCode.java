@@ -15,6 +15,7 @@ public enum ErrorCode {
 	METHOD_NOT_ALLOWED("error.method.not.allowed", 405),
 	UNSUPPORTED_MEDIA_TYPE("error.media.type.unsupported", 415),
 	IDEMPOTENCY_KEY_REUSED("error.idempotency.key.reused", 422),
+	BALANCE_LIMIT_EXCEEDED("error.balance.limit.exceeded", 422),
 	CURRENCY_MISMATCH("error.currency.mismatch", 500),
 	UNBALANCED_POSTING("error.posting.unbalanced", 500),
 	INTERNAL_ERROR("error.internal", 500);

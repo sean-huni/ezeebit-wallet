@@ -72,3 +72,44 @@ Feature: Money arrives and the balance goes up
   Scenario: A body that is not JSON is rejected
     When the rail sends the body "not json" with key "t-1"
     Then the request is refused with 400 MALFORMED_REQUEST
+
+  Scenario: An amount with more digits than the ledger can store is rejected
+    When the rail deposits "123456789012345678901" ZAR for "Acme" with key "t-1"
+    Then the request is refused with 400 AMOUNT_TOO_LARGE
+    And "Acme" holds nothing
+
+  Scenario: A deposit that would take the balance past what the ledger can store is refused
+    Given the rail has deposited "99999999999999999999.99" ZAR for "Acme" with key "o1"
+    When the rail deposits "99999999999999999999.99" ZAR for "Acme" with key "o2"
+    Then the request is refused with 422 BALANCE_LIMIT_EXCEEDED
+    And exactly 0 deposits are recorded for "Acme" with key "o2"
+    And "Acme" holds "99999999999999999999.99" ZAR
+    And every journal sums to zero in each currency
+
+  Scenario: A reference containing a control character is rejected
+    When the rail deposits "10.00" ZAR for "Acme" with key "t-1" and a reference containing a NUL character
+    Then the request is refused with 400 VALIDATION_FAILED
+    And the problem names the field "reference"
+    And "Acme" holds nothing
+
+  Scenario: An idempotency key containing a control character is rejected
+    When the rail deposits "10.00" ZAR for "Acme" with a key containing a tab
+    Then the request is refused with 400 VALIDATION_FAILED
+    And the problem names the field "Idempotency-Key"
+    And "Acme" holds nothing
+
+  Scenario: An amount sent as a JSON number is rejected, only a decimal string is accepted
+    When the rail sends an amount of 10.00 as a JSON number for "Acme" with key "t-1"
+    Then the request is refused with 400 VALIDATION_FAILED
+    And the problem names the field "amount"
+    And "Acme" holds nothing
+
+  Scenario Outline: A deposit without a usable merchant id names the field
+    When the rail sends a deposit whose merchantId is "<merchantId>" with key "t-1"
+    Then the request is refused with 400 VALIDATION_FAILED
+    And the problem names the field "merchantId"
+
+    Examples:
+      | merchantId |
+      | null       |
+      | not-a-uuid |

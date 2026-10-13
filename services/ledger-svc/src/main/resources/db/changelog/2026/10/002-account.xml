@@ -24,12 +24,22 @@
     </changeSet>
 
     <changeSet id="002-account-platform-unique" author="ledger-svc">
+        <!-- First applied without this guard on local volumes; ANY keeps those databases starting. -->
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uq_account_platform_currency_type"/></not>
+        </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: createIndex has no WHERE clause; NULL merchant_id escapes the unique constraint -->
         <sql>CREATE UNIQUE INDEX uq_account_platform_currency_type ON account (currency, type) WHERE merchant_id IS NULL;</sql>
         <rollback><dropIndex tableName="account" indexName="uq_account_platform_currency_type"/></rollback>
     </changeSet>
 
     <changeSet id="002-account-checks" author="ledger-svc">
+        <!-- First applied without this guard on local volumes; ANY keeps those databases starting. -->
+        <validCheckSum>ANY</validCheckSum>
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_account_type', 'ck_account_shape')</sqlCheck>
+        </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
         <sql>ALTER TABLE account ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING'));
 ALTER TABLE account ADD CONSTRAINT ck_account_shape CHECK (

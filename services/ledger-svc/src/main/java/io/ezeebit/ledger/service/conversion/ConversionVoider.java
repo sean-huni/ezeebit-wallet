@@ -8,6 +8,7 @@ import io.ezeebit.ledger.domain.JournalStatus;
 import io.ezeebit.ledger.domain.JournalType;
 import io.ezeebit.ledger.domain.MerchantId;
 import io.ezeebit.ledger.exception.ErrorCode;
+import io.ezeebit.ledger.service.idempotency.RequestFingerprint;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,14 +16,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ConversionVoider {
 
-	private final JournalRepo journals;
+	private static final String VOID = "VOID";
 
-	public ConversionVoider(final JournalRepo journals) {
+	private final JournalRepo journals;
+	private final RequestFingerprint fingerprint;
+
+	public ConversionVoider(final JournalRepo journals, final RequestFingerprint fingerprint) {
 		this.journals = journals;
+		this.fingerprint = fingerprint;
 	}
 
 	@Transactional
-	public UUID voidPosting(final MerchantId merchant, final UUID conversionId, final String requestHash) {
+	public UUID voidPosting(final MerchantId merchant, final UUID conversionId) {
+		String requestHash = fingerprint.of(VOID, merchant.value().toString(), conversionId.toString());
 		UUID journalId = UUID.randomUUID();
 		journals.insert(new JournalEntity(journalId, merchant.value(), JournalType.CONVERSION.name(),
 				JournalStatus.VOID.name(), conversionId.toString(), requestHash,

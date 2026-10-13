@@ -7,6 +7,8 @@ import io.ezeebit.ledger.dto.req.VoidReq;
 import io.ezeebit.ledger.dto.resp.ApiResponse;
 import io.ezeebit.ledger.dto.resp.ConversionPostingResp;
 import io.ezeebit.ledger.service.conversion.ConversionPostingService;
+import io.ezeebit.ledger.service.conversion.ConversionVoidService;
+import io.ezeebit.ledger.service.conversion.answer.ConversionPostingReader;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,9 +30,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConversionPostingCtrl {
 
 	private final ConversionPostingService postings;
+	private final ConversionVoidService voids;
+	private final ConversionPostingReader reader;
 
-	public ConversionPostingCtrl(final ConversionPostingService postings) {
+	public ConversionPostingCtrl(final ConversionPostingService postings, final ConversionVoidService voids,
+			final ConversionPostingReader reader) {
 		this.postings = postings;
+		this.voids = voids;
+		this.reader = reader;
 	}
 
 	@Operation(operationId = "postConversion", summary = "Post both legs of a conversion before its deadline",
@@ -46,7 +53,7 @@ public class ConversionPostingCtrl {
 	@GetMapping("/{conversionId}")
 	public ApiResponse<ConversionPostingResp> find(@PathVariable final UUID conversionId,
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @RequestParam final UUID merchantId) {
-		return new ApiResponse<>(postings.find(conversionId, merchantId));
+		return new ApiResponse<>(reader.find(conversionId, merchantId));
 	}
 
 	@Operation(operationId = "voidConversionPosting", summary = "Void a conversion so it can never post",
@@ -55,7 +62,7 @@ public class ConversionPostingCtrl {
 	@ResponseStatus(HttpStatus.CREATED)
 	public ApiResponse<ConversionPostingResp> voidPosting(@PathVariable final UUID conversionId,
 			@Valid @RequestBody final VoidReq request) {
-		return new ApiResponse<>(postings.voidPosting(conversionId, request.merchantId()));
+		return new ApiResponse<>(voids.voidPosting(conversionId, request.merchantId()));
 	}
 
 }

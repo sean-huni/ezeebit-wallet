@@ -17,7 +17,7 @@ Walkthrough video: link to be added.
 | Need | Notes |
 |---|---|
 | JDK 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
-| Docker, running | Postgres and Grafana LGTM for the fleet, and Testcontainers during the build |
+| Docker, running | Postgres and Grafana LGTM for the fleet; Testcontainers and the `checkSecrets` scanners during the build; Paketo image builds |
 | Free ports | 5432 (Postgres), 8089 (WireMock rate service), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888 |
 | zsh, curl | used by `fleet.sh` |
 
@@ -51,7 +51,7 @@ mounts (`docker/wiremock/mappings/`). Run one tier with `./gradlew :services:led
 
 ## Quality gates
 
-`./gradlew build` also runs five static and coverage gates, configured once in the root
+`./gradlew build` also runs five static and coverage gates, plus the secrets scan (see Supply-chain gate), configured once in the root
 `build.gradle` for every service. Tool versions are pinned in `gradle.properties`.
 
 | Tool | Reads | Fails the build when |
@@ -76,6 +76,91 @@ With a token, `sonarAll` runs every service's `check`, then analyses all five as
 each module's compile classpath as `sonar.java.libraries`, the merged JaCoCo report and the
 Checkstyle reports, and waits for the quality gate (`sonar.qualitygate.wait`). `SONAR_HOST_URL` defaults to `http://localhost:9000`; `SONAR_PROJECT_KEY`
 overrides the default key `ezeebit-wallet`.
+
+## Supply-chain gate
+
+Two Gradle tasks, split by cost. Both run the scanners as containers pinned by tag and digest in
+`security/scanners.lock`, the only place a scanner version lives.
+
+| Task | Runs in | Reads | Needs |
+|---|---|---|---|
+| `checkSecrets` | every `./gradlew build` (root `check`) | the git history and the working tree | Docker; no images; under 2 s measured on a warm Gradle daemon |
+| `checkSupplyChain` | only when asked | secrets again, then the five images, their SBOMs and the compose and docker files | `bootBuildImageAll`, which it depends on |
+
+```sh
+./gradlew bootBuildImageAll          # ezeebit/<svc>:0.0.1-SNAPSHOT, one per service, Paketo only
+./gradlew bootBuildImageAll checkSupplyChain
+cat build/reports/supply-chain/console.txt   # the console text, saved as printed
+```
+
+Images come from Spring Boot's `bootBuildImage` with the Paketo builder
+`paketobuildpacks/builder-noble-java-tiny` pinned in `gradle.properties` and `BP_JVM_VERSION=25`;
+the repository has no Dockerfile. They are built for the Docker daemon's architecture.
+
+### What each stage does
+
+| Stage | Instrument | Universe |
+|---|---|---|
+| secrets | gitleaks 8.30.1 `git --log-opts=--all` | every non-merge commit reachable from any ref; the console prints the count gitleaks scanned beside the count git reports, and a mismatch fails |
+| secrets | gitleaks `dir`, then trivy `fs --scanners secret` | tracked files plus untracked files that `.gitignore` does not exclude, copied out first, so `.env` never reaches a scanner |
+| images | trivy 0.74.0 `image --input` on a `docker save` tarball | the OS packages, JRE, buildpack helpers and jars in each image; the scanner gets no Docker socket |
+| sbom | trivy `--format cyclonedx` from the same tarball | one CycloneDX document per image in `build/supply-chain/sbom/` |
+| config | trivy `config` | `compose.yaml`, `docker/` and any tracked `Dockerfile*`; reported, never gating |
+
+Both image scans skip `layers/sbom`, where Paketo stores SBOM documents describing packages that
+already sit in other layers. Read as a second source, they put the buildpack launcher into a layer
+that differs per image and so made it look like this repository's code.
+
+### Reading the console
+
+1. **Stages required by this run.** One line per stage: scanners that recorded a completing exit
+   code, and report files present and non-empty. Anything short of full is `MISSING` and fails the
+   gate: a scanner that never ran must not read as one that found nothing.
+2. **Secrets.** Findings per instrument, as rule, file and line. Values are redacted (`--redact`
+   for gitleaks; trivy masks them) and the console never prints one. Any finding fails.
+3. **Images.** `N images, M layers carried by all N`, then per service the distinct findings in
+   SERVICE layers and in SHARED layers, and how many of them gate. A SHARED layer is one every
+   image carries: the run image, the JRE and the buildpack helpers. Those findings move when the
+   builder pin moves, so they are reported, not gated. A SERVICE layer is one this repository builds
+   (the application and its jars), and only those findings are ours to fix.
+4. **SBOM.** Component count per image.
+5. **Misconfiguration.** Its own universe: checks against files, never vulnerabilities in an image,
+   so its totals must not be added to the image totals.
+6. **Suppressions**, then the verdict.
+
+**The verdict is a three-clause test.** `checkSupplyChain` fails only on a finding that is HIGH or
+CRITICAL **and** has a published fix **and** sits in a SERVICE layer. Everything else is reported.
+`security/trivy-ignore.yaml` starts with no vulnerability entries; an entry without an
+`expired_at` and a `statement` fails the gate.
+
+**State at 2026-10-13 (trivy DB of that day): FAILED, on real findings, nothing suppressed.** Nine
+CVEs meet all three clauses, all in jars that Spring Boot 4.1.1 manages:
+`tomcat-embed-core` 11.0.24 (three CRITICAL, fixed in 11.0.25), `freemarker` 2.3.34 (one CRITICAL,
+eureka-svc only, fixed in 2.3.35), and `jackson-core`/`jackson-databind` 3.1.5 and 2.21.5 (five HIGH,
+fixed in 3.1.7 and 2.21.7). Spring Boot 4.1.1 was the newest 4.1.x on Maven Central that day. The
+fix is a dependency-version change, a separate decision from adding the gate. The SHARED HIGH
+findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers) belong to the
+builder pin. The misconfiguration stage ran, and trivy recognised none of the 11 files as a format
+it checks (it has no compose checks), so it reports zero checks rather than a clean bill.
+
+### SAST and SCA read different things
+
+- **SCA (trivy)** reads the shipped image: jars, OS packages, the JRE, buildpack binaries. It finds
+  **known** CVEs in code nobody here wrote.
+- **SAST (SpotBugs with Find Security Bugs, Checkstyle, SonarQube; see Quality gates)** reads this
+  repository's own code. It finds **unknown** defects that no CVE describes.
+- For secrets, **gitleaks reads git objects and trivy reads files**, so the history is the half
+  trivy cannot see. That is why both run.
+
+Reports land in `build/supply-chain/` (one JSON per scanner plus `status.txt`, one exit code per
+scanner) and the console in `build/reports/supply-chain/console.txt`. Re-render the verdict from
+those files without rescanning:
+
+```sh
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.0.1-SNAPSHOT \
+  OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
+  ./security/scan.sh gate secrets,sbom,images,config
+```
 
 ## Run the fleet
 
@@ -311,6 +396,7 @@ ezeebit-wallet/
 ├── settings.gradle         the five service projects
 ├── gradle.properties       Spring Boot, Spring Cloud and quality-tool versions
 ├── config/                 checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
+├── security/               scanners.lock, trivy-ignore.yaml, scan.sh and report.py: the supply-chain gate
 ├── compose.yaml            Postgres 18.6 (alpine) with both databases; WireMock rate service; Grafana LGTM
 ├── docker/lgtm/            dashboards, alert rules, Slack route, container start script
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair

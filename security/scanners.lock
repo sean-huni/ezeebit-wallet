@@ -1,0 +1,12 @@
+# The supply-chain scanners, pinned by tag AND index digest. security/scan.sh is the only reader and
+# refuses an image reference that is not tag@sha256. Verified 2026-10-13 two ways: the Docker Hub tag
+# API digest and `docker buildx imagetools inspect` agree. Each is the newest release at least two
+# weeks old on its GitHub releases page that day (trivy 0.75.0, 12 days old, was passed over).
+TRIVY_IMAGE=aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+GITLEAKS_IMAGE=zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+# The vulnerability databases change daily, so a verdict is reproducible in its tooling and not in its
+# data. The DB date is printed beside every verdict. Cached in this named volume between runs.
+TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2
+TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1
+TRIVY_CACHE_VOLUME=ezeebit-trivy-cache

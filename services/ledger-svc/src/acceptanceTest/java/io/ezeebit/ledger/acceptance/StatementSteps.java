@@ -90,7 +90,7 @@ public class StatementSteps {
 		readsInPages(merchant, currency, 500);
 		BigDecimal sum = pagedLines.stream().map(line -> new BigDecimal((String) line.get("amount")))
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
-		Reply balances = ledger.get("/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
+		Reply balances = ledger.get("/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
 		List<String> held = balances.read("$.data[?(@.currency == '%s')].balance".formatted(currency));
 		assertThat(new BigDecimal(held.getFirst())).isEqualByComparingTo(sum);
 	}
@@ -100,7 +100,7 @@ public class StatementSteps {
 	}
 
 	private String path(final String merchant) {
-		return "/api/v1/merchants/%s/entries".formatted(state.merchant(merchant));
+		return "/v1/merchants/%s/entries".formatted(state.merchant(merchant));
 	}
 
 	private static List<Map<String, String>> project(final List<Map<String, Object>> lines) {

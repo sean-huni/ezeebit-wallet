@@ -14,6 +14,7 @@ public enum ErrorCode {
 	AMOUNT_TOO_LARGE("error.amount.too.large", 400),
 	AMOUNT_TOO_SMALL("error.amount.too.small", 400),
 	UNSUPPORTED_API_VERSION("error.api.version.unsupported", 400),
+	GATEWAY_REQUIRED("error.gateway.required", 403),
 	NOT_FOUND("error.not.found", 404),
 	QUOTE_NOT_FOUND("error.quote.not.found", 404),
 	CONVERSION_NOT_FOUND("error.conversion.not.found", 404),

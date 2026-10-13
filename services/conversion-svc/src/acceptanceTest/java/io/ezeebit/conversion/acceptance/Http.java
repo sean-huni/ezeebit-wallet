@@ -38,6 +38,8 @@ public class Http {
 		long start = System.nanoTime();
 		RestClient.RequestBodySpec request = client.method(org.springframework.http.HttpMethod.valueOf(method))
 				.uri(URI.create(url));
+		// Every call arrives as if through the gateway; GatewayProofIT covers the calls that do not.
+		request = request.header("X-Ezeebit-Gateway", environment.getRequiredProperty("ezeebit.gateway.shared-secret"));
 		if (key != null) {
 			request = request.header("Idempotency-Key", key);
 		}

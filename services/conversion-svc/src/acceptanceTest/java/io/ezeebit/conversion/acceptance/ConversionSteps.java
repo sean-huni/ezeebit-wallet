@@ -45,7 +45,7 @@ public class ConversionSteps {
 
 	@When("{string} looks up a conversion that does not exist")
 	public void unknown(final String merchant) {
-		state.record(http.conversion("GET", "/api/v1/merchants/%s/conversions/%s".formatted(state.merchant(merchant),
+		state.record(http.conversion("GET", "/v1/merchants/%s/conversions/%s".formatted(state.merchant(merchant),
 				UUID.randomUUID()), null, null));
 	}
 
@@ -80,7 +80,7 @@ public class ConversionSteps {
 
 	@Then("the statement of {string} shows the conversion of quote {string} at exactly the quoted amounts")
 	public void statementShowsQuotedAmounts(final String merchant, final String quote) {
-		Reply statement = http.ledger("GET", "/api/v1/merchants/%s/entries".formatted(state.merchant(merchant)), null, null);
+		Reply statement = http.ledger("GET", "/v1/merchants/%s/entries".formatted(state.merchant(merchant)), null, null);
 		List<Map<String, Object>> lines = statement.read("$.data.entries[?(@.type == 'CONVERSION')]");
 		Reply offered = state.quote(quote);
 		assertThat(lines).hasSize(2);
@@ -92,7 +92,7 @@ public class ConversionSteps {
 	}
 
 	Reply accept(final String merchant, final String quote, final String key) {
-		Reply reply = http.conversion("POST", "/api/v1/merchants/%s/conversions".formatted(state.merchant(merchant)), key,
+		Reply reply = http.conversion("POST", "/v1/merchants/%s/conversions".formatted(state.merchant(merchant)), key,
 				"{\"quoteId\":\"%s\"}".formatted(state.quoteId(quote)));
 		remember(reply, state.merchant(merchant));
 		return reply;
@@ -107,7 +107,7 @@ public class ConversionSteps {
 	}
 
 	private void shows(final String conversionId, final String status, final String reason) {
-		Reply reply = http.conversion("GET", "/api/v1/merchants/%s/conversions/%s".formatted(state.merchantOf(conversionId),
+		Reply reply = http.conversion("GET", "/v1/merchants/%s/conversions/%s".formatted(state.merchantOf(conversionId),
 				conversionId), null, null);
 		assertThat(reply.status()).as(reply.body()).isEqualTo(200);
 		assertThat(reply.<String>read("$.data.status")).isEqualTo(status);

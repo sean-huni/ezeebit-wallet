@@ -116,7 +116,7 @@ public class QuoteSteps {
 	}
 
 	private void ask(final String merchant, final String name, final String body) {
-		Reply reply = http.conversion("POST", "/api/v1/merchants/%s/quotes".formatted(state.merchant(merchant)), null, body);
+		Reply reply = http.conversion("POST", "/v1/merchants/%s/quotes".formatted(state.merchant(merchant)), null, body);
 		state.record(reply);
 		state.quoted(name, reply);
 	}

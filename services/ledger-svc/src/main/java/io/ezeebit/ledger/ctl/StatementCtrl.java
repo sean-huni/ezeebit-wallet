@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/{version}/merchants/{merchantId}/entries")
+@RequestMapping("/{version:v\\d+}/merchants/{merchantId}/entries")
 public class StatementCtrl {
 
 	private final StatementService statements;

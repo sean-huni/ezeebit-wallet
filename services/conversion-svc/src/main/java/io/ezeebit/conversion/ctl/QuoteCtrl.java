@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // No Idempotency-Key: a quote moves no money and is cheap to repeat.
 @RestController
-@RequestMapping("/api/{version}/merchants/{merchantId}/quotes")
+@RequestMapping("/{version:v\\d+}/merchants/{merchantId}/quotes")
 public class QuoteCtrl {
 
 	private final QuoteService quotes;

@@ -11,6 +11,7 @@ public enum ErrorCode {
 	AMOUNT_NOT_POSITIVE("error.amount.not.positive", 400),
 	AMOUNT_TOO_LARGE("error.amount.too.large", 400),
 	UNSUPPORTED_API_VERSION("error.api.version.unsupported", 400),
+	GATEWAY_REQUIRED("error.gateway.required", 403),
 	NOT_FOUND("error.not.found", 404),
 	POSTING_NOT_FOUND("error.posting.not.found", 404),
 	METHOD_NOT_ALLOWED("error.method.not.allowed", 405),

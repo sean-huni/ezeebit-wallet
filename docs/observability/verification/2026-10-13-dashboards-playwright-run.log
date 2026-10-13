@@ -1,67 +1,67 @@
-# node 2026-10-13-dashboards-playwright.mjs, 2026-10-13T13:45:24Z capture of the run that produced out/; exit 0
-ok   traffic  driven  {"deposit 201":4,"deposit replay 201":4,"deposit refused 400":1,"quote ZAR/USDT 201":3,"conversion ZAR/USDT 201 COMPLETED":3,"quote ZAR/USDC 201":3,"conversion ZAR/USDC 201 COMPLETED":3,"quote NGN/USDT 201":3,"conversion NGN/USDT 201 COMPLETED":3,"quote KES/USDC 201":3,"conversion KES/USDC 201 COMPLETED":3,"probe quote 201":1,"probe conversion 201":1,"quote ZAR/NGN unsupported 400":1,"conversion insufficient funds 422 INSUFFICIENT_FUNDS":1,"probe quote USDT/ZAR stale rate 502":1,"balances burst 200":103,"balances burst 429":77}
-ok   prometheus  one series per JVM  {"config-svc":1,"eureka-svc":1,"gateway-svc":1,"conversion-svc":1,"ledger-svc":1}
-ok   tempo  one trace spans three services  53934025271a8d003ba480d4a905445b: 8 spans from conversion-svc, gateway-svc, ledger-svc; http post | rate limit | http post /api/v1/merchants/*/conversions/** | ledger posting | http post /internal/{version}/conversion-postings | http post | conversion accept | http post /{version:v\d+}/merchants/{merchantId}/conversions
-ok   tempo  business span 'rate limit' in the trace  53934025271a8d003ba480d4a905445b
-ok   tempo  business span 'conversion accept' in the trace  53934025271a8d003ba480d4a905445b
-ok   tempo  business span 'ledger posting' in the trace  53934025271a8d003ba480d4a905445b
-ok   loki+tempo  20 random request-path log lines resolve to their span in Tempo  20 of 20 (universe: 200 lines with a trace_id in the last 10 min)
+# node 2026-10-13-dashboards-playwright.mjs, run that produced docs/observability/evidence/ (results.json at 2026-10-13T14:12:55Z); exit 0
+ok   traffic  driven  {"deposit 201":4,"deposit replay 201":4,"deposit refused 400":1,"quote ZAR/USDT 201":3,"conversion ZAR/USDT 201 COMPLETED":3,"quote ZAR/USDC 201":3,"conversion ZAR/USDC 201 COMPLETED":3,"quote NGN/USDT 201":3,"conversion NGN/USDT 201 COMPLETED":3,"quote KES/USDC 201":3,"conversion KES/USDC 201 COMPLETED":3,"probe quote 201":1,"probe conversion 201":1,"quote ZAR/NGN unsupported 400":1,"conversion insufficient funds 422 INSUFFICIENT_FUNDS":1,"probe quote USDT/ZAR stale rate 502":1,"balances burst 200":102,"balances burst 429":78}
+ok   prometheus  one series per JVM  {"config-svc":1,"eureka-svc":1,"ledger-svc":1,"conversion-svc":1,"gateway-svc":1}
+ok   tempo  one trace spans three services  fcc2e6ced20cfdcbab357acaa34bf6a2: 8 spans from conversion-svc, gateway-svc, ledger-svc; rate limit | http post /api/v1/merchants/*/conversions/** | http post | http post /{version:v\d+}/merchants/{merchantId}/conversions | http post | conversion accept | http post /internal/{version}/conversion-postings | ledger posting
+ok   tempo  business span 'rate limit' in the trace  fcc2e6ced20cfdcbab357acaa34bf6a2
+ok   tempo  business span 'conversion accept' in the trace  fcc2e6ced20cfdcbab357acaa34bf6a2
+ok   tempo  business span 'ledger posting' in the trace  fcc2e6ced20cfdcbab357acaa34bf6a2
+ok   loki+tempo  20 random request-path log lines resolve to their span in Tempo  20 of 20 (universe: 132 lines with a trace_id in the last 10 min)
 ok   loki  the probe conversion's own log lines carry its trace id  ledger-svc: conversion post POSTED | conversion-svc: conversion accepted for ZAR/USDT: COMPLETED
-ok   prometheus  latency exemplars carry a trace_id Tempo resolves  2707a598e0d36c549bdd952980fb7835
+ok   prometheus  latency exemplars carry a trace_id Tempo resolves  7bb2388d37f19dddd9a6501ab7ff3d68
 ok   ezeebit-fleet-desktop  scrolled inside the Grafana pane  div 756/2297px: 4 viewport captures, each step moved
-ok   ezeebit-fleet desktop  captures are not blank  4 shots, smallest 165367 bytes
+ok   ezeebit-fleet desktop  captures are not blank  4 shots, smallest 167327 bytes
 ok   ezeebit-fleet desktop  content floor  19 panels seen while scrolling, 0 empty, 25 datasource requests
 ok   ezeebit-money-desktop  scrolled inside the Grafana pane  div 756/1879px: 3 viewport captures, each step moved
-ok   ezeebit-money desktop  captures are not blank  3 shots, smallest 166405 bytes
-ok   ezeebit-money desktop  content floor  13 panels seen while scrolling, 1 empty (Sweeper actions), 35 datasource requests
+ok   ezeebit-money desktop  captures are not blank  3 shots, smallest 158778 bytes
+ok   ezeebit-money desktop  content floor  13 panels seen while scrolling, 1 empty (Sweeper actions), 30 datasource requests
 ok   ezeebit-traces-desktop  scrolled inside the Grafana pane  div 756/1918px: 3 viewport captures, each step moved
-ok   ezeebit-traces desktop  captures are not blank  3 shots, smallest 126621 bytes
+ok   ezeebit-traces desktop  captures are not blank  3 shots, smallest 124005 bytes
 ok   ezeebit-traces desktop  content floor  6 panels seen while scrolling, 0 empty, 17 datasource requests
 ok   ezeebit-logs-desktop  scrolled inside the Grafana pane  div 756/1271px: 2 viewport captures, each step moved
-ok   ezeebit-logs desktop  captures are not blank  2 shots, smallest 198668 bytes
+ok   ezeebit-logs desktop  captures are not blank  2 shots, smallest 196045 bytes
 ok   ezeebit-logs desktop  content floor  3 panels seen while scrolling, 0 empty, 7 datasource requests
 ok   ezeebit-alerts-desktop  scrolled inside the Grafana pane  div 756/1309px: 2 viewport captures, each step moved
-ok   ezeebit-alerts desktop  captures are not blank  2 shots, smallest 115194 bytes
+ok   ezeebit-alerts desktop  captures are not blank  2 shots, smallest 111961 bytes
 ok   ezeebit-alerts desktop  content floor  11 panels seen while scrolling, 2 empty (LatencySLOBurn; LedgerInvariantBroken), 18 datasource requests
 ok   ezeebit-fleet-mobile  scrolled inside the Grafana pane  document 844/6227px: 9 viewport captures, each step moved
-ok   ezeebit-fleet mobile  captures are not blank  9 shots, smallest 135553 bytes
+ok   ezeebit-fleet mobile  captures are not blank  9 shots, smallest 134895 bytes
 ok   ezeebit-fleet mobile  content floor  19 panels seen while scrolling, 0 empty, 26 datasource requests
 ok   ezeebit-money-mobile  scrolled inside the Grafana pane  document 844/4527px: 7 viewport captures, each step moved
-ok   ezeebit-money mobile  captures are not blank  7 shots, smallest 125578 bytes
-ok   ezeebit-money mobile  content floor  13 panels seen while scrolling, 1 empty (Sweeper actions), 25 datasource requests
+ok   ezeebit-money mobile  captures are not blank  7 shots, smallest 124978 bytes
+ok   ezeebit-money mobile  content floor  13 panels seen while scrolling, 1 empty (Sweeper actions), 29 datasource requests
 ok   ezeebit-traces-mobile  scrolled inside the Grafana pane  document 844/2748px: 4 viewport captures, each step moved
-ok   ezeebit-traces mobile  captures are not blank  4 shots, smallest 122686 bytes
-ok   ezeebit-traces mobile  content floor  6 panels seen while scrolling, 0 empty, 16 datasource requests
+ok   ezeebit-traces mobile  captures are not blank  4 shots, smallest 123011 bytes
+ok   ezeebit-traces mobile  content floor  6 panels seen while scrolling, 0 empty, 14 datasource requests
 ok   ezeebit-logs-mobile  scrolled inside the Grafana pane  document 844/1695px: 3 viewport captures, each step moved
-ok   ezeebit-logs mobile  captures are not blank  3 shots, smallest 139621 bytes
+ok   ezeebit-logs mobile  captures are not blank  3 shots, smallest 141275 bytes
 ok   ezeebit-logs mobile  content floor  3 panels seen while scrolling, 0 empty, 9 datasource requests
 ok   ezeebit-alerts-mobile  scrolled inside the Grafana pane  document 844/3737px: 6 viewport captures, each step moved
-ok   ezeebit-alerts mobile  captures are not blank  6 shots, smallest 63724 bytes
+ok   ezeebit-alerts mobile  captures are not blank  6 shots, smallest 64993 bytes
 ok   ezeebit-alerts mobile  content floor  11 panels seen while scrolling, 2 empty (LatencySLOBurn; LedgerInvariantBroken), 15 datasource requests
 ok   ezeebit-fleet  time picker re-queries the new window  median span 1800s -> 300s over 14 requests
 ok   ezeebit-money  time picker re-queries the new window  median span 1800s -> 300s over 17 requests
 ok   ezeebit-traces  time picker re-queries the new window  median span 1800s -> 300s over 9 requests
-ok   ezeebit-logs  time picker re-queries the new window  median span 1801.217s -> 300.032s over 6 requests
+ok   ezeebit-logs  time picker re-queries the new window  median span 1801.204s -> 300.022s over 6 requests
 ok   ezeebit-alerts  time picker re-queries the new window  median span 1800s -> 300s over 6 requests
 ok   ezeebit-fleet  variable service reaches the datasource  36 of 42 expressions carry conversion-svc
 ok   ezeebit-fleet  variable interval reaches the datasource  24 of 42 expressions carry [5m]
 ok   ezeebit-money  variable currency reaches the datasource  4 of 34 expressions carry ZAR
-ok   ezeebit-money  variable pair reaches the datasource  10 of 30 expressions carry ZAR/USDT
+ok   ezeebit-money  variable pair reaches the datasource  12 of 34 expressions carry ZAR/USDT
 ok   ezeebit-money  variable outcome reaches the datasource  20 of 34 expressions carry issued
-ok   ezeebit-money  variable interval reaches the datasource  32 of 34 expressions carry [5m]
+ok   ezeebit-money  variable interval reaches the datasource  10 of 30 expressions carry [5m]
 ok   ezeebit-traces  variable service reaches the datasource  10 of 40 expressions carry conversion-svc
-ok   ezeebit-traces  variable trace_id reaches the datasource  2 of 26 expressions carry 53934025271a8d003ba480d4a905445b
+ok   ezeebit-traces  variable trace_id reaches the datasource  2 of 26 expressions carry fcc2e6ced20cfdcbab357acaa34bf6a2
 ok   ezeebit-traces  variable min_duration reaches the datasource  2 of 40 expressions carry 7ms
 ok   ezeebit-traces  variable interval reaches the datasource  3 of 40 expressions carry [5m]
 ok   ezeebit-logs  variable service reaches the datasource  7 of 7 expressions carry conversion-svc
 ok   ezeebit-logs  variable level reaches the datasource  7 of 7 expressions carry warn
-ok   ezeebit-logs  variable search reaches the datasource  5 of 5 expressions carry quote issued
-ok   ezeebit-logs  variable trace_id reaches the datasource  6 of 7 expressions carry 53934025271a8d003ba480d4a905445b
+ok   ezeebit-logs  variable search reaches the datasource  7 of 7 expressions carry quote issued
+ok   ezeebit-logs  variable trace_id reaches the datasource  6 of 7 expressions carry fcc2e6ced20cfdcbab357acaa34bf6a2
 ok   fleet  data link lands on Logs for the service, window kept  /d/ezeebit-logs/logs?var-service=gateway-svc&from=now-15m&to=now&timezone=browser&var-level=$__all&var-search=&var-trace_id=.%2A&refresh=10s
 ok   fleet  the landed Logs board queries that service  2 expressions carry gateway-svc
 ok   fleet  dashboard link keeps time and service  /d/ezeebit-traces/traces?from=now-15m&to=now&timezone=browser&var-service=ledger-svc&var-interval=1m&var-trace_id=&var-min_duration=100ms&refresh=10s
-ok   logs  trace_id opens the trace in Tempo  53934025271a8d003ba480d4a905445b -> /explore?schemaVersion=1&panes={"t4i":{"datasource":"tempo","queries":[{"query":"53934025271a8d003ba480d4a905445b","queryType":"traceql","datasource":{"type":"t
+ok   logs  trace_id opens the trace in Tempo  fcc2e6ced20cfdcbab357acaa34bf6a2 -> /explore?schemaVersion=1&panes={"oa1":{"datasource":"tempo","queries":[{"query":"fcc2e6ced20cfdcbab357acaa34bf6a2","queryType":"traceql","datasource":{"type":"t
 ok   logs  the opened trace shows its services  gateway-svc and conversion-svc rendered
-ok   traces  trace view shows spans from three services  53934025271a8d003ba480d4a905445b: gateway-svc, conversion-svc, ledger-svc
-ok   alerts  alert state changes are annotations on the Alerts dashboard  28 stored, 1 annotation requests from the page; states Normal (NoData), Normal, Pending
+ok   traces  trace view shows spans from three services  fcc2e6ced20cfdcbab357acaa34bf6a2: gateway-svc, conversion-svc, ledger-svc
+ok   alerts  alert state changes are annotations on the Alerts dashboard  48 stored, 1 annotation requests from the page; states Normal, Pending, Normal (NoData)
 suite: 65 passed, 0 failed

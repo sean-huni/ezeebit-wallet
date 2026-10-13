@@ -424,15 +424,16 @@ def fleet():
                                                        "1": {"text": "UP", "color": "green"}}}],
                steps=[{"color": "red", "value": None}, {"color": "green", "value": 1}], text_mode="value"), 5, 8)
     b.row("Database pool (Hikari)")
-    b.add(timeseries("Connections in use, idle and waiting", "Per JVM. 'waiting' is threads blocked on the pool: "
+    b.add(timeseries("Connections in use, idle and waiting", "Per service, each JVM's last value in 30s, so a restarted "
+                     "JVM's old series drops out. 'waiting' is threads blocked on the pool: "
                      "DbPoolSaturated fires while it stays above 0. Only ledger-svc and conversion-svc have a database.",
-                     [prom(f"sum by (job) (hikaricp_connections_active{{{SEL}}})", "{{job}} active"),
-                      prom(f"sum by (job) (hikaricp_connections_idle{{{SEL}}})", "{{job}} idle"),
-                      prom(f"sum by (job) (hikaricp_connections_pending{{{SEL}}})", "{{job}} waiting")], "short",
+                     [prom(f"sum by (job) (last_over_time(hikaricp_connections_active{{{SEL}}}[30s]))", "{{job}} active"),
+                      prom(f"sum by (job) (last_over_time(hikaricp_connections_idle{{{SEL}}}[30s]))", "{{job}} idle"),
+                      prom(f"sum by (job) (last_over_time(hikaricp_connections_pending{{{SEL}}}[30s]))", "{{job}} waiting")], "short",
                      SERVICE_LINKS), 8, 8)
     b.add(timeseries("Pool utilisation", "Connections in use as a share of the pool's maximum (10 by default).",
-                     [prom(f"sum by (job) (hikaricp_connections_active{{{SEL}}}) / sum by (job) "
-                           f"(hikaricp_connections_max{{{SEL}}})", "{{job}}")], "percentunit", SERVICE_LINKS,
+                     [prom(f"sum by (job) (last_over_time(hikaricp_connections_active{{{SEL}}}[30s])) / sum by (job) "
+                           f"(last_over_time(hikaricp_connections_max{{{SEL}}}[30s]))", "{{job}}")], "percentunit", SERVICE_LINKS,
                      thresholds=0.9, min_max=(0, 1)), 8, 8)
     b.add(timeseries("Connection acquire p95 and timeouts", "Time to get a connection from the pool, and connections "
                      "that timed out (each one a failed request). Timeouts empty is the healthy state.",
@@ -442,8 +443,8 @@ def fleet():
     b.row("JVM")
     b.add(timeseries("Heap used and committed", "Heap in use per service against what the JVM has committed. The "
                      "maximum is left out: on this laptop it is a quarter of RAM and flattens every line.",
-                     [prom(f'sum by (job) (jvm_memory_used_bytes{{{SEL}, area="heap"}})', "{{job}} used"),
-                      prom(f'sum by (job) (jvm_memory_committed_bytes{{{SEL}, area="heap"}})', "{{job}} committed")], "bytes",
+                     [prom(f'sum by (job) (last_over_time(jvm_memory_used_bytes{{{SEL}, area="heap"}}[30s]))', "{{job}} used"),
+                      prom(f'sum by (job) (last_over_time(jvm_memory_committed_bytes{{{SEL}, area="heap"}}[30s]))', "{{job}} committed")], "bytes",
                      SERVICE_LINKS), 8, 8)
     b.add(timeseries("GC pause time per second", "Seconds spent paused for garbage collection per second of wall time.",
                      [prom(f"sum by (job) (rate(jvm_gc_pause_milliseconds_sum{{{SEL}}}{WINDOW})) / 1000", "{{job}}")],

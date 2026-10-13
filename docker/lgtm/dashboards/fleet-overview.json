@@ -1056,7 +1056,7 @@
     {
       "type": "timeseries",
       "title": "Connections in use, idle and waiting",
-      "description": "Per JVM. 'waiting' is threads blocked on the pool: DbPoolSaturated fires while it stays above 0. Only ledger-svc and conversion-svc have a database.",
+      "description": "Per service, each JVM's last value in 30s, so a restarted JVM's old series drops out. 'waiting' is threads blocked on the pool: DbPoolSaturated fires while it stays above 0. Only ledger-svc and conversion-svc have a database.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1068,7 +1068,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (hikaricp_connections_active{job=~\"$service\"})",
+          "expr": "sum by (job) (last_over_time(hikaricp_connections_active{job=~\"$service\"}[30s]))",
           "legendFormat": "{{job}} active",
           "range": true
         },
@@ -1078,7 +1078,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (hikaricp_connections_idle{job=~\"$service\"})",
+          "expr": "sum by (job) (last_over_time(hikaricp_connections_idle{job=~\"$service\"}[30s]))",
           "legendFormat": "{{job}} idle",
           "range": true
         },
@@ -1088,7 +1088,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (hikaricp_connections_pending{job=~\"$service\"})",
+          "expr": "sum by (job) (last_over_time(hikaricp_connections_pending{job=~\"$service\"}[30s]))",
           "legendFormat": "{{job}} waiting",
           "range": true
         }
@@ -1153,7 +1153,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (hikaricp_connections_active{job=~\"$service\"}) / sum by (job) (hikaricp_connections_max{job=~\"$service\"})",
+          "expr": "sum by (job) (last_over_time(hikaricp_connections_active{job=~\"$service\"}[30s])) / sum by (job) (last_over_time(hikaricp_connections_max{job=~\"$service\"}[30s]))",
           "legendFormat": "{{job}}",
           "range": true
         }
@@ -1324,7 +1324,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (jvm_memory_used_bytes{job=~\"$service\", area=\"heap\"})",
+          "expr": "sum by (job) (last_over_time(jvm_memory_used_bytes{job=~\"$service\", area=\"heap\"}[30s]))",
           "legendFormat": "{{job}} used",
           "range": true
         },
@@ -1334,7 +1334,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (jvm_memory_committed_bytes{job=~\"$service\", area=\"heap\"})",
+          "expr": "sum by (job) (last_over_time(jvm_memory_committed_bytes{job=~\"$service\", area=\"heap\"}[30s]))",
           "legendFormat": "{{job}} committed",
           "range": true
         }

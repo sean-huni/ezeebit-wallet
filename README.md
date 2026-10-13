@@ -205,7 +205,7 @@ ezeebit-wallet/
 ├── security/               scanners.lock, trivy-ignore.yaml, scan.sh and report.py: the supply-chain gate
 ├── .circleci/config.yml    the CI job: the same Gradle commands as a laptop
 ├── compose.yaml            Postgres 18.6 (alpine) with both databases; WireMock rate service; Redis 8.10 (alpine); Grafana LGTM
-├── docker/lgtm/            dashboards, alert rules, Slack route, container start script
+├── docker/lgtm/            generate.py (dashboards and alert rules), datasources, promtool tests, Slack route, start script
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
 ├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
 ├── observability/          OTLP settings, logback appender wiring; compiled into every service
@@ -328,5 +328,6 @@ Run state (pids and logs) lives in `.fleet/`, which is gitignored.
 - [docs/quality-gates.md](docs/quality-gates.md): test tiers, SAST and coverage.
 - [docs/supply-chain.md](docs/supply-chain.md): secrets, images, SBOMs, how to read the console.
 - [docs/ci.md](docs/ci.md): the CircleCI pipeline (not yet run).
-- [docs/observability.md](docs/observability.md): dashboards, business metrics, alerts, rehearsal
+- [docs/observability.md](docs/observability.md): dashboards, tracing, business metrics, alerts, rehearsal, and the Playwright suite
+- [docs/observability-evidence.md](docs/observability-evidence.md): screenshots of the dashboards, an end-to-end trace, trace-correlated logs and the alerts
   timings.

@@ -1,12 +1,13 @@
 # ezeebit-wallet
 
 Ezeebit backend take-home. The chosen tasks are **Task 1** (hold a merchant's money across
-currencies) and **Task 2** (convert one currency into another). Status: a runnable skeleton. Five
-Spring Boot services build, test, boot, register and route through one gateway, each domain
-service owns its own PostgreSQL database, and Liquibase runs on boot. The business endpoints
-(internal deposits, balances, statement, quotes, conversions) are designed in
-[ARCHITECTURE.md](ARCHITECTURE.md) and **not yet implemented**. Design, trade-offs, the remaining
-tasks and AI usage notes are in [SOLUTION.md](SOLUTION.md).
+currencies) and **Task 2** (convert one currency into another). Status: **Task 1 is built**: the
+ledger takes internal deposits into a double-entry journal and serves balances and a statement
+through the gateway. **Task 2 (quotes, conversions) is designed in
+[ARCHITECTURE.md](ARCHITECTURE.md) and not yet implemented.** Five Spring Boot services build,
+test, boot, register and route through one gateway, and each domain service owns its own
+PostgreSQL database. Design, trade-offs, the remaining tasks and AI usage notes are in
+[SOLUTION.md](SOLUTION.md).
 
 Walkthrough video: link to be added.
 
@@ -28,10 +29,21 @@ Stack: Spring Boot 4.1.1, Spring Cloud 2025.1.3.
 ./gradlew clean build
 ```
 
-Runs 6 tests in 5 suites. The ledger and conversion tests start a `postgres:18.6-alpine`
-container through Testcontainers, so Docker must be running. Tests boot each service alone, with
-the config server and the registry switched off, and with OTLP export switched off (no collector
-is needed).
+`build` runs every tier. ledger-svc has three, wired as a shared convention in the root
+`build.gradle` (a service opts in by being added to its `tieredServices` list):
+
+| Gradle task | Source | What it is | ledger-svc tests |
+|---|---|---|---|
+| `test` | `src/test` | unit tests: domain, mapping, fingerprint, i18n bundle; no Spring context, no Docker | 46 |
+| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), and each DB constraint proven by the row it refuses | 9 |
+| `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real HTTP, some ending in a SQL check that every journal sums to zero | 42 scenarios |
+
+The other four services have one `test` task each (5 tests). Total: 102 tests. The ledger's
+integration and acceptance tiers and the conversion tests start a `postgres:18.6-alpine` container
+through Testcontainers, so Docker must be running. Spring tests run under the `acceptance`
+profile, boot each service alone, with the config server, the registry and OTLP export switched
+off. Run one tier with `./gradlew :services:ledger-svc:acceptanceTest` (or `test`,
+`integrationTest`); Cucumber's own report lands in `services/ledger-svc/build/reports/cucumber/`.
 
 ## Run the fleet
 
@@ -87,14 +99,34 @@ operation is `POST /internal/v1/deposits` on ledger-svc, called by the money-in 
 listener, and is never routed by the gateway. Locally it is exercised against ledger-svc on :8081
 directly.
 
-With the fleet up:
+With the fleet up (merchant ids are UUIDs; amounts are decimal strings):
 
 ```sh
-curl -i localhost:8080/api/v1/merchants/m1/balances      # 404 from ledger-svc: routed, endpoint not built yet
-curl -i localhost:8080/api/v1/merchants/m1/quotes        # 404 from conversion-svc, same reason
-curl -i localhost:8080/internal/v1/deposits              # 404 from the gateway: unrouted
-curl -s localhost:8888/ledger-svc/default                # config that config-svc serves to ledger-svc
+M=4402340a-8ce5-4052-816a-a1ff6170b086
+
+# Deposit (the rail's call, straight to ledger-svc). Same key and body again: 201, identical body, credited once.
+curl -s -X POST localhost:8081/internal/v1/deposits \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: rail-transfer-1' \
+  -d "{\"merchantId\":\"$M\",\"currency\":\"ZAR\",\"amount\":\"1500.00\",\"reference\":\"rail transfer 1\"}"
+
+curl -s localhost:8080/api/v1/merchants/$M/balances                  # {"data":[{"currency":"ZAR","balance":"1500.00"}]}
+curl -s "localhost:8080/api/v1/merchants/$M/entries?currency=ZAR"    # statement, each entry with balanceAfter
+curl -i localhost:8080/api/v1/merchants/$M/quotes                    # 404 from conversion-svc: Task 2 not built
+curl -i localhost:8080/internal/v1/deposits                          # 404 from the gateway: unrouted
+curl -s localhost:8888/ledger-svc/default                            # config that config-svc serves to ledger-svc
 ```
+
+Ledger answers and errors:
+
+| Call | Success | Errors (RFC 9457 problem detail with a stable `code`) |
+|---|---|---|
+| `POST /internal/v1/deposits` | 201 `{"data":{journalId, merchantId, currency, amount, balanceAfter, reference, created}}`; a replay returns the same body | 400 `AMOUNT_SCALE_EXCEEDED`, `AMOUNT_NOT_POSITIVE`, `AMOUNT_TOO_LARGE`, `UNKNOWN_CURRENCY`, `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED` (with `errors[]` naming the field: a missing or non-UUID `merchantId`, an `amount` sent as a JSON number, a control character in `reference` or `Idempotency-Key`), `MALFORMED_REQUEST` (not JSON); 422 `IDEMPOTENCY_KEY_REUSED`, `BALANCE_LIMIT_EXCEEDED` (the balance would pass 20 digits before the point) |
+| `GET /api/v1/merchants/{id}/balances` | 200 `{"data":[{currency, balance}]}`, empty for a merchant that never received money | 400 `VALIDATION_FAILED` (id not a UUID) |
+| `GET /api/v1/merchants/{id}/entries?currency=&from=&to=&limit=&after=` | 200 `{"data":{entries:[...], nextCursor}}`; `from` inclusive, `to` exclusive (ISO-8601, years 1970 to 9999, `from` before `to`), `limit` 1 to 500 (default 100), pass `nextCursor` back as `after` | 400 `UNKNOWN_CURRENCY`, `VALIDATION_FAILED` (with `errors[]`) |
+
+Amounts with more decimals than the currency allows (ZAR, NGN, KES: 2; USDT, USDC: 6) are
+refused, never rounded. An unsupported version on ledger-svc itself (`/api/v2/...`) is 400
+`UNSUPPORTED_API_VERSION`; through the gateway it is 404, because the route table publishes v1 only.
 
 Stop a domain service (`kill $(cat .fleet/conversion-svc.pid)`) and its routes answer **503**
 from the gateway instead of 500, whether the service has left the registry or is still listed but
@@ -188,7 +220,7 @@ ezeebit-wallet/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry
     ├── gateway-svc/        edge routing; api/advice/UpstreamUnavailableAdvice maps upstream failures to 503/504
-    ├── ledger-svc/         Task 1; db/changelog/db.changelog-master.xml (no changesets yet)
+    ├── ledger-svc/         Task 1; changesets in db/changelog/2026/10/; src/acceptanceTest holds the Spring and Cucumber tiers
     └── conversion-svc/     Task 2; db/changelog/db.changelog-master.xml (no changesets yet)
 ```
 
@@ -213,5 +245,5 @@ Run state (pids and logs) lives in `.fleet/`, which is gitignored.
 
 ## Not here yet
 
-The business endpoints and their database schema. Designs are in
+Task 2 (quotes and conversions) and the ledger's conversion posting endpoints. Designs are in
 [ARCHITECTURE.md](ARCHITECTURE.md); the plan for the rest is in [SOLUTION.md](SOLUTION.md).

@@ -18,8 +18,8 @@ auto-settlement (Task 5) is a conversion triggered by a deposit, and payout rout
 behind the withdrawal. If the ledger and conversion are right, the other four are mostly plumbing
 around them. If they are wrong, nothing built on top can be trusted.
 
-**Status in this repository: a runnable skeleton with the design written down. The business
-endpoints are designed, not implemented.**
+**Status in this repository: Task 1 (the ledger) is built and tested. Task 2 (conversion) is
+designed, not implemented.**
 
 What exists and is verified:
 
@@ -28,8 +28,16 @@ What exists and is verified:
   `eureka-svc` (8761).
 - One PostgreSQL 18.6 (Alpine) container with a separate database and owning role per domain
   service (`ledger`, `conversion`), with `CONNECT` revoked from `PUBLIC`, so neither role can
-  even connect to the other's database. Liquibase runs on boot in both; the changelogs hold no
-  changesets yet.
+  even connect to the other's database. Liquibase runs on boot in both; only the ledger has
+  changesets so far.
+- **The Task 1 ledger.** `POST /internal/v1/deposits` (Idempotency-Key required) posts a
+  balanced journal: merchant account `+X`, platform deposit clearing `-X`, in one transaction,
+  with `balance_after` on the merchant entry. `GET /api/v1/merchants/{id}/balances` and
+  `GET /api/v1/merchants/{id}/entries` (the statement) are served through the gateway. Five
+  currencies (ZAR, NGN, KES at 2 decimals; USDT, USDC at 6); an amount with more decimals than its
+  currency allows is refused, never rounded. A replayed deposit returns the identical answer and
+  credits once; the same key with a different body is 422. The database refuses an entry whose
+  currency differs from its account's, and a negative merchant balance.
 - The gateway's published route table: balances and entries route to the ledger; quotes and
   conversions route to conversion; `/internal/**` is never routed. Deposits are internal
   (`POST /internal/v1/deposits`, called by the money-in rail), so a merchant cannot credit itself.
@@ -39,14 +47,19 @@ What exists and is verified:
 - Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
   service, four provisioned dashboards, two alert rules with optional Slack delivery.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 5 test suites, 6 tests, 0 failures. The ledger and conversion
-  tests boot against a real Postgres via Testcontainers, so Docker is required for the build.
+- `./gradlew clean build` passes: 102 tests, 0 failures. The ledger runs three tiers: 46 unit tests
+  (no Spring, no Docker), 9 Spring integration tests and 42 Cucumber acceptance scenarios over
+  real HTTP, both on Testcontainers Postgres. The three 500s a review reached (a balance past the
+  column's 20 digits, a NUL in `reference`, a statement window outside timestamptz's range) are
+  now refused with 422 or 400, each by a scenario first seen failing. They include 50 concurrent deposits summing exactly
+  and 20 concurrent copies of one deposit crediting once. Each concurrency, idempotency and
+  currency-integrity test was seen failing with its control removed (row lock, unique constraint,
+  composite foreign key, request-hash check) before it was trusted.
 
-What does not exist yet: the deposit, balance, statement, quote and conversion endpoints, their
-tables, and their tests. Calling `/api/v1/merchants/{id}/balances` through the gateway today
-returns 404 from the ledger service (it is up, the endpoint is not built). I chose to spend the
-time box on getting the money model and its failure behaviour right on paper, plus a skeleton
-that the implementation drops into, rather than on a rushed implementation.
+What does not exist yet: the quote and conversion endpoints, their tables and tests, and the
+ledger's conversion-posting endpoints (Task 2). Where the built ledger departs from or adds to the
+design (an `entry.seq` ordering column, seeded clearing accounts, how the request hash is taken,
+the `{"data": ...}` envelope), ARCHITECTURE.md section 4, "As built", lists it.
 
 ## 2. Design on one page
 
@@ -187,12 +200,13 @@ service becomes a profile and KYC context once authentication exists.
 
 In order:
 
-1. **Implement the designed endpoints:** the ledger tables and Liquibase changesets, deposit,
-   balances, statement, the internal conversion posting, then quote and accept.
-2. **A concurrency test:** N parallel debits against one account, asserting that exactly
-   `floor(balance / amount)` succeed and the balance never goes below zero.
-3. **Idempotency tests:** same key and same body replays; same key and a different body is a 422;
-   a retried conversion after a ledger timeout posts once.
+1. **Implement Task 2:** the ledger's internal conversion posting, then quote and accept. (The
+   ledger's tables, deposit, balances and statement are done.)
+2. **A debit concurrency test:** N parallel debits against one account, asserting that exactly
+   `floor(balance / amount)` succeed and the balance never goes below zero. (Concurrent deposits
+   are tested; there are no debits until Task 2.)
+3. **Conversion idempotency tests:** a retried conversion after a ledger timeout posts once.
+   (Deposit replay and same-key-different-body are tested.)
 4. **A rate service stub** for local runs and tests, including slow, stale and wildly wrong rates,
    so the failure paths are exercised and not only described.
 5. **A stale-conversion sweeper** that resolves conversions left `PENDING` by a ledger timeout,

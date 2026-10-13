@@ -63,6 +63,11 @@ public class ConversionPostingSteps {
 		state.record(ledger.get("%s/%s".formatted(POSTINGS, state.conversion(conversion))));
 	}
 
+	@When("the path {string} is requested")
+	public void requested(final String path) {
+		state.record(ledger.get(path));
+	}
+
 	@When("{int} conversions for {string} each sell {string} {word} at the same time, buying in turn:")
 	public void concurrent(final int count, final String merchant, final String sellAmount, final String sellCurrency,
 			final DataTable buys) {

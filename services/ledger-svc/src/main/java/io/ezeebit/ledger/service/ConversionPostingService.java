@@ -122,7 +122,8 @@ public class ConversionPostingService {
 	// First answer and every replay are built from the stored rows, so a replay is byte-identical.
 	private ConversionPostingResp read(final MerchantId merchant, final UUID conversionId) {
 		JournalEntity journal = journals.findByIdentity(merchant.value(), JournalType.CONVERSION.name(),
-				conversionId.toString()).orElseThrow(() -> new LedgerException(ErrorCode.NOT_FOUND, null));
+				conversionId.toString()).orElseThrow(() -> new LedgerException(ErrorCode.POSTING_NOT_FOUND, "conversionId",
+						conversionId.toString()));
 		return mapper.toResp(journal, entries.merchantLines(journal.id()), catalog.all());
 	}
 

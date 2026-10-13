@@ -23,21 +23,22 @@ public class ConversionReplayer {
 		this.journals = journals;
 	}
 
-	// A refusal replays as the same refusal whatever is sent: money that arrived since changes nothing.
+	// A VOID holds no posting body, so no hash can match it: it blocks every posting. Otherwise the hash comes
+	// first, and a refusal replays as the same refusal for the same body whatever money arrived since.
 	@Transactional(readOnly = true)
 	public UUID storedPosting(final MerchantId merchant, final UUID conversionId, final String requestHash,
 			final String sellCurrency, final String buyCurrency) {
 		JournalEntity stored = stored(merchant, conversionId);
-		if (JournalStatus.REFUSED.name().equals(stored.status())) {
-			ErrorCode refusal = ErrorCode.valueOf(stored.reason());
-			throw new LedgerException(refusal, null,
-					refusal == ErrorCode.INSUFFICIENT_FUNDS ? sellCurrency : buyCurrency);
-		}
 		if (JournalStatus.VOID.name().equals(stored.status())) {
 			throw new LedgerException(ErrorCode.CONVERSION_VOIDED, "conversionId", conversionId.toString());
 		}
 		if (!RequestFingerprint.sameHash(stored.requestHash(), requestHash)) {
 			throw new LedgerException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "conversionId", conversionId.toString());
+		}
+		if (JournalStatus.REFUSED.name().equals(stored.status())) {
+			ErrorCode refusal = ErrorCode.valueOf(stored.reason());
+			throw new LedgerException(refusal, null,
+					refusal == ErrorCode.INSUFFICIENT_FUNDS ? sellCurrency : buyCurrency);
 		}
 		return stored.id();
 	}

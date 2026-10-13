@@ -133,7 +133,7 @@ configure(subprojects.findAll { it.name in tieredServices }) {
 def coverageFloors = [
 	'config-svc'    : [LINE: '0.57'],
 	'eureka-svc'    : [LINE: '0.57'],
-	'gateway-svc'   : [LINE: '0.67', BRANCH: '0.47'],
+	'gateway-svc'   : [LINE: '0.89', BRANCH: '0.97'],
 	'ledger-svc'    : [LINE: '0.93', BRANCH: '0.87'],
 	'conversion-svc': [LINE: '0.90', BRANCH: '0.84'],
 ]

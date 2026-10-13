@@ -26,13 +26,14 @@ public class LedgerAnswerMapper {
 			return LedgerAnswer.INPUT_REFUSED;
 		}
 		// IDEMPOTENCY_KEY_REUSED falls to UNKNOWN: something else holds the id, possibly a posting.
+		// Only POSTING_NOT_FOUND is ABSENT, which leads to a void; a NOT_FOUND route 404 says nothing about the id.
 		return switch (code) {
 			case "INSUFFICIENT_FUNDS" -> LedgerAnswer.INSUFFICIENT_FUNDS;
 			case "BALANCE_LIMIT_EXCEEDED" -> LedgerAnswer.BALANCE_LIMIT_EXCEEDED;
 			case "POSTING_DEADLINE_PASSED" -> LedgerAnswer.DEADLINE_PASSED;
 			case "CONVERSION_VOIDED" -> LedgerAnswer.VOIDED;
 			case "CONVERSION_ALREADY_POSTED" -> LedgerAnswer.POSTED;
-			case "NOT_FOUND" -> LedgerAnswer.ABSENT;
+			case "POSTING_NOT_FOUND" -> LedgerAnswer.ABSENT;
 			default -> LedgerAnswer.UNKNOWN;
 		};
 	}

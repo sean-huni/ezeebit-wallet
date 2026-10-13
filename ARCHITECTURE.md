@@ -316,7 +316,7 @@ GET /rates?base=ZAR&quote=USDT
 - `timestamp` is when the price was taken, as an ISO-8601 instant.
 - An error status, an unknown pair, a refused connection or no answer within 2 s means "no rate"
   (503). An answer for another pair, an unreadable rate or timestamp, or a rate with more than 14
-  decimals is a bad rate (502, `RATE_MALFORMED`).
+  decimals is a bad rate (502 `RATE_REJECTED`, reason `RATE_MALFORMED`).
 
 ### Notes on the build
 
@@ -373,7 +373,7 @@ the gateway it is 404, because the route table publishes v1 only.
 | Upstream resets, or silent for 10 s | gateway 504 `UPSTREAM_OUTCOME_UNKNOWN` | yes |
 | config-svc or eureka-svc down | running services keep their config and last registry; a restarting service cannot boot | no (framework behaviour) |
 | Postgres down | the affected service fails its requests; nothing is half-written, every posting is one transaction | no (by design) |
-| Rate service slow, down or wrong | quote refused in about 2 s (503) or with the broken rule (502); nothing stored, no default rate | yes: slow, 500, zero, negative, stale, out of band, jump, unreadable |
+| Rate service slow, down or wrong | quote refused in about 2 s, at most about 4 s (2 s connect plus 2 s read) (503) or with the broken rule (502); nothing stored, no default rate | yes: slow, 500, zero, negative, stale, out of band, jump, unreadable |
 | Ledger slow or silent during accept | 202 PENDING; same-key retry re-posts only while the quote is live; the sweeper settles or voids | yes: answer never sent, answer lost, retry live, retry expired |
 | Ledger refuses, then money arrives | the REFUSED marker makes the retry get the same 422 | yes |
 | Duplicate request | replayed, never posted twice | yes: 20 concurrent deposits, 5 concurrent conversions |

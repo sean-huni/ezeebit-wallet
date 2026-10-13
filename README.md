@@ -30,14 +30,16 @@ Boot 4.1.1, Spring Cloud 2025.1.3.
 ```
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
-HTTP), the static analysis and coverage gates, and a secrets scan. About 2.5 minutes on a laptop.
+HTTP), the static analysis and coverage gates, and a secrets scan (about 151 s on an 18-core laptop with dependencies and images cached; the
+first run also downloads them).
 Test counts are in [SOLUTION.md](SOLUTION.md#1-tasks-chosen-and-status); the tiers and gates are
 described in [docs/quality-gates.md](docs/quality-gates.md).
 
 ## Run the fleet
 
 ```sh
-./fleet.sh up       # Postgres + WireMock, bootJar, every service in order (each waited until healthy), then Grafana LGTM
+./fleet.sh up       # Postgres + WireMock, bootJar, config-svc and eureka-svc first, then the other three together,
+                    # each waited until healthy, then a routing check, then Grafana LGTM
 ./fleet.sh status   # port and /actuator/health HTTP code per service (000 = not answering)
 ./fleet.sh down     # stop the JVMs, then docker compose down (data volumes are kept)
 ```
@@ -125,11 +127,12 @@ Also worth trying:
 
 ```sh
 curl -i localhost:8080/internal/v1/deposits     # 404 from the gateway: unrouted
-kill $(cat .fleet/conversion-svc.pid)           # then a quote through the gateway answers 503 UPSTREAM_UNAVAILABLE
 curl -s -X POST localhost:8089/__admin/mappings -d \
   '{"priority":1,"request":{"urlPath":"/rates"},"response":{"status":200,"fixedDelayMilliseconds":3000,"body":"{}"}}'
                                                 # a slow rate feed: the next quote is refused with 503 RATE_UNAVAILABLE in about 2 s
 curl -s -X POST localhost:8089/__admin/mappings/reset   # back to the committed rates
+kill $(cat .fleet/conversion-svc.pid)           # then a quote through the gateway answers 503 UPSTREAM_UNAVAILABLE
+./fleet.sh down && ./fleet.sh up                # restore the fleet afterwards
 ```
 
 Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#6-api-summary).
@@ -148,6 +151,32 @@ Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
 `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there.
+
+## Repository layout
+
+```
+ezeebit-wallet/
+├── README.md, ARCHITECTURE.md, SOLUTION.md
+├── docs/                   quality gates, supply chain, CI, observability
+├── build.gradle            shared build conventions for every service
+├── settings.gradle         the five service projects
+├── gradle.properties       Spring Boot, Spring Cloud, quality-tool and override versions; Paketo pins
+├── config/                 checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
+├── security/               scanners.lock, trivy-ignore.yaml, scan.sh and report.py: the supply-chain gate
+├── .circleci/config.yml    the CI job: the same Gradle commands as a laptop
+├── compose.yaml            Postgres 18.6 (alpine) with both databases; WireMock rate service; Grafana LGTM
+├── docker/lgtm/            dashboards, alert rules, Slack route, container start script
+├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
+├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
+├── observability/          OTLP settings, logback appender wiring; compiled into every service
+├── fleet.sh                up | status | down
+└── services/
+    ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
+    ├── eureka-svc/         service registry
+    ├── gateway-svc/        edge routing; api/advice/UpstreamUnavailableAdvice maps upstream failures to 503/504
+    ├── ledger-svc/         Task 1; changesets in db/changelog/2026/10/; src/acceptanceTest holds the Spring and Cucumber tiers
+    └── conversion-svc/     Task 2; changesets in db/changelog/2026/10/; outbound/ holds the rate and ledger clients
+```
 
 ## Gateway routes
 

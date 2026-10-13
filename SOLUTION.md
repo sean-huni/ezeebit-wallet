@@ -9,11 +9,12 @@ Walkthrough video: link to be added.
 
 ## Time and scope
 
-I spent about 3 hours of my own time on this. Most of the code and documentation was written by AI
-agents (Claude Code) that I directed. I set the scope and made the design decisions, and the work
-went through review gates before it was merged: tests seen failing before they were trusted,
-reviews of each branch, and a final review of the whole repository, whose fixes are the last merge
-on `dev`. Section 8 says where I accepted, changed or rejected what the agents produced.
+I spent about 3 hours of my own attention, directing AI agents (Claude Code) that wrote most of the
+code and docs under review gates: tests seen failing before they were trusted, reviews of each
+branch, and a final review of the whole repository. The agents' work ran from 02:44 to about 10:11 on
+13 October 2026 (commit timestamps, UTC+2), well past the brief's two to three hours. The brief says
+to stop and write up the rest; I kept building the extras listed below, which a reviewer can
+ignore. Section 8 says where I accepted, changed or rejected what the agents produced.
 
 **The submission is Tasks 1 and 2**: the ledger and conversion services, the gateway and the local
 fleet that runs them.
@@ -73,7 +74,7 @@ What exists:
 | eureka-svc | 1 | | |
 
 conversion-svc's acceptance scenarios run against the real ledger jar as its own process, with
-WireMock scripting rate-feed faults and ledger faults. Among them: 50 concurrent deposits sum
+WireMock scripting rate-feed faults and ledger faults. Across both services' suites: 50 concurrent deposits sum
 exactly, 20 concurrent copies of one deposit credit once, and 8 concurrent conversions from one
 balance succeed exactly as often as the funds allow. Each concurrency, idempotency and
 currency-integrity test was seen failing with its control removed (row lock, unique constraint,
@@ -247,7 +248,8 @@ the services and tests and drafted the documentation, which I reviewed.
 - The first fleet had every health check green and still could not route: for up to a minute the
   gateway saw an empty registry (Eureka's 30 s default caches), and a stopped service reached the
   client as HTTP 500. Found by stopping one service and comparing its route with a sibling's and an
-  unrouted path. Fixed with 5 s registry intervals and the gateway's 503/504 mapping, now tested.
+  unrouted path. Fixed with 5 s registry intervals (verified by a live probe, not an automated test) and the
+  gateway's 503/504 mapping, now tested.
 - The first concurrent-conversion test sent every conversion to the same target currency, and
   stayed green with the source-account lock removed, because the shared target lock serialised the
   requests first. It now buys a different currency per request and goes red without the source lock.

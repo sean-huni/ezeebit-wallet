@@ -54,13 +54,17 @@ What exists and is verified:
   connection is 503 (covered by two tests); any other I/O failure (reset, timeout) is 504
   "outcome unknown: retry with the same Idempotency-Key" (not tested yet). Details name no service.
 - Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
-  service, four provisioned dashboards, two alert rules with optional Slack delivery.
+  service, four provisioned dashboards, four alert rules with optional Slack delivery. Business
+  metrics for Tasks 1 and 2 (deposits, conversion postings, quotes and refusals by reason, rate
+  service latency, conversions by outcome, sweeper actions, overdue PENDING conversions) feed a
+  Money row on Fleet Overview and two alerts: RateFeedRefusing (repeated rate refusals for a pair)
+  and ConversionsStuckPending. Both were driven to Alerting on a local run with Slack disconnected.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 259 tests, 0 failures. The ledger runs three tiers: 50 unit tests
-  (no Spring, no Docker), 16 Spring integration tests and 57 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 81 unit tests
+- `./gradlew clean build` passes: 276 tests, 0 failures. The ledger runs three tiers: 55 unit tests
+  (no Spring, no Docker), 16 Spring integration tests and 59 Cucumber acceptance scenarios over
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 87 unit tests
   (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
-  states), 11 integration tests, and 40 acceptance scenarios against the real ledger jar running as
+  states), 11 integration tests, and 44 acceptance scenarios against the real ledger jar running as
   its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of
   band, jump, unreadable) and injecting ledger faults (answer never sent, answer lost). The three 500s a review reached (a balance past the
   column's 20 digits, a NUL in `reference`, a statement window outside timestamptz's range) are
@@ -152,7 +156,7 @@ The brief leaves these open. I made a choice for each so the design is concrete.
    (timestamp within 10 s), and inside a per-pair sanity band (min/max, from config-svc). If the
    pair's most recent quote is younger than 5 minutes, the rate must also be within 5% of that
    quote's market rate; otherwise band and freshness alone apply, so a run of refusals cannot lock
-   a pair out for ever. Repeated refusals for a pair are a future alert; the rule is not written.
+   a pair out for ever. Repeated refusals for a pair page: RateFeedRefusing fires per pair.
 4. **Rate service failure.** Connect and read are each limited to 2 seconds. A timeout, refused
    connection or error status is 503 `RATE_UNAVAILABLE`; a bad rate is 502 `RATE_REJECTED` with its
    reason. There is never a fallback to a cached or default rate.
@@ -227,9 +231,8 @@ In order:
 1. **A reconciliation job** that checks every merchant account balance against the sum of its
    entries (platform balances are derived on read, so there is nothing to reconcile) and that every
    journal sums to zero per currency, and alerts on any difference.
-2. **Business metrics and alerts for conversion:** quotes and refusals by reason, PENDING
-   conversions and their age, sweeper outcomes, and the platform FX position per currency; an alert
-   on repeated rate refusals for a pair.
+2. **The platform FX position per currency** as a metric and a panel (the business metrics and
+   their alerts are built; the position is visible only by query).
 3. **A ledger currency endpoint**, so conversion-svc reads currency scales from the ledger instead
    of keeping its own copy in config.
 4. **A two-instance run of conversion-svc** to prove the sweeper live across processes (today it is

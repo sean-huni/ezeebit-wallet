@@ -2,7 +2,7 @@
 
 How the system is shaped and why. README.md covers running it; SOLUTION.md covers task choice, trade-offs and how tasks 3 to 6 slot in.
 
-**Built vs designed.** At this commit the repository contains: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service; local observability and alerting (section 3); **the Task 1 ledger (section 4)**: deposits, balances and the statement; and **Task 2 (section 5)**: quotes, conversions, the ledger's conversion postings and voids, and the PENDING sweeper, all built and tested. A WireMock container stands in for the exchange-rate service the brief says already exists. Where the build departs from the design, the "As built" lists in sections 4 and 5 say so.
+**Built vs designed.** At this commit the repository contains: five services that boot, register and route; the gateway's route table and its 503/504 mapping for upstream failures; one database per domain service; local observability, business metrics and alerting (section 3); **the Task 1 ledger (section 4)**: deposits, balances and the statement; and **Task 2 (section 5)**: quotes, conversions, the ledger's conversion postings and voids, and the PENDING sweeper, all built and tested. A WireMock container stands in for the exchange-rate service the brief says already exists. Where the build departs from the design, the "As built" lists in sections 4 and 5 say so.
 
 ## 1. How the design was derived
 
@@ -126,12 +126,50 @@ Without it all three reached the client as 500, which reads as a gateway bug. Tw
 
 **Observability, built.** One `grafana/otel-lgtm:0.36.0` container runs Grafana, Prometheus, Tempo, Loki and an OTLP collector. Every service exports over OTLP/HTTP to :4318: metrics on a 10 s step, traces sampled at 100%, and logs, where a line logged inside a request carries its `trace_id`. Each JVM is its own series: `service.instance.id` is `host:port`, so two instances of one service never write into one Prometheus series. Dashboards and alert rules are provisioned from files in `docker/lgtm/`.
 
+### Business metrics
+
+Micrometer meters, exported over the same OTLP path; the Prometheus name is shown. Every tag is a bounded enum: a known currency or pair, an outcome, a code. No tag carries a merchant, a key or an id.
+
+| Metric (Prometheus) | Type | Tags | Counted where |
+|---|---|---|---|
+| `ezeebit_ledger_deposits_total` | counter | `currency` (`unknown` when refused for it), `outcome` posted, replayed, refused; `code` (`none` or the refusal code) | ledger `DepositService`, once per answer |
+| `ezeebit_ledger_conversion_postings_total` | counter | `outcome` posted, replayed, voided, refused; `code` | ledger `ConversionPostingService`, once per answer, posting and void alike; a replayed refusal counts again |
+| `ezeebit_conversion_quotes_total` | counter | `pair` (`SELL/BUY` of two known currencies, else `unknown`), `outcome` issued, refused; `reason` (the code, e.g. `RATE_UNAVAILABLE`, `RATE_REJECTED`, `AMOUNT_TOO_SMALL`); `detail` (the rate rule for `RATE_REJECTED`: `RATE_STALE`, `RATE_OUT_OF_BAND`, `RATE_JUMP`, `RATE_MALFORMED`, `RATE_NOT_POSITIVE`; else `none`) | `QuoteService` |
+| `ezeebit_conversion_rate_calls_milliseconds_{bucket,count,sum}` | timer, buckets 25 ms to 5 s | `outcome` answered, unavailable, unreadable | `RateClient`, around the HTTP call |
+| `ezeebit_conversion_outcomes_total` | counter | `status` COMPLETED, REJECTED, PENDING; `reason` | COMPLETED and REJECTED by `ConversionSettler` only when its compare-and-set moved the row, so once per conversion across replicas; PENDING by `ConversionService` when the first ledger answer left it open |
+| `ezeebit_conversion_sweeps_total` | counter | `action` completed, voided, refused, unresolved | `PendingResolver`, once per row it claimed |
+| `ezeebit_conversion_pending_overdue` | gauge | none | `PendingOverdueGauge`: `count(*)` of PENDING rows past deadline plus max transaction time, the sweeper's own definition of due |
+
+Requests refused before the service layer (malformed JSON, a missing field) are not business events and are counted only by the HTTP metrics.
+
+**Levels are read from the database, never from heap state.** A counter is a flow: each replica counts its own requests and dashboards `sum()` them. A level is different: a per-replica copy of "how many conversions are stuck" would be wrong on every replica but one. `ezeebit_conversion_pending_overdue` is computed by a query on each export, so every replica reports the same number, and the dashboard and the alert take `max()`, never `sum()`, which would multiply it by the replica count. If the query fails (database down) the gauge exports NaN, which reads as Normal in ConversionsStuckPending; the failing requests surface as HighErrorRate.
+
 ### Alerting
 
 | Rule | Condition | Fires |
 |---|---|---|
 | ServiceDown | `absent_over_time` over a pushed JVM metric, 30 s window, one term per service (`absent()` would wait out the 5 min lookback, because a pushed series gets no staleness marker) | after 1 min; one alert per service |
 | HighErrorRate | a service's 5xx share of requests above 5% | after 2 min |
+| RateFeedRefusing | per pair, quotes refused with `RATE_UNAVAILABLE` or `RATE_REJECTED` in the last minute above 2. The count is `clamp_min(X - X offset 1m, 0) or (X unless X offset 1m)` summed by pair: a series first created inside the window has nothing for `increase()` to start from, so it counts whole, and a restarted JVM's drop is clamped to 0 rather than read as a negative | after 2 min; one alert per pair |
+| ConversionsStuckPending | `max(ezeebit_conversion_pending_overdue) > 0`; the sweeper runs every 10 s, so a due row normally lives seconds | after 5 min |
+
+No data is OK for all four, by design: no refusal series means no refusals, and a conversion-svc that exports nothing is ServiceDown's to page, so one silent service never pages twice. An evaluation error is Error, never OK.
+
+Rehearsed once with Slack disconnected (lgtm started with `SLACK_WEBHOOK_URL` empty, no contact point installed), local run 2026-10-13: ledger-svc frozen with SIGSTOP and a conversion accepted (202 PENDING); the WireMock rate service stopped while a quote was sent every 2 s.
+
+| Event | Time |
+|---|---|
+| ledger frozen, conversion PENDING | t+0s |
+| rate service stopped | t+3s |
+| RateFeedRefusing Pending for ZAR/USDT | t+24s |
+| ConversionsStuckPending Pending (the conversion became due at about t+75s) | t+96s |
+| RateFeedRefusing Alerting, 29 refusals in the last minute | t+147s |
+| ConversionsStuckPending Alerting | t+393s |
+| ledger resumed, rate service started | t+490s |
+| ConversionsStuckPending Normal; the sweeper had voided the conversion (REJECTED, VOIDED) | t+512s |
+| RateFeedRefusing Normal | t+543s |
+
+Three stale-rate refusals for ZAR/USDC in a few seconds took that pair to Pending and back to Normal without firing, which is the 2 min hold doing its job.
 
 The Slack contact point is installed only when `SLACK_WEBHOOK_URL` is set: Grafana refuses to start on a Slack contact point with an empty URL. Grafana's own database lives on tmpfs, because everything in it is provisioned from files and a Pending alert persisted at shutdown fired the instant the next boot evaluated a still-booting fleet. Before that fix a restart produced 4 false pages (reproduced with Slack disconnected); after it the same script produced 0, and a boot produces 0 notifications.
 
@@ -242,7 +280,7 @@ Proven by tests (`./gradlew :services:ledger-svc:check`; the conversion-posting 
 **Quote.** `POST /api/v1/merchants/{id}/quotes` with `{sell, buy, sellAmount | buyAmount}`:
 
 1. Call the exchange-rate service with a short timeout (about 2s).
-2. Validate the rate: positive; fresh (source timestamp within N seconds); inside the pair's configured sanity band (min/max, served by config-svc). If the most recent quote for the pair is younger than N minutes (about 5), also within X% of its market `rate`, read from the `quote` table (no separate store). Otherwise band and freshness alone apply, so one refused rate cannot lock a pair out for ever. Repeated refusals for a pair are a future alert: the alerting path now exists, the rule is not written.
+2. Validate the rate: positive; fresh (source timestamp within N seconds); inside the pair's configured sanity band (min/max, served by config-svc). If the most recent quote for the pair is younger than N minutes (about 5), also within X% of its market `rate`, read from the `quote` table (no separate store). Otherwise band and freshness alone apply, so one refused rate cannot lock a pair out for ever. Repeated refusals for a pair fire RateFeedRefusing (section 3).
 3. Apply the spread in the platform's favour.
 4. Round in the platform's favour, by at most one minor unit: for a `sellAmount` quote, the buy amount the merchant receives rounds **down** to the buy currency's scale; for a `buyAmount` quote, the sell amount the merchant pays rounds **up** to the sell currency's scale.
 5. Persist with a short TTL (about 15s) and return `quoteId`, `appliedRate`, both amounts and `expiresAt`.
@@ -393,7 +431,8 @@ The rest of 12-factor is followed: config comes from the environment with commit
 
 ## 9. Known gaps at this commit
 
-- No alert on repeated rate refusals for a pair, and no business metrics (quotes, conversions, refusals by reason, PENDING age): only HTTP and JVM metrics.
+- The business metrics count events and one level; nothing yet reports the platform FX position per currency or the age of the oldest PENDING conversion.
+- `ezeebit_conversion_pending_overdue` exports NaN when its query fails, and ConversionsStuckPending reads NaN as Normal (section 3).
 - Currency scales are configured in conversion-svc as well as stored in the ledger (section 5, "As built"); a ledger currency endpoint would remove the copy.
 - The sweeper's live run on two replicas is proven in-process (two concurrent sweeps on one database), not with two running conversion-svc instances.
 - Quotes are never deleted: a retention job is needed before volume grows.

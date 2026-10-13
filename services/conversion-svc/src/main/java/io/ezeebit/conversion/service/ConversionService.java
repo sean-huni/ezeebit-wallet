@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.ezeebit.conversion.common.ConversionMetrics;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.model.QuoteEntity;
@@ -32,10 +33,11 @@ public class ConversionService {
 	private final ConversionMapper mapper;
 	private final ConversionProperties properties;
 	private final Clock clock;
+	private final ConversionMetrics metrics;
 
 	public ConversionService(final ConversionRepo conversions, final QuoteRepo quoteRepo, final QuoteReader quotes,
 			final ConversionStarter starter, final ConversionSettler settler, final ConversionMapper mapper,
-			final ConversionProperties properties, final Clock clock) {
+			final ConversionProperties properties, final Clock clock, final ConversionMetrics metrics) {
 		this.conversions = conversions;
 		this.quoteRepo = quoteRepo;
 		this.quotes = quotes;
@@ -44,6 +46,7 @@ public class ConversionService {
 		this.mapper = mapper;
 		this.properties = properties;
 		this.clock = clock;
+		this.metrics = metrics;
 	}
 
 	public ConversionResp accept(final UUID merchantId, final String key, final ConversionReq request) {
@@ -66,7 +69,12 @@ public class ConversionService {
 					() -> new ConversionException(ErrorCode.QUOTE_ALREADY_USED, "quoteId", request.quoteId())),
 					request.quoteId());
 		}
-		return answer(settler.postAndSettle(conversions.findByKey(merchantId, key).orElseThrow()));
+		ConversionEntity first = settler.postAndSettle(conversions.findByKey(merchantId, key).orElseThrow());
+		// A settled outcome is counted where it is settled; a first answer that left it open is counted here.
+		if (ConversionStatus.PENDING.name().equals(first.status())) {
+			metrics.conversion(ConversionStatus.PENDING, null);
+		}
+		return answer(first);
 	}
 
 	public ConversionResp find(final UUID merchantId, final UUID conversionId) {

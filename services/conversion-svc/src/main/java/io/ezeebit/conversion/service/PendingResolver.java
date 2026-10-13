@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.ezeebit.conversion.common.ConversionMetrics;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
@@ -23,16 +24,18 @@ public class PendingResolver {
 	private final ConversionSettler settler;
 	private final ConversionProperties properties;
 	private final Clock clock;
+	private final ConversionMetrics metrics;
 
 	public PendingResolver(final TransactionTemplate transaction, final ConversionRepo conversions,
 			final LedgerClient ledger, final ConversionSettler settler, final ConversionProperties properties,
-			final Clock clock) {
+			final Clock clock, final ConversionMetrics metrics) {
 		this.transaction = transaction;
 		this.conversions = conversions;
 		this.ledger = ledger;
 		this.settler = settler;
 		this.properties = properties;
 		this.clock = clock;
+		this.metrics = metrics;
 	}
 
 	// The row stays locked while the ledger is asked, so a second replica skips it instead of resolving it twice.
@@ -49,6 +52,7 @@ public class PendingResolver {
 			answer = ledger.voidPosting(conversion.id(), conversion.merchantId());
 		}
 		settler.settle(conversion, answer);
+		metrics.sweep(answer);
 		return conversion.id();
 	}
 

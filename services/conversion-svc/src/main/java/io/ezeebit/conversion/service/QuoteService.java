@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+import io.ezeebit.conversion.common.ConversionMetrics;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.repo.QuoteRepo;
 import io.ezeebit.conversion.domain.Currency;
@@ -17,6 +18,7 @@ import io.ezeebit.conversion.domain.RateValidator;
 import io.ezeebit.conversion.domain.Side;
 import io.ezeebit.conversion.dto.req.QuoteReq;
 import io.ezeebit.conversion.dto.resp.QuoteResp;
+import io.ezeebit.conversion.exception.ConversionException;
 import io.ezeebit.conversion.mapper.QuoteMapper;
 import io.ezeebit.conversion.outbound.rates.RateClient;
 import org.springframework.stereotype.Service;
@@ -32,9 +34,11 @@ public class QuoteService {
 	private final QuoteMapper mapper;
 	private final ConversionProperties properties;
 	private final Clock clock;
+	private final ConversionMetrics metrics;
 
 	public QuoteService(final CurrencyCatalog catalog, final RateClient rates, final RateValidator validator,
-			final QuoteRepo quotes, final QuoteMapper mapper, final ConversionProperties properties, final Clock clock) {
+			final QuoteRepo quotes, final QuoteMapper mapper, final ConversionProperties properties, final Clock clock,
+			final ConversionMetrics metrics) {
 		this.catalog = catalog;
 		this.rates = rates;
 		this.validator = validator;
@@ -42,9 +46,29 @@ public class QuoteService {
 		this.mapper = mapper;
 		this.properties = properties;
 		this.clock = clock;
+		this.metrics = metrics;
 	}
 
 	public QuoteResp quote(final UUID merchantId, final QuoteReq request) {
+		String pair = pairTag(request);
+		try {
+			QuoteResp quote = price(merchantId, request);
+			metrics.quoteIssued(pair);
+			return quote;
+		}
+		catch (ConversionException refusal) {
+			metrics.quoteRefused(pair, refusal);
+			throw refusal;
+		}
+	}
+
+	// Two known currency codes, so the tag has at most 25 values whatever a caller sends.
+	private String pairTag(final QuoteReq request) {
+		return catalog.isKnown(request.sell()) && catalog.isKnown(request.buy())
+				? "%s/%s".formatted(request.sell(), request.buy()) : "unknown";
+	}
+
+	private QuoteResp price(final UUID merchantId, final QuoteReq request) {
 		Currency sell = catalog.require(request.sell(), "sell");
 		Currency buy = catalog.require(request.buy(), "buy");
 		PairPolicy policy = catalog.policy(sell, buy);

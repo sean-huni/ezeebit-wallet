@@ -20,11 +20,15 @@ public class CurrencyCatalog {
 	}
 
 	public Currency require(final String code, final String field) {
-		Integer scale = code == null ? null : properties.currencies().get(code.toLowerCase(Locale.ROOT));
-		if (scale == null || !code.equals(code.toUpperCase(Locale.ROOT))) {
+		if (!isKnown(code)) {
 			throw new ConversionException(ErrorCode.UNKNOWN_CURRENCY, field, code);
 		}
-		return new Currency(code, scale);
+		return new Currency(code, properties.currencies().get(code.toLowerCase(Locale.ROOT)));
+	}
+
+	public boolean isKnown(final String code) {
+		return code != null && code.equals(code.toUpperCase(Locale.ROOT))
+				&& properties.currencies().containsKey(code.toLowerCase(Locale.ROOT));
 	}
 
 	public PairPolicy policy(final Currency sell, final Currency buy) {

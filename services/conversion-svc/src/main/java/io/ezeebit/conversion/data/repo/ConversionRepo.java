@@ -70,6 +70,12 @@ public class ConversionRepo {
 		return spec.query((rs, row) -> read(rs)).optional();
 	}
 
+	// The sweeper's own definition of due: a non-zero count that persists means it cannot resolve them.
+	public long countDue(final Instant cutoff) {
+		return jdbc.sql("SELECT count(*) FROM conversion WHERE status = 'PENDING' AND deadline < :cutoff")
+				.param("cutoff", Timestamps.of(cutoff)).query(Long.class).single();
+	}
+
 	private static ConversionEntity read(final ResultSet rs) throws SQLException {
 		return new ConversionEntity(rs.getObject("c_id", UUID.class), rs.getObject("c_merchant_id", UUID.class),
 				rs.getObject("quote_id", UUID.class), rs.getString("idempotency_key"), rs.getString("c_status"),

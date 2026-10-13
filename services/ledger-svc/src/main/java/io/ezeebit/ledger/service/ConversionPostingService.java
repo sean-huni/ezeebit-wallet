@@ -1,7 +1,10 @@
 package io.ezeebit.ledger.service;
 
 import java.util.UUID;
+import java.util.function.Supplier;
 
+import io.ezeebit.ledger.common.LedgerMetrics;
+import io.ezeebit.ledger.common.LedgerMetrics.Outcome;
 import io.ezeebit.ledger.common.RequestFingerprint;
 import io.ezeebit.ledger.data.model.JournalEntity;
 import io.ezeebit.ledger.data.repo.EntryRepo;
@@ -33,10 +36,12 @@ public class ConversionPostingService {
 	private final JournalRepo journals;
 	private final EntryRepo entries;
 	private final ConversionPostingMapper mapper;
+	private final LedgerMetrics metrics;
 
 	public ConversionPostingService(final CurrencyCatalog catalog, final RequestFingerprint fingerprint,
 			final ConversionPoster poster, final ConversionVoider voider, final ConversionReplayer replayer,
-			final RefusalRecorder refusals, final JournalRepo journals, final EntryRepo entries, final ConversionPostingMapper mapper) {
+			final RefusalRecorder refusals, final JournalRepo journals, final EntryRepo entries,
+			final ConversionPostingMapper mapper, final LedgerMetrics metrics) {
 		this.catalog = catalog;
 		this.fingerprint = fingerprint;
 		this.poster = poster;
@@ -46,9 +51,14 @@ public class ConversionPostingService {
 		this.journals = journals;
 		this.entries = entries;
 		this.mapper = mapper;
+		this.metrics = metrics;
 	}
 
 	public ConversionPostingResp post(final ConversionPostingReq request) {
+		return counted(() -> postOrReplay(request), new MerchantId(request.merchantId()), request.conversionId());
+	}
+
+	private Outcome postOrReplay(final ConversionPostingReq request) {
 		Currency sellCurrency = catalog.require(request.sellCurrency());
 		Currency buyCurrency = catalog.require(request.buyCurrency());
 		if (sellCurrency.code().equals(buyCurrency.code())) {
@@ -62,6 +72,7 @@ public class ConversionPostingService {
 				request.deadline().toString());
 		try {
 			poster.post(new ConversionPostingCommand(merchant, request.conversionId(), sell, buy, request.deadline(), hash));
+			return Outcome.POSTED;
 		}
 		catch (DuplicateKeyException duplicate) {
 			replayer.storedPosting(merchant, request.conversionId(), hash, request.sellCurrency(), request.buyCurrency());
@@ -69,7 +80,7 @@ public class ConversionPostingService {
 		catch (LedgerException refusal) {
 			refusals.recordAndRethrow(merchant, request, hash, refusal);
 		}
-		return read(merchant, request.conversionId());
+		return Outcome.REPLAYED;
 	}
 
 	public ConversionPostingResp find(final UUID conversionId, final UUID merchantId) {
@@ -78,14 +89,34 @@ public class ConversionPostingService {
 
 	public ConversionPostingResp voidPosting(final UUID conversionId, final UUID merchantId) {
 		MerchantId merchant = new MerchantId(merchantId);
-		String hash = fingerprint.of(VOID, merchantId.toString(), conversionId.toString());
+		return counted(() -> voidOrReplay(merchant, conversionId), merchant, conversionId);
+	}
+
+	private Outcome voidOrReplay(final MerchantId merchant, final UUID conversionId) {
 		try {
-			voider.voidPosting(merchant, conversionId, hash);
+			voider.voidPosting(merchant, conversionId, fingerprint.of(VOID, merchant.value().toString(),
+					conversionId.toString()));
+			return Outcome.VOIDED;
 		}
 		catch (DuplicateKeyException duplicate) {
 			replayer.storedVoid(merchant, conversionId);
+			return Outcome.REPLAYED;
 		}
-		return read(merchant, conversionId);
+	}
+
+	// Every answer is counted once: its outcome, or the code of the refusal it gave (a replayed refusal included).
+	private ConversionPostingResp counted(final Supplier<Outcome> action, final MerchantId merchant,
+			final UUID conversionId) {
+		try {
+			Outcome outcome = action.get();
+			ConversionPostingResp answer = read(merchant, conversionId);
+			metrics.conversionPosting(outcome, null);
+			return answer;
+		}
+		catch (LedgerException refusal) {
+			metrics.conversionPosting(Outcome.REFUSED, refusal.code());
+			throw refusal;
+		}
 	}
 
 	// First answer and every replay are built from the stored rows, so a replay is byte-identical.

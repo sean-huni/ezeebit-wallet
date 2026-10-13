@@ -34,8 +34,6 @@
     </changeSet>
 
     <changeSet id="004-entry-checks" author="ledger-svc">
-        <!-- First applied without this guard on local volumes; ANY keeps those databases starting. -->
-        <validCheckSum>ANY</validCheckSum>
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_entry_amount_nonzero')</sqlCheck>
         </preConditions>

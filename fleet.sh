@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres in Docker, every service as a JVM.
+# Runs the whole fleet on this host: Postgres and Grafana LGTM in Docker, every service as a JVM.
 # Usage: ./fleet.sh up | down | status
 set -u
 cd "${0:A:h}"
@@ -27,6 +27,19 @@ await_healthy() {
   return 1
 }
 
+await_routed() {
+  # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
+  local m=00000000-0000-0000-0000-000000000000 deadline=$(( SECONDS + 60 )) b q
+  while (( SECONDS < deadline )); do
+    b=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/balances")
+    q=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$(port_of gateway-svc)/api/v1/merchants/$m/conversions/$m")
+    [[ $b == 200 && $q == 404 ]] && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }
+    sleep 1
+  done
+  print -u2 "  gateway not routing after 60s (balances '$b', conversions '$q')"
+  return 1
+}
+
 start() {
   local svc=$1
   java -jar services/$svc/build/libs/$svc-*.jar > "$RUN/$svc.log" 2>&1 &
@@ -41,8 +54,8 @@ up() {
     kill -0 $(<$f) 2>/dev/null && { print -u2 "fleet already running ($f); ./fleet.sh down first"; return 1; }
   done
   [[ -f .env ]] && { set -a; source ./.env; set +a; }
-  print "postgres"
-  docker compose up -d --wait postgres || return 1
+  print "postgres, wiremock (the exchange-rate service)"
+  docker compose up -d --wait postgres wiremock || return 1
   print "build"
   ./gradlew -q bootJar || return 1
   # Control plane first: every other service fetches config and registers on boot.
@@ -51,11 +64,17 @@ up() {
   local svc
   for svc in ledger-svc conversion-svc gateway-svc; do start $svc; done
   for svc in ledger-svc conversion-svc gateway-svc; do await_healthy $svc || return 1; done
-  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc)"
+  await_routed || return 1
+  # Last, so neither a slow boot nor a failed up can page: ServiceDown only ever sees a healthy fleet.
+  print "lgtm"
+  docker compose up -d --wait lgtm || return 1
+  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc), grafana http://localhost:3000"
 }
 
 down() {
   local svc pid
+  # Monitoring first, so a deliberate stop never pages.
+  docker compose stop lgtm
   for svc in ${(Oa)SERVICES}; do
     [[ -f $RUN/$svc.pid ]] || continue
     pid=$(<$RUN/$svc.pid)

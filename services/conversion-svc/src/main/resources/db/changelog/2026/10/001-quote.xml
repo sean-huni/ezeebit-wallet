@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="001-quote-table" author="conversion-svc">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="quote"/></not></preConditions>
+        <createTable tableName="quote">
+            <column name="id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_quote"/></column>
+            <column name="merchant_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="sell_currency" type="VARCHAR(5)"><constraints nullable="false"/></column>
+            <column name="buy_currency" type="VARCHAR(5)"><constraints nullable="false"/></column>
+            <column name="sell_amount" type="NUMERIC(38,18)"><constraints nullable="false"/></column>
+            <column name="buy_amount" type="NUMERIC(38,18)"><constraints nullable="false"/></column>
+            <!-- The market rate as the rate service gave it, and the rate after the spread. -->
+            <column name="rate" type="NUMERIC(38,18)"><constraints nullable="false"/></column>
+            <column name="applied_rate" type="NUMERIC(38,18)"><constraints nullable="false"/></column>
+            <column name="spread_bps" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="rate_source_timestamp" type="TIMESTAMPTZ"><constraints nullable="false"/></column>
+            <column name="expires_at" type="TIMESTAMPTZ"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+        </createTable>
+        <!-- The jump check reads the most recent quote for a pair. -->
+        <createIndex tableName="quote" indexName="ix_quote_pair_created">
+            <column name="sell_currency"/>
+            <column name="buy_currency"/>
+            <column name="created"/>
+        </createIndex>
+        <rollback><dropTable tableName="quote"/></rollback>
+    </changeSet>
+
+    <changeSet id="001-quote-checks" author="conversion-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_quote_status', 'ck_quote_shape')</sqlCheck>
+        </preConditions>
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <sql>ALTER TABLE quote ADD CONSTRAINT ck_quote_status CHECK (status IN ('ACTIVE', 'USED'));
+ALTER TABLE quote ADD CONSTRAINT ck_quote_shape CHECK (sell_currency &lt;&gt; buy_currency AND sell_amount &gt; 0
+    AND buy_amount &gt; 0 AND rate &gt; 0 AND applied_rate &gt; 0 AND spread_bps BETWEEN 0 AND 9999);</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE quote DROP CONSTRAINT ck_quote_status, DROP CONSTRAINT ck_quote_shape;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

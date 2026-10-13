@@ -5,7 +5,7 @@ services:
       - 'POSTGRES_USER=${POSTGRES_USER:-postgres}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}'
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       # Runs only on an empty data volume; after editing it, `docker compose down -v`.
       - './docker/postgres/initdb:/docker-entrypoint-initdb.d:ro'
@@ -18,5 +18,44 @@ services:
       timeout: 3s
       retries: 30
 
+  wiremock:
+    # Stands in for the exchange-rate service the brief says already exists; its contract is an
+    # assumption, written down in ARCHITECTURE.md section 5. Not the -alpine tag: that ships amd64 only.
+    image: 'wiremock/wiremock:3.13.2-3'
+    command: ['--disable-banner']
+    ports:
+      - '127.0.0.1:${RATES_PORT:-8089}:8080'
+    volumes:
+      - './docker/wiremock/mappings:/home/wiremock/mappings:ro'
+
+  lgtm:
+    # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
+    # Grafana runs with anonymous Admin access.
+    image: 'grafana/otel-lgtm:0.36.0'
+    entrypoint: ['/ezeebit/start.sh']
+    environment:
+      - 'SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}'
+    ports:
+      # Loopback only: anonymous Admin can read the Slack webhook, and open OTLP accepts forged metrics.
+      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:4317:4317'
+      - '127.0.0.1:4318:4318'
+    volumes:
+      - './docker/lgtm:/ezeebit:ro'
+      - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'
+      - './docker/lgtm/alerting/rules.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml:ro'
+      - 'lgtmdata:/data'
+    tmpfs:
+      # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted
+      # Pending alert restored after downtime fires the instant a booting fleet is first evaluated.
+      - '/data/grafana/data'
+    healthcheck:
+      # run-all.sh writes this file once Grafana, Prometheus, Tempo, Loki and the collector answer.
+      test: ['CMD-SHELL', 'test -f /tmp/ready']
+      interval: 2s
+      timeout: 3s
+      retries: 90
+
 volumes:
   pgdata:
+  lgtmdata:

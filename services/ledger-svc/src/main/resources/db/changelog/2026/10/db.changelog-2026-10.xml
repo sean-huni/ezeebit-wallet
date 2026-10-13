@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <include file="db/changelog/2026/10/001-currency.xml"/>
+    <include file="db/changelog/2026/10/002-account.xml"/>
+    <include file="db/changelog/2026/10/003-journal.xml"/>
+    <include file="db/changelog/2026/10/004-entry.xml"/>
+    <include file="db/changelog/2026/10/005-conversion.xml"/>
+    <include file="db/changelog/2026/10/006-journal-refused.xml"/>
+
+</databaseChangeLog>

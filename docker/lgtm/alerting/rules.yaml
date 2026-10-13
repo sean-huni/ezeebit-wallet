@@ -1,0 +1,138 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: ezeebit
+    folder: Ezeebit alerts
+    interval: 10s
+    rules:
+      - uid: ezeebit-service-down
+        title: ServiceDown
+        condition: B
+        # 30s = 3 export steps. One term per service, so each down service is its own alert;
+        # a fleet that never booted pages too. absent() would wait out the 5m lookback.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 60, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                absent_over_time(jvm_threads_live{job="config-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="eureka-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="ledger-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="conversion-svc"}[30s])
+                or absent_over_time(jvm_threads_live{job="gateway-svc"}[30s])
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # Every service exporting returns no series: that is the healthy state.
+        noDataState: OK
+        execErrState: Error
+        # Longer than a fleet boot (about 30s from Grafana ready to the last first sample).
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.job }} has exported no metrics for 30s'
+      - uid: ezeebit-high-error-rate
+        title: HighErrorRate
+        condition: B
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 120, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (job) (rate(http_server_requests_milliseconds_count{status=~"5.."}[1m]))
+                / sum by (job) (rate(http_server_requests_milliseconds_count[1m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0.05]}
+        # No 5xx anywhere returns no series.
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.job }} answers more than 5% of requests with 5xx'
+      - uid: ezeebit-rate-feed-refusing
+        title: RateFeedRefusing
+        condition: B
+        # A is the pair's rate refusals in the last minute when either arm holds, else 0: more than 2 refusals,
+        # or at least 1 that is half or more of the pair's quotes, so a quiet pair refused every time pages too.
+        # Each count: a series first created inside the window has nothing for increase() to start from, so it
+        # counts whole (unless); a restarted JVM's drop is clamped to 0.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 120, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m)))
+                * clamp_max(
+                    ((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) > bool 2)
+                    + (((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) >= bool 1)
+                      * (((sum by (pair) (clamp_min(ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} - ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m, 0) or (ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} unless ezeebit_conversion_quotes_total{outcome="refused", reason=~"RATE_UNAVAILABLE|RATE_REJECTED"} offset 1m))) / (sum by (pair) (clamp_min(ezeebit_conversion_quotes_total - ezeebit_conversion_quotes_total offset 1m, 0) or (ezeebit_conversion_quotes_total unless ezeebit_conversion_quotes_total offset 1m)))) >= bool 0.5)),
+                    1)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No rate refusal since the services started returns no series: nothing to report. A silent
+        # conversion-svc is ServiceDown's to page, not this rule's.
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Quotes for {{ $labels.pair }} refused for the rate (unavailable or rejected) {{ $values.A.Value }} times in the last minute: more than 2, or half or more of its quotes'
+      - uid: ezeebit-conversions-stuck-pending
+        title: ConversionsStuckPending
+        condition: B
+        # Read from the database by every replica, so all report the same count: max, never sum.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 60, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: max(ezeebit_conversion_pending_overdue)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No conversion-svc exporting returns no series; ServiceDown pages for that.
+        noDataState: OK
+        execErrState: Error
+        # One sweep runs every 10s, so a due row normally lives for seconds; 5m means it cannot be resolved.
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $values.A.Value }} PENDING conversions are past their deadline and the sweeper has not resolved them for 5m'

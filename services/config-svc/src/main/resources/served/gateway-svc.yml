@@ -1,5 +1,9 @@
 # The published route table: only these paths reach a service. /internal/** is never routed.
 spring:
+  http:
+    clients:
+      # Proxy read timeout: no answer within it is 504 UPSTREAM_OUTCOME_UNKNOWN. Above conversion-svc's own outbound budget.
+      read-timeout: 10s
   cloud:
     loadbalancer:
       cache:

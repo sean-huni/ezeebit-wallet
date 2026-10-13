@@ -1,0 +1,3 @@
+# Findings the gate deliberately does not fail on. Every vulnerability entry needs an expired_at and a
+# statement giving the reason; an entry without both is a finding hidden, not a decision recorded.
+vulnerabilities: []

@@ -1,0 +1,27 @@
+# Compiled into every service (root build.gradle). classpath:/config/ loads beside each service's own application.yml.
+management:
+  opentelemetry:
+    resource-attributes:
+      # One series per JVM: without it every replica of a service writes into one Prometheus series.
+      service.instance.id: ${HOSTNAME:localhost}:${server.port}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTLP_URL:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTLP_URL:http://localhost:4318}/v1/logs
+  otlp:
+    metrics:
+      export:
+        url: ${OTLP_URL:http://localhost:4318}/v1/metrics
+        # Default 1m; the ServiceDown window is a multiple of this step.
+        step: 10s
+  tracing:
+    sampling:
+      probability: 1.0
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

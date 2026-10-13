@@ -2,7 +2,7 @@ package io.ezeebit.gateway.api.advice;
 
 import java.net.ConnectException;
 
-import org.springframework.http.HttpStatus;
+import io.ezeebit.gateway.exception.ErrorCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -13,20 +13,23 @@ import org.springframework.web.client.ResourceAccessException;
 @RestControllerAdvice
 public class UpstreamUnavailableAdvice {
 
+	private final ProblemFactory problems;
+
+	public UpstreamUnavailableAdvice(final ProblemFactory problems) {
+		this.problems = problems;
+	}
+
 	// No registered instance: the load balancer throws a 503.
 	@ExceptionHandler(HttpServerErrorException.class)
-	ProblemDetail upstreamFailed(HttpServerErrorException ex) {
-		return ProblemDetail.forStatusAndDetail(ex.getStatusCode(), "Upstream service unavailable");
+	ProblemDetail upstreamFailed(final HttpServerErrorException ex) {
+		return problems.of(ErrorCode.UPSTREAM_UNAVAILABLE);
 	}
 
 	// Refused connection: the request never reached the service. Anything else (reset, timeout) may have.
 	@ExceptionHandler(ResourceAccessException.class)
-	ProblemDetail upstreamUnreachable(ResourceAccessException ex) {
-		if (ex.getMostSpecificCause() instanceof ConnectException) {
-			return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Upstream service unavailable");
-		}
-		return ProblemDetail.forStatusAndDetail(HttpStatus.GATEWAY_TIMEOUT,
-				"Upstream outcome unknown: retry with the same Idempotency-Key");
+	ProblemDetail upstreamUnreachable(final ResourceAccessException ex) {
+		return problems.of(ex.getMostSpecificCause() instanceof ConnectException ? ErrorCode.UPSTREAM_UNAVAILABLE
+				: ErrorCode.UPSTREAM_OUTCOME_UNKNOWN);
 	}
 
 }

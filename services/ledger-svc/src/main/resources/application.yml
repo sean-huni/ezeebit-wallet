@@ -1,5 +1,7 @@
 server:
   port: ${SERVER_PORT:8081}
+  # Loopback unless SERVER_ADDRESS says otherwise: /internal/** moves money and has no authentication.
+  address: ${SERVER_ADDRESS:127.0.0.1}
 spring:
   application:
     name: ledger-svc
@@ -7,3 +9,6 @@ spring:
     import: "${CONFIG_IMPORT_OPTIONALITY:}configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
+  messages:
+    basename: i18n/messages
+    fallback-to-system-locale: false

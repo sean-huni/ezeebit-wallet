@@ -1,0 +1,15 @@
+{
+  "uid": "ezeebit-alerts",
+  "title": "Alerts",
+  "tags": ["ezeebit"],
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "alertlist", "title": "Ezeebit alert rules", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 14},
+     "description": "ServiceDown, HighErrorRate, RateFeedRefusing and ConversionsStuckPending in every state, including Normal. Rules live in docker/lgtm/alerting/rules.yaml.",
+     "options": {"viewMode": "list", "showInstances": true, "maxItems": 50, "sortOrder": 1,
+       "stateFilter": {"firing": true, "pending": true, "noData": true, "normal": true, "error": true},
+       "groupMode": "default", "groupBy": [], "alertInstanceLabelFilter": ""}}
+  ]
+}

@@ -26,17 +26,24 @@ public class Http {
 	}
 
 	public Reply conversion(final String method, final String path, @Nullable final String key, @Nullable final String body) {
+		return conversion(method, path, key, body, null);
+	}
+
+	// traceparent: the W3C trace context a gateway would forward, so the call joins that caller's trace.
+	public Reply conversion(final String method, final String path, @Nullable final String key, @Nullable final String body,
+			@Nullable final String traceparent) {
 		Reply reply = call(method, "http://127.0.0.1:%s%s".formatted(environment.getRequiredProperty("local.server.port"), path),
-				key, body);
+				key, body, traceparent);
 		SpecCoverage.record(method, path, reply);
 		return reply;
 	}
 
 	public Reply ledger(final String method, final String path, @Nullable final String key, @Nullable final String body) {
-		return call(method, Externals.get().ledgerUrl() + path, key, body);
+		return call(method, Externals.get().ledgerUrl() + path, key, body, null);
 	}
 
-	private Reply call(final String method, final String url, @Nullable final String key, @Nullable final String body) {
+	private Reply call(final String method, final String url, @Nullable final String key, @Nullable final String body,
+			@Nullable final String traceparent) {
 		long start = System.nanoTime();
 		RestClient.RequestBodySpec request = client.method(org.springframework.http.HttpMethod.valueOf(method))
 				.uri(URI.create(url));
@@ -44,6 +51,9 @@ public class Http {
 		request = request.header("X-Ezeebit-Gateway", environment.getRequiredProperty("ezeebit.gateway.shared-secret"));
 		if (key != null) {
 			request = request.header("Idempotency-Key", key);
+		}
+		if (traceparent != null) {
+			request = request.header("traceparent", traceparent);
 		}
 		if (body != null) {
 			request = request.contentType(MediaType.APPLICATION_JSON).body(body);

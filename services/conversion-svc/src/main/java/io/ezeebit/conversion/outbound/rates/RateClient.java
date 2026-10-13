@@ -39,8 +39,8 @@ public class RateClient {
 		RateDto dto;
 		long started = System.nanoTime();
 		try {
-			dto = rates.get().uri(uri -> uri.path("/rates").queryParam("base", base).queryParam("quote", quote).build())
-					.retrieve().body(RateDto.class);
+			// A template, so the client timer's uri tag is the route and not one value per pair.
+			dto = rates.get().uri("/rates?base={base}&quote={quote}", base, quote).retrieve().body(RateDto.class);
 		}
 		catch (ResourceAccessException | RestClientResponseException ex) {
 			metrics.rateCall(since(started), "unavailable");

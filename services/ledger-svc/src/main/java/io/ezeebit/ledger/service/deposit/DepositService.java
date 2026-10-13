@@ -12,12 +12,17 @@ import io.ezeebit.ledger.dto.resp.DepositResp;
 import io.ezeebit.ledger.exception.LedgerException;
 import io.ezeebit.ledger.service.CurrencyCatalog;
 import io.ezeebit.ledger.service.idempotency.RequestFingerprint;
+import io.micrometer.observation.Observation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 // Not transactional itself: the duplicate key must be caught outside the transaction it rolled back.
 @Service
 public class DepositService {
+
+	private static final Logger LOG = LoggerFactory.getLogger(DepositService.class);
 
 	private final CurrencyCatalog catalog;
 	private final RequestFingerprint fingerprint;
@@ -38,6 +43,11 @@ public class DepositService {
 
 	// First call and every replay answer from the stored rows, so a replay is byte-identical.
 	public DepositResp deposit(final String idempotencyKey, final DepositReq request) {
+		Observation span = metrics.depositSpan();
+		return metrics.observe(span, () -> post(span, idempotencyKey, request));
+	}
+
+	private DepositResp post(final Observation span, final String idempotencyKey, final DepositReq request) {
 		Currency currency = null;
 		try {
 			currency = catalog.require(request.currency());
@@ -55,11 +65,13 @@ public class DepositService {
 				outcome = Outcome.REPLAYED;
 			}
 			DepositResp answer = reader.read(journalId, merchant, currency);
-			metrics.deposit(currency, outcome, null);
+			metrics.deposit(span, currency, outcome, null);
+			LOG.info("deposit {} in {}", outcome, currency.code().value());
 			return answer;
 		}
 		catch (LedgerException refusal) {
-			metrics.deposit(currency, Outcome.REFUSED, refusal.code());
+			metrics.deposit(span, currency, Outcome.REFUSED, refusal.code());
+			LOG.info("deposit refused: {}", refusal.code());
 			throw refusal;
 		}
 	}

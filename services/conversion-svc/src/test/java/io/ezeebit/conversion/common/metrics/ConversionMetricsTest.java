@@ -14,12 +14,13 @@ import io.ezeebit.conversion.exception.ErrorCode;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.distribution.CountAtBucket;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 
 class ConversionMetricsTest {
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-	private final ConversionMetrics metrics = new ConversionMetrics(registry);
+	private final ConversionMetrics metrics = new ConversionMetrics(registry, ObservationRegistry.NOOP);
 
 	@Test
 	void anIssuedQuoteIsCountedByPairWithNoReason() {

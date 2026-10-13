@@ -42,7 +42,7 @@ public class PendingResolver {
 
 	// The row stays locked while the ledger is asked, so a second replica skips it instead of resolving it twice.
 	// Counted only after execute returns, so a failed commit (the row back to PENDING) is never counted.
-	public Optional<UUID> resolveNext(final List<UUID> skip) {
+	public Optional<Swept> resolveNext(final List<UUID> skip) {
 		Optional<Resolution> resolved = transaction.execute(status -> conversions
 				.claimDue(clock.instant().minus(properties.maxTransactionTime()), skip)
 				.map(this::resolve));
@@ -50,7 +50,7 @@ public class PendingResolver {
 			metrics.sweep(resolution.answer());
 			resolution.moved().ifPresent(settled -> metrics.conversion(settled.status(), settled.reason()));
 		});
-		return resolved.map(Resolution::id);
+		return resolved.map(resolution -> new Swept(resolution.id(), ConversionMetrics.sweepAction(resolution.answer())));
 	}
 
 	// Found: COMPLETED. Not found: a VOID in the ledger refuses any late posting, then REJECTED. Unknown: try later.
@@ -63,6 +63,10 @@ public class PendingResolver {
 	}
 
 	private record Resolution(UUID id, LedgerAnswer answer, Optional<Settlement> moved) {
+	}
+
+	// The claimed row and what the sweep did with it: completed, voided, refused or unresolved.
+	public record Swept(UUID id, String action) {
 	}
 
 }

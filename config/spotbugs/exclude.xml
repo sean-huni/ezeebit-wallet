@@ -20,6 +20,7 @@
 			<Field type="io.ezeebit.conversion.data.repo.QuoteRepo"/>
 			<Field type="io.ezeebit.conversion.service.conversion.ConversionSettler"/>
 			<Field type="io.micrometer.core.instrument.MeterRegistry"/>
+			<Field type="io.micrometer.observation.ObservationRegistry"/>
 			<Field type="org.springframework.web.client.RestClient"/>
 			<Field type="org.springframework.transaction.support.TransactionTemplate"/>
 		</Or>
@@ -43,6 +44,19 @@
 				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>
 				<Method name="fetch" params="java.lang.String,java.lang.String" returns="io.ezeebit.conversion.domain.MarketRate"/>
 			</And>
+		</Or>
+	</Match>
+
+	<!-- Business outcome lines: every argument is an enum constant, a route operation literal, or a currency or pair the
+	     catalog admitted as ASCII [A-Z]{3,5}, so no caller text can carry a line break into them. -->
+	<Match>
+		<Bug pattern="CRLF_INJECTION_LOGS"/>
+		<Or>
+			<And><Class name="io.ezeebit.ledger.service.deposit.DepositService"/><Method name="post"/></And>
+			<And><Class name="io.ezeebit.ledger.service.conversion.ConversionPostingService"/><Method name="answer"/></And>
+			<And><Class name="io.ezeebit.conversion.service.quote.QuoteService"/><Method name="issue"/></And>
+			<And><Class name="io.ezeebit.conversion.service.conversion.ConversionService"/><Method name="acceptAndTag"/></And>
+			<And><Class name="io.ezeebit.gateway.api.filter.RateLimitFilter"/><Method name="limit"/></And>
 		</Or>
 	</Match>
 

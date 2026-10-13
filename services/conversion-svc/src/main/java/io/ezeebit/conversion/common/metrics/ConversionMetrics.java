@@ -10,6 +10,7 @@ import io.ezeebit.conversion.exception.ConversionException;
 import io.ezeebit.conversion.exception.ErrorCode;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.stereotype.Component;
 
 // Counters are flows, so each replica counts its own and dashboards sum them. Tags are bounded enums only.
@@ -28,9 +29,16 @@ public class ConversionMetrics {
 			Duration.ofSeconds(2), Duration.ofSeconds(4), Duration.ofSeconds(5) };
 
 	private final MeterRegistry registry;
+	private final ConversionSpans spans;
 
-	public ConversionMetrics(final MeterRegistry registry) {
+	public ConversionMetrics(final MeterRegistry registry, final ObservationRegistry observations) {
 		this.registry = registry;
+		this.spans = new ConversionSpans(observations);
+	}
+
+	// The business spans travel with the counters, so a service records both through its one telemetry dependency.
+	public ConversionSpans spans() {
+		return spans;
 	}
 
 	public void quoteIssued(final String pair) {
@@ -39,9 +47,11 @@ public class ConversionMetrics {
 
 	// The detail is read only from a rate rejection, whose reason is always a RateRejection constant.
 	public void quoteRefused(final String pair, final ConversionException refusal) {
-		String detail = refusal.code() == ErrorCode.RATE_REJECTED
-				? String.valueOf(refusal.properties().getOrDefault("reason", NONE)) : NONE;
-		quote(pair, "refused", refusal.code().name(), detail);
+		quote(pair, "refused", refusal.code().name(), detail(refusal));
+	}
+
+	static String detail(final ConversionException refusal) {
+		return refusal.code() == ErrorCode.RATE_REJECTED ? String.valueOf(refusal.properties().getOrDefault("reason", NONE)) : NONE;
 	}
 
 	public void rateCall(final Duration took, final String outcome) {
@@ -60,8 +70,11 @@ public class ConversionMetrics {
 	}
 
 	public void sweep(final LedgerAnswer answer) {
-		registry.counter(SWEEPS, "action", answer.settlement().map(ConversionMetrics::action).orElse("unresolved"))
-				.increment();
+		registry.counter(SWEEPS, "action", sweepAction(answer)).increment();
+	}
+
+	public static String sweepAction(final LedgerAnswer answer) {
+		return answer.settlement().map(ConversionMetrics::action).orElse("unresolved");
 	}
 
 	private void quote(final String pair, final String outcome, final String reason, final String detail) {

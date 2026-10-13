@@ -19,6 +19,7 @@ import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.quote.QuoteReader;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 
 class ConversionSettlerTest {
@@ -29,7 +30,7 @@ class ConversionSettlerTest {
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerClient ledger = mock(LedgerClient.class);
 	private final ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class),
-			Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry));
+			Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry, ObservationRegistry.NOOP));
 	private final ConversionEntity pending = new ConversionEntity(UUID.randomUUID(), UUID.randomUUID(),
 			UUID.randomUUID(), "k1", "PENDING", null, NOW.plusSeconds(45), NOW, null, null);
 

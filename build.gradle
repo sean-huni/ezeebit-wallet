@@ -51,6 +51,8 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
 		implementation "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:${otelLogbackAppenderVersion}"
 		testImplementation 'org.springframework.boot:spring-boot-starter-test'
+		// TestObservationRegistry: business spans are asserted on the observation, without an exporter.
+		testImplementation 'io.micrometer:micrometer-observation-test'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}
 

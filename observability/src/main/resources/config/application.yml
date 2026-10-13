@@ -23,5 +23,22 @@ management:
       probability: 1.0
   metrics:
     distribution:
+      # Buckets for p95 panels and for exemplars, which ride on histogram buckets. The ezeebit.* timers come from each
+      # service's business spans. Keys match whole dot-separated segments: ezeebit.quote never matches ezeebit.quotes.
       percentiles-histogram:
         http.server.requests: true
+        http.client.requests: true
+        ezeebit.deposit: true
+        ezeebit.ledger.posting: true
+        ezeebit.quote: true
+        ezeebit.conversion.accept: true
+        ezeebit.ratelimit.decision: true
+      minimum-expected-value:
+        http: 1ms
+        ezeebit: 1ms
+      maximum-expected-value:
+        http: 10s
+        ezeebit: 10s
+      # An exact 500 ms bucket (le="500.0"): LatencySLOBurn counts requests slower than the SLO against it.
+      slo:
+        http.server.requests: 500ms

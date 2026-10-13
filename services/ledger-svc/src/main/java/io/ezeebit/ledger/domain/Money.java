@@ -47,6 +47,14 @@ public record Money(BigDecimal amount, CurrencyCode currency) {
 		return sum;
 	}
 
+	public Money debit(final Money amount) {
+		Money remaining = plus(amount.negate());
+		if (remaining.amount.signum() < 0) {
+			throw new LedgerException(ErrorCode.INSUFFICIENT_FUNDS, null, currency.value());
+		}
+		return remaining;
+	}
+
 	public Money negate() {
 		return new Money(amount.negate(), currency);
 	}

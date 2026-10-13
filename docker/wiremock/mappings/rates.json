@@ -1,0 +1,331 @@
+{
+  "mappings": [
+    {
+      "name": "rate USDT/ZAR",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDT"
+          },
+          "quote": {
+            "equalTo": "ZAR"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDT\",\"quote\":\"ZAR\",\"rate\":\"18.4321\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate ZAR/USDT",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "ZAR"
+          },
+          "quote": {
+            "equalTo": "USDT"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"ZAR\",\"quote\":\"USDT\",\"rate\":\"0.054254\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate USDC/ZAR",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDC"
+          },
+          "quote": {
+            "equalTo": "ZAR"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDC\",\"quote\":\"ZAR\",\"rate\":\"18.4302\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate ZAR/USDC",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "ZAR"
+          },
+          "quote": {
+            "equalTo": "USDC"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"ZAR\",\"quote\":\"USDC\",\"rate\":\"0.054260\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate USDT/NGN",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDT"
+          },
+          "quote": {
+            "equalTo": "NGN"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDT\",\"quote\":\"NGN\",\"rate\":\"1550.12\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate NGN/USDT",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "NGN"
+          },
+          "quote": {
+            "equalTo": "USDT"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"NGN\",\"quote\":\"USDT\",\"rate\":\"0.000645\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate USDC/NGN",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDC"
+          },
+          "quote": {
+            "equalTo": "NGN"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDC\",\"quote\":\"NGN\",\"rate\":\"1549.80\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate NGN/USDC",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "NGN"
+          },
+          "quote": {
+            "equalTo": "USDC"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"NGN\",\"quote\":\"USDC\",\"rate\":\"0.000645\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate USDT/KES",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDT"
+          },
+          "quote": {
+            "equalTo": "KES"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDT\",\"quote\":\"KES\",\"rate\":\"129.45\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate KES/USDT",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "KES"
+          },
+          "quote": {
+            "equalTo": "USDT"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"KES\",\"quote\":\"USDT\",\"rate\":\"0.007725\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate USDC/KES",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "USDC"
+          },
+          "quote": {
+            "equalTo": "KES"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"USDC\",\"quote\":\"KES\",\"rate\":\"129.40\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "rate KES/USDC",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates",
+        "queryParameters": {
+          "base": {
+            "equalTo": "KES"
+          },
+          "quote": {
+            "equalTo": "USDC"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"base\":\"KES\",\"quote\":\"USDC\",\"rate\":\"0.007728\",\"timestamp\":\"{{now}}\"}",
+        "transformers": [
+          "response-template"
+        ]
+      }
+    },
+    {
+      "name": "unsupported pair",
+      "priority": 100,
+      "request": {
+        "method": "GET",
+        "urlPath": "/rates"
+      },
+      "response": {
+        "status": 404,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"error\":\"unknown pair\"}"
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 package io.ezeebit.ledger.domain;
 
 public enum JournalType {
-	DEPOSIT
+	DEPOSIT, CONVERSION
 }

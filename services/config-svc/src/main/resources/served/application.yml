@@ -6,6 +6,8 @@ eureka:
     registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    # Registers the address the service listens on, so the gateway reaches a loopback-bound instance.
+    ip-address: ${SERVER_ADDRESS:127.0.0.1}
 management:
   endpoints:
     web:

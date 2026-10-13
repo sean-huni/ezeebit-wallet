@@ -11,6 +11,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -53,6 +54,11 @@ public class ValidationExceptionHandler {
 			return problems.of(ErrorCode.IDEMPOTENCY_KEY_MISSING);
 		}
 		return problems.invalid(List.of(violations.typeMismatch(ex.getHeaderName())));
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ProblemDetail missingParameter(final MissingServletRequestParameterException ex) {
+		return problems.invalid(List.of(violations.typeMismatch(ex.getParameterName())));
 	}
 
 	// Valid JSON with a value of the wrong type names its field; anything else is malformed.

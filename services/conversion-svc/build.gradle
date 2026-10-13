@@ -1,11 +1,32 @@
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
 	runtimeOnly 'org.postgresql:postgresql'
-	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
-	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	acceptanceTestImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
+}
+
+// Spring tests read the same file config-svc serves, so pairs, bands and timeouts have one home.
+def served = rootProject.file('services/config-svc/src/main/resources/served/conversion-svc.yml')
+tasks.withType(Test).configureEach {
+	systemProperty 'spring.config.import', "file:${served}"
+}
+
+// The acceptance tier runs the real ledger-svc jar as a separate process: real HTTP, its own database.
+def ledgerJar = project(':services:ledger-svc').tasks.named('bootJar').flatMap { it.archiveFile }
+tasks.named('acceptanceTest') {
+	dependsOn ledgerJar
+	inputs.file(ledgerJar)
+	// The rate feed in these tests serves the same committed mappings compose mounts into wiremock.
+	systemProperty 'rates.stubs', rootProject.file('docker/wiremock').absolutePath
+	doFirst {
+		systemProperty 'ledger.jar', ledgerJar.get().asFile.absolutePath
+	}
+	// ./gradlew ... -Dcucumber.filter.name='<regex>' runs only the matching scenarios.
+	if (System.getProperty('cucumber.filter.name')) {
+		systemProperty 'cucumber.filter.name', System.getProperty('cucumber.filter.name')
+	}
 }

@@ -1,0 +1,3 @@
+# Profile for the integration and acceptance tiers. The datasource comes from Testcontainers
+# (@ServiceConnection); pairs, bands and timeouts come from the served file (see build.gradle).
+# The services bind loopback by default (server.address in their own application.yml), so tests inherit it.

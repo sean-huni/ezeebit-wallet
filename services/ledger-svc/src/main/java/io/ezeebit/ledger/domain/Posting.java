@@ -23,6 +23,14 @@ public record Posting(List<PostingLine> lines) {
 		});
 	}
 
+	// Merchant source -sell, FX source +sell, FX target -buy, merchant target +buy: each currency nets to zero.
+	public static Posting conversion(final ConversionLegs sell, final ConversionLegs buy) {
+		return new Posting(List.of(new PostingLine(sell.merchantAccount(), sell.amount().negate()),
+				new PostingLine(sell.fxAccount(), sell.amount()),
+				new PostingLine(buy.fxAccount(), buy.amount().negate()),
+				new PostingLine(buy.merchantAccount(), buy.amount())));
+	}
+
 	public static Posting deposit(final UUID merchantAccount, final UUID clearingAccount, final Money amount) {
 		return new Posting(List.of(new PostingLine(merchantAccount, amount),
 				new PostingLine(clearingAccount, amount.negate())));

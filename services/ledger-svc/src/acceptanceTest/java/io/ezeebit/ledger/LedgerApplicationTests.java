@@ -31,4 +31,12 @@ class LedgerApplicationTests {
 				GROUP BY c.code HAVING count(a.id) <> 1""").query(String.class).list()).isEmpty();
 	}
 
+	@Test
+	void everyCurrencyHasExactlyOnePlatformFxAccount() {
+		assertThat(jdbc.sql("""
+				SELECT c.code FROM currency c
+				LEFT JOIN account a ON a.currency = c.code AND a.type = 'PLATFORM_FX' AND a.merchant_id IS NULL
+				GROUP BY c.code HAVING count(a.id) <> 1""").query(String.class).list()).isEmpty();
+	}
+
 }

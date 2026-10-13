@@ -18,6 +18,16 @@ services:
       timeout: 3s
       retries: 30
 
+  wiremock:
+    # Stands in for the exchange-rate service the brief says already exists; its contract is an
+    # assumption, written down in ARCHITECTURE.md section 5. Not the -alpine tag: that ships amd64 only.
+    image: 'wiremock/wiremock:3.13.2-3'
+    command: ['--disable-banner']
+    ports:
+      - '127.0.0.1:${RATES_PORT:-8089}:8080'
+    volumes:
+      - './docker/wiremock/mappings:/home/wiremock/mappings:ro'
+
   lgtm:
     # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
     # Grafana runs with anonymous Admin access.

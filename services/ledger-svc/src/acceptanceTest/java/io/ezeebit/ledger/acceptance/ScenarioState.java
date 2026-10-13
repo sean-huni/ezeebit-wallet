@@ -10,9 +10,14 @@ import java.util.UUID;
 public class ScenarioState {
 
 	private final Map<String, UUID> merchants = new HashMap<>();
+	private final Map<String, UUID> conversions = new HashMap<>();
 	private final Map<String, String> sentBodies = new HashMap<>();
 	private final Map<String, Reply> answers = new HashMap<>();
 	private final List<Reply> replies = new ArrayList<>();
+
+	public UUID conversion(final String name) {
+		return conversions.computeIfAbsent(name, ignored -> UUID.randomUUID());
+	}
 
 	public UUID merchant(final String name) {
 		return merchants.computeIfAbsent(name, ignored -> UUID.randomUUID());

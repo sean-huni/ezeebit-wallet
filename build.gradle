@@ -67,7 +67,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 //   test            unit tests in src/test: no Spring context, no Docker
 //   integrationTest JUnit tests in src/acceptanceTest: Spring Boot on Testcontainers Postgres
 //   acceptanceTest  Cucumber features in src/acceptanceTest: business scenarios over real HTTP
-def tieredServices = ['ledger-svc']
+def tieredServices = ['ledger-svc', 'conversion-svc']
 configure(subprojects.findAll { it.name in tieredServices }) {
 	sourceSets {
 		acceptanceTest {

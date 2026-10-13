@@ -18,18 +18,27 @@ auto-settlement (Task 5) is a conversion triggered by a deposit, and payout rout
 behind the withdrawal. If the ledger and conversion are right, the other four are mostly plumbing
 around them. If they are wrong, nothing built on top can be trusted.
 
-**Status in this repository: Task 1 (the ledger) is built and tested. Task 2 (conversion) is
-designed, not implemented.**
+**Status in this repository: Task 1 (the ledger) and Task 2 (conversion) are built and tested.**
 
 What exists and is verified:
 
+- **Task 2, conversion.** `POST /api/v1/merchants/{id}/quotes` calls the exchange-rate service
+  (2 s timeouts, no fallback rate), validates the rate (positive, fresh, inside the pair's band, no
+  jump of more than 5% from the pair's last quote), applies a 50 bps spread and rounds in the
+  platform's favour, and stores a quote that lives 15 s. `POST .../conversions {quoteId}` with an
+  `Idempotency-Key` writes the conversion PENDING, then asks the ledger to post it in one
+  transaction (four entries, the merchant's two accounts locked in id order, funds checked, a
+  deadline checked on the ledger's clock); the answer settles it COMPLETED or REJECTED, and an
+  answer that never arrives leaves it PENDING (202) for a sweeper, which finds the posting or voids
+  it in the ledger so a late arrival is refused. A refusal (insufficient funds) is recorded in the
+  ledger before it is answered, so money arriving later can never let that conversion post. A WireMock container stands in for the rate service.
 - Five Spring Boot 4.1.1 services (Java 25, Spring Cloud 2025.1.3) in one Gradle 9.8.1 build:
   `gateway-svc` (8080), `ledger-svc` (8081), `conversion-svc` (8082), `config-svc` (8888),
   `eureka-svc` (8761).
 - One PostgreSQL 18.6 (Alpine) container with a separate database and owning role per domain
   service (`ledger`, `conversion`), with `CONNECT` revoked from `PUBLIC`, so neither role can
-  even connect to the other's database. Liquibase runs on boot in both; only the ledger has
-  changesets so far.
+  even connect to the other's database. Liquibase runs on boot in both, each from its own
+  changelog.
 - **The Task 1 ledger.** `POST /internal/v1/deposits` (Idempotency-Key required) posts a
   balanced journal: merchant account `+X`, platform deposit clearing `-X`, in one transaction,
   with `balance_after` on the merchant entry. `GET /api/v1/merchants/{id}/balances` and
@@ -47,19 +56,23 @@ What exists and is verified:
 - Local observability: one Grafana LGTM container, OTLP metrics, traces and logs from every
   service, four provisioned dashboards, two alert rules with optional Slack delivery.
 - `./fleet.sh up | status | down` brings the whole fleet up in dependency order and checks health.
-- `./gradlew clean build` passes: 102 tests, 0 failures. The ledger runs three tiers: 46 unit tests
-  (no Spring, no Docker), 9 Spring integration tests and 42 Cucumber acceptance scenarios over
-  real HTTP, both on Testcontainers Postgres. The three 500s a review reached (a balance past the
+- `./gradlew clean build` passes: 259 tests, 0 failures. The ledger runs three tiers: 50 unit tests
+  (no Spring, no Docker), 16 Spring integration tests and 57 Cucumber acceptance scenarios over
+  real HTTP, both on Testcontainers Postgres. conversion-svc runs the same three: 81 unit tests
+  (pricing, rounding, rate rules, quote expiry, the state machine over every ordered pair of
+  states), 11 integration tests, and 40 acceptance scenarios against the real ledger jar running as
+  its own process, with WireMock scripting the rate feed (slow, 500, stale, zero, negative, out of
+  band, jump, unreadable) and injecting ledger faults (answer never sent, answer lost). The three 500s a review reached (a balance past the
   column's 20 digits, a NUL in `reference`, a statement window outside timestamptz's range) are
   now refused with 422 or 400, each by a scenario first seen failing. They include 50 concurrent deposits summing exactly
   and 20 concurrent copies of one deposit crediting once. Each concurrency, idempotency and
   currency-integrity test was seen failing with its control removed (row lock, unique constraint,
   composite foreign key, request-hash check) before it was trusted.
 
-What does not exist yet: the quote and conversion endpoints, their tables and tests, and the
-ledger's conversion-posting endpoints (Task 2). Where the built ledger departs from or adds to the
-design (an `entry.seq` ordering column, seeded clearing accounts, how the request hash is taken,
-the `{"data": ...}` envelope), ARCHITECTURE.md section 4, "As built", lists it.
+Where the build departs from or adds to the design, ARCHITECTURE.md lists it: section 4 "As
+built" for the ledger (an `entry.seq` ordering column, seeded clearing accounts, how the request hash
+is taken, the `{"data": ...}` envelope), section 5 "As built" for conversion (VOID as a journal
+status, where the deadline is checked, retry and sweeper mechanics, the scale configuration).
 
 ## 2. Design on one page
 
@@ -95,8 +108,10 @@ Two domain services, each owning its own database, behind one gateway.
 - **A PENDING conversion is resolved, never guessed.** After the posting deadline plus the maximum
   transaction time, a sweeper asks the ledger by conversion id: found means COMPLETED; not found
   means it writes a VOID marker under the same identity (a late posting then conflicts and is
-  refused) and marks REJECTED. A same-key retry returns the current state and never re-posts at a
-  stale rate.
+  refused) and marks REJECTED. A ledger refusal is recorded at the ledger before it is answered, so
+  it is final. A same-key retry posts a PENDING conversion again only while its quote is live (the
+  ledger replays whatever it holds for that id), and otherwise returns the current state, so it never
+  posts at a stale rate.
 - **Concurrency** is handled with `SELECT ... FOR UPDATE` on the merchant account rows only, locked
   in ascending id order, plus `CHECK (balance >= 0)` on merchant accounts as the last line of
   defence. Platform accounts are never locked: every posting writes them, so a lock would serialise
@@ -129,42 +144,51 @@ The brief leaves these open. I made a choice for each so the design is concrete.
    `NUMERIC(38,18)` so a larger scale can be added without a migration of existing data.
 2. **Currency kinds.** A currency is either FIAT or STABLECOIN; this is an attribute on the
    currency, not a separate service.
-3. **Rate service contract.** I assume it returns a mid rate for a currency pair plus the
-   timestamp of that price. A rate is accepted only if it is positive, fresh (source timestamp
-   within a few seconds), and inside a per-pair sanity band (min/max, from config-svc). If the
-   pair's most recent quote is younger than about 5 minutes, the rate must also be within a set
-   percentage of its market rate, read from the quote table; otherwise band and freshness alone
-   apply, so a run of refusals cannot lock a pair out for ever. Repeated refusals for a pair are a
-   future alert; observability and alerting now exist, the rule is not written.
-4. **Rate service failure.** The call has a short timeout (around 2 seconds). On timeout or a bad
-   rate the quote request fails with 503 or 502 and a reason. There is never a fallback to a
-   cached or default rate.
+3. **Rate service contract.** I assume `GET /rates?base=ZAR&quote=USDT` answers
+   `{"base","quote","rate","timestamp"}`: `rate` is how many units of `quote` one unit of `base`
+   buys, as a decimal string, and `timestamp` is when that price was taken. Both directions of each
+   pair are served, so the platform never inverts a rate. The full contract is in ARCHITECTURE.md
+   section 5, and WireMock serves it locally. A rate is accepted only if it is positive, fresh
+   (timestamp within 10 s), and inside a per-pair sanity band (min/max, from config-svc). If the
+   pair's most recent quote is younger than 5 minutes, the rate must also be within 5% of that
+   quote's market rate; otherwise band and freshness alone apply, so a run of refusals cannot lock
+   a pair out for ever. Repeated refusals for a pair are a future alert; the rule is not written.
+4. **Rate service failure.** Connect and read are each limited to 2 seconds. A timeout, refused
+   connection or error status is 503 `RATE_UNAVAILABLE`; a bad rate is 502 `RATE_REJECTED` with its
+   reason. There is never a fallback to a cached or default rate.
 5. **Quote TTL.** Around 15 seconds. Short enough that the market cannot move far, long enough for
    a person to press "confirm" on a mobile connection. This is a configuration value, not a
    constant.
 6. **Spread.** A configurable value in basis points per currency pair, always applied in the
    platform's favour, and stored on the quote with the market rate so every conversion records
-   both. The exact number is a business decision; I have not picked one.
-7. **Rounding.** Always in the platform's favour, by at most one minor unit. Quoted by sell
+   both. Every pair is configured at 50 bps as a placeholder: the real number is a business
+   decision. The sanity bands in `served/conversion-svc.yml` are likewise wide placeholders around
+   today's rates.
+7. **Rounding.** Always in the platform's favour, by at most one minor unit, and never enough to
+   move the rate the merchant really gets more than 1% from the stated rate (such a quote is
+   refused as too small). Quoted by sell
    amount: the amount the merchant receives rounds down to the buy currency's scale. Quoted by buy
    amount: the amount the merchant pays rounds up to the sell currency's scale.
 8. **Quotes are single-use.** A quote can be accepted once (enforced by a unique constraint on the
-   conversion's quote id). Re-sending the same accept with the same `Idempotency-Key` re-checks
-   quote expiry and returns the conversion's current state rather than failing, never re-posting
-   at a stale rate; the same quote under a different key is 409 `QUOTE_ALREADY_USED`.
-9. **Merchant id in the path:** `/api/v1/merchants/{merchantId}/...`, as the brief allows.
-10. **Platform accounts may go negative.** The deposit clearing account is the source side of a
+   conversion's quote id). Re-sending the same accept with the same `Idempotency-Key` returns the
+   conversion's current state; if it is still PENDING and the quote is still live, the posting is
+   sent again (the ledger is idempotent on the conversion id), and after expiry it is never sent at
+   a stale rate. The same quote under a different key is 409 `QUOTE_ALREADY_USED`.
+9. **Timing.** Posting deadline = quote expiry + 30 s grace; the sweeper settles a PENDING
+   conversion only 30 s after that (the maximum transaction time), and runs every 10 s.
+10. **Merchant id in the path:** `/api/v1/merchants/{merchantId}/...`, as the brief allows.
+11. **Platform accounts may go negative.** The deposit clearing account is the source side of a
     deposit, so its balance is negative while money is owed in from outside. The platform FX
     account per currency is the platform's open position. Only merchant accounts carry the
     non-negative constraint and a cached, locked balance; platform balances are summed on read.
-11. **Deposits arrive pre-confirmed for Task 1, and only from inside.** The internal deposit
+12. **Deposits arrive pre-confirmed for Task 1, and only from inside.** The internal deposit
     endpoint (`POST /internal/v1/deposits`, never routed) credits money that has already been
     confirmed by the rail that brought it in, keyed on (merchantId, the rail's transfer reference). Pending or unconfirmed funds belong to
     Task 4.
-12. **Accounts are opened on first use.** A merchant's account for a currency is created the first
+13. **Accounts are opened on first use.** A merchant's account for a currency is created the first
     time money arrives in that currency, by a deposit or by a conversion credit
     (`INSERT ... ON CONFLICT DO NOTHING`, then lock). There is no separate "open account" call.
-13. **Hedging is out of scope.** The platform FX balances show the platform's exposure per
+14. **Hedging is out of scope.** The platform FX balances show the platform's exposure per
     currency; offsetting that exposure is a treasury concern outside this slice.
 
 ## 5. How Tasks 3 to 6 fit the same design
@@ -200,29 +224,24 @@ service becomes a profile and KYC context once authentication exists.
 
 In order:
 
-1. **Implement Task 2:** the ledger's internal conversion posting, then quote and accept. (The
-   ledger's tables, deposit, balances and statement are done.)
-2. **A debit concurrency test:** N parallel debits against one account, asserting that exactly
-   `floor(balance / amount)` succeed and the balance never goes below zero. (Concurrent deposits
-   are tested; there are no debits until Task 2.)
-3. **Conversion idempotency tests:** a retried conversion after a ledger timeout posts once.
-   (Deposit replay and same-key-different-body are tested.)
-4. **A rate service stub** for local runs and tests, including slow, stale and wildly wrong rates,
-   so the failure paths are exercised and not only described.
-5. **A stale-conversion sweeper** that resolves conversions left `PENDING` by a ledger timeout,
-   after the posting deadline plus the maximum transaction time: COMPLETED if the ledger holds the
-   posting, otherwise a VOID marker in the ledger and REJECTED.
-6. **A reconciliation job** that checks every merchant account balance against the sum of its
+1. **A reconciliation job** that checks every merchant account balance against the sum of its
    entries (platform balances are derived on read, so there is nothing to reconcile) and that every
    journal sums to zero per currency, and alerts on any difference.
-7. **A transactional outbox** for ledger events, which Task 5 depends on.
-8. **Observability: done.** OTLP export to a local Grafana LGTM stack, four dashboards, ServiceDown
-   and HighErrorRate alerts to Slack; gaps are listed in `ARCHITECTURE.md` section 9.
-9. **An OpenAPI contract** published by each service.
-10. **A gateway upstream read timeout.** None is set yet, so a hung upstream hangs the request
-    rather than answering 504.
-11. **A MySQL portability check:** run the same suite against MySQL 8 to back up the claim in
-    section 3 with a result.
+2. **Business metrics and alerts for conversion:** quotes and refusals by reason, PENDING
+   conversions and their age, sweeper outcomes, and the platform FX position per currency; an alert
+   on repeated rate refusals for a pair.
+3. **A ledger currency endpoint**, so conversion-svc reads currency scales from the ledger instead
+   of keeping its own copy in config.
+4. **A two-instance run of conversion-svc** to prove the sweeper live across processes (today it is
+   proven with two concurrent sweeps in one process).
+5. **A transactional outbox** for ledger events, which Task 5 depends on.
+6. **An OpenAPI contract** published by each service, and generated client DTOs for the
+   conversion-to-ledger seam.
+7. **A gateway upstream read timeout.** None is set yet, so a hung upstream hangs the request
+   rather than answering 504.
+8. **Quote retention:** quotes are never deleted.
+9. **A MySQL portability check:** run the same suite against MySQL 8 to back up the claim in
+   section 3 with a result.
 
 ## 7. AI usage notes
 
@@ -256,6 +275,26 @@ live probe, not by an automated test.
 restart, from a Pending alert Grafana had persisted at shutdown. It was caught by reading Grafana's
 own notification counter before the planned outage rehearsal, reproduced red with Slack
 disconnected, fixed by moving Grafana's database to tmpfs, and green on the same script.
+
+**Changed, because verification disagreed with the first version of Task 2:**
+
+- The first concurrent-conversion test sent every conversion to the same target currency. With the
+  source-account lock deliberately removed it stayed green, because the lock on the shared target
+  account serialised the requests first. It now buys a different currency per request, and goes
+  red without the source lock (`Expected size: 3 but was: 8`).
+- The ledger client was first wired through a `@LoadBalanced RestClient.Builder` bean. Every test
+  passed, because tests run with Eureka off; the live smoke run then answered 503 for every quote,
+  because Eureka's own client had picked up that builder and conversion-svc never registered. The
+  client now adds the load-balancer interceptor directly, and a test boots with Eureka on and goes
+  red with the old bean.
+- A review of Task 2 found that a ledger refusal was not final: the ledger kept no record of it, so
+  a same-key retry after a deposit could post while conversion-svc recorded REJECTED. The ledger now
+  commits a REFUSED journal before answering; the race is reproduced in a scenario that goes red
+  without that write. The same review found two quotes that answered 500 (a computed amount too
+  large to store) and tiny quotes whose rounding made the stated rate untrue; both are now 400.
+- A "slow rate service" test measured 5 seconds for a refusal configured at 2. The service was
+  right; the test's own HTTP client (Apache HttpClient, present on the test classpath) silently
+  retried every 503 after a second. The test client is now the JDK one, which never retries.
 
 **Rejected:** an early table of services and datastores that included Redis rate limiting, MongoDB
 for notifications, and read replicas for settlement. Nothing in Tasks 1 and 2 needs any of them,

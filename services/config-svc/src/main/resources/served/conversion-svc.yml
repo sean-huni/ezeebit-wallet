@@ -3,3 +3,48 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/conversion}
     username: ${DB_USER:conversion}
     password: ${DB_PASSWORD:conversion}
+  cloud:
+    loadbalancer:
+      cache:
+        # As on the gateway: a 35s instance cache would keep a dead ledger instance routable.
+        enabled: false
+conversion:
+  quote-ttl: 15s
+  # Deadline sent to the ledger = quote expiry + grace; no posting commits after it.
+  posting-grace: 30s
+  # The sweeper resolves a PENDING conversion only after deadline + this, when no posting can still commit.
+  max-transaction-time: 30s
+  sweep-interval: 10s
+  rates:
+    url: ${RATES_URL:http://localhost:${RATES_PORT:8089}}
+    connect-timeout: 2s
+    read-timeout: 2s
+    max-age: 10s
+    max-jump-percent: 5
+    jump-window: 5m
+  ledger:
+    # A Eureka service name, resolved by the load-balanced client.
+    url: http://ledger-svc
+    connect-timeout: 1s
+    read-timeout: 3s
+  # Must match the ledger's currency table; the ledger refuses any amount whose scale does not fit.
+  currencies:
+    zar: 2
+    ngn: 2
+    kes: 2
+    usdt: 6
+    usdc: 6
+  # Key: sell-buy. Rate = units of buy per one unit of sell. Band = the only rates accepted from the feed.
+  pairs:
+    usdt-zar: { min: 10, max: 30, spread-bps: 50 }
+    zar-usdt: { min: 0.03, max: 0.1, spread-bps: 50 }
+    usdc-zar: { min: 10, max: 30, spread-bps: 50 }
+    zar-usdc: { min: 0.03, max: 0.1, spread-bps: 50 }
+    usdt-ngn: { min: 800, max: 3000, spread-bps: 50 }
+    ngn-usdt: { min: 0.0003, max: 0.00125, spread-bps: 50 }
+    usdc-ngn: { min: 800, max: 3000, spread-bps: 50 }
+    ngn-usdc: { min: 0.0003, max: 0.00125, spread-bps: 50 }
+    usdt-kes: { min: 80, max: 200, spread-bps: 50 }
+    kes-usdt: { min: 0.005, max: 0.0125, spread-bps: 50 }
+    usdc-kes: { min: 80, max: 200, spread-bps: 50 }
+    kes-usdc: { min: 0.005, max: 0.0125, spread-bps: 50 }

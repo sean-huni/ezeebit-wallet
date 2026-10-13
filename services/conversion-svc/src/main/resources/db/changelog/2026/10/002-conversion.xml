@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="002-conversion-table" author="conversion-svc">
+        <preConditions onFail="MARK_RAN"><not><tableExists tableName="conversion"/></not></preConditions>
+        <createTable tableName="conversion">
+            <column name="id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_conversion"/></column>
+            <column name="merchant_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="quote_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_conversion_quote" referencedTableName="quote" referencedColumnNames="id"/>
+            </column>
+            <column name="idempotency_key" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="reason" type="VARCHAR(32)"/>
+            <!-- Sent to the ledger: no posting may commit after it. The sweeper waits until it has passed. -->
+            <column name="deadline" type="TIMESTAMPTZ"><constraints nullable="false"/></column>
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="completed" type="TIMESTAMPTZ"/>
+        </createTable>
+        <!-- A quote is single-use, across every replica: the database is the arbiter. -->
+        <addUniqueConstraint tableName="conversion" columnNames="quote_id" constraintName="uq_conversion_quote"/>
+        <addUniqueConstraint tableName="conversion" columnNames="merchant_id, idempotency_key" constraintName="uq_conversion_idempotency"/>
+        <createIndex tableName="conversion" indexName="ix_conversion_status_deadline">
+            <column name="status"/>
+            <column name="deadline"/>
+        </createIndex>
+        <rollback><dropTable tableName="conversion"/></rollback>
+    </changeSet>
+
+    <changeSet id="002-conversion-checks" author="conversion-svc">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_conversion_shape')</sqlCheck>
+        </preConditions>
+        <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+        <!-- Also the status domain: only these three states pass. -->
+        <sql>ALTER TABLE conversion ADD CONSTRAINT ck_conversion_shape CHECK (
+    (status = 'PENDING' AND reason IS NULL AND completed IS NULL)
+    OR (status = 'COMPLETED' AND reason IS NULL AND completed IS NOT NULL)
+    OR (status = 'REJECTED' AND reason IS NOT NULL AND completed IS NOT NULL));</sql>
+        <rollback>
+            <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
+            <sql>ALTER TABLE conversion DROP CONSTRAINT ck_conversion_shape;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

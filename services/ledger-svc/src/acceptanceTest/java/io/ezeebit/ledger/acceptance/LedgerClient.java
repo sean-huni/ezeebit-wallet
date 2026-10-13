@@ -28,6 +28,11 @@ public class LedgerClient {
 		return reply(request.body(body).retrieve().toEntity(String.class));
 	}
 
+	public Reply post(final String path, final String body) {
+		return reply(client().post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
+				.toEntity(String.class));
+	}
+
 	// The path is sent exactly as given: callers percent-encode, so %2B stays a plus and never becomes a space.
 	public Reply get(final String path) {
 		URI uri = URI.create("http://127.0.0.1:%s%s".formatted(port(), path));

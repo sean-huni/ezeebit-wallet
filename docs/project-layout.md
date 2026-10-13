@@ -13,7 +13,7 @@ ezeebit-wallet/
 ├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, and this layout
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
 ├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml
-├── docker/          local backing services: Postgres init Structured Query Language (SQL), WireMock rate feed, Grafana LGTM (Loki, Grafana, Tempo, Mimir; lgtm/generate.py writes its dashboards and rules)
+├── docker/          local backing services: the Postgres init script, WireMock rate feed, and Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OpenTelemetry Protocol (OTLP) settings and the logback appender, compiled into every service's main source set
 ├── architecture/    the dependency-injection budget gate (DependencyBudgetTest), compiled into every service's test source set
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
@@ -40,7 +40,7 @@ each one:
 | `service/` + `service/<use case>/` | one subpackage per use case; shared helpers stay in `service/` | `*Service` |
 | `domain/` | value objects, enums, state rules; no framework imports | none |
 | `exception/` | the service's exception and its `ErrorCode` (wire code and message key only) | `*Exception` |
-| `data/model/`, `data/repo/` (+ `data/repo/query/`) | row records, SQL repositories, query parameter shapes | `*Entity`, `*Repo` |
+| `data/model/`, `data/repo/` (+ `data/repo/query/`) | row records, Structured Query Language (SQL) repositories, query parameter shapes | `*Entity`, `*Repo` |
 | `mapper/` | entity and domain to response | `*Mapper` |
 | `outbound/<context>/` | one anti-corruption layer (ACL) per called service: client, caller-owned data transfer objects (DTOs), translation | `*Client`, `*Dto`, `*Mapper` |
 | `scheduler/` | timed triggers that delegate to a service | `*Sweeper`, `*Scheduler` |
@@ -64,7 +64,7 @@ io.ezeebit.ledger     LedgerApplication
 ├── ctl/              BalanceCtrl, ConversionPostingCtrl, DepositCtrl, DocExamples, StatementCtrl
 ├── api/
 │   ├── doc/          OperationErrors, ProblemResponses, ProblemSchemas, PublishedPaths (the OpenAPI spec: error responses derived from ErrorStatus, /{version} named v1)
-│   ├── advice/       BusinessExceptionHandler, ErrorStatus, GlobalExceptionHandler, ProblemFactory, RoutingExceptionHandler, ValidationExceptionHandler, Violation, ViolationReader (RFC (Request for Comments) 9457 errors; ErrorStatus is the code-to-status table)
+│   ├── advice/       BusinessExceptionHandler, ErrorStatus, GlobalExceptionHandler, ProblemFactory, RoutingExceptionHandler, ValidationExceptionHandler, Violation, ViolationReader (Request for Comments (RFC) 9457 errors; ErrorStatus is the code-to-status table)
 │   ├── filter/       GatewayProofFilter (refuses public routes the gateway did not forward)
 │   ├── json/         StrictStringDeserializer (money only from JSON strings)
 │   └── validation/   OrderedWindow, OrderedWindowValidator, SupportedInstant, SupportedInstantValidator
@@ -115,7 +115,7 @@ service.statement         -> data.model(1), data.repo(2), data.repo.query(1), do
 
 | Package | One job | Key classes |
 |---|---|---|
-| `ctl` | HTTP endpoints | `DepositCtrl`, `ConversionPostingCtrl` (internal), `BalanceCtrl`, `StatementCtrl` |
+| `ctl` | Hypertext Transfer Protocol (HTTP) endpoints | `DepositCtrl`, `ConversionPostingCtrl` (internal), `BalanceCtrl`, `StatementCtrl` |
 | `api.doc` | shape the OpenAPI spec: each operation's error codes, their problem responses, literal v1 paths | `OperationErrors`, `ProblemResponses`, `ProblemSchemas`, `PublishedPaths` |
 | `api.advice` | render every error as RFC 9457; the one code-to-status table | `ErrorStatus`, `ProblemFactory`, `BusinessExceptionHandler`, `ValidationExceptionHandler`, `RoutingExceptionHandler`, `GlobalExceptionHandler` |
 | `api.filter` | refuse public routes not forwarded by the gateway | `GatewayProofFilter` |

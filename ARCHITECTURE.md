@@ -24,10 +24,10 @@ then deleted every candidate the brief cannot justify for the chosen tasks. The 
 | "trust these balances completely" | adverb | append-only journal; balance derived from entries and reconcilable |
 | "explain, at any later date, exactly how a balance reached its current value" | adverbs | immutable entries, each carrying `balance_after`; an entry is never updated or deleted |
 | "amounts can be large" | adjective | `NUMERIC` / `BigDecimal`, never floating point |
-| "two different currencies must never be silently mixed" | modal + adverb | `Money` value object whose cross-currency arithmetic throws; the DB ties an entry's currency to its account's currency |
+| "two different currencies must never be silently mixed" | modal + adverb | `Money` value object whose cross-currency arithmetic throws; the database (DB) ties an entry's currency to its account's currency |
 | "convert an amount of one currency they hold into another" | verb | conversion operation |
 | "exchange-rate service already exists ... can be slow and its price keeps moving" | adjectives | call it, never build it; timeout; quotes expire |
-| "which rate the merchant actually gets ... between quoting a price and completing the conversion" | verbs | two steps: quote (locks a rate for a short TTL), then accept; the merchant gets exactly the quoted rate or a clear rejection |
+| "which rate the merchant actually gets ... between quoting a price and completing the conversion" | verbs | two steps: quote (locks a rate for a short time to live (TTL)), then accept; the merchant gets exactly the quoted rate or a clear rejection |
 | "not end up on the wrong side of a moving market" | phrase | short quote TTL, spread in the platform's favour, rounding in the platform's favour |
 | "must never be able to convert more than they actually hold" | modal | atomic debit under a row lock with a balance check; `CHECK (balance >= 0)` as last line of defence |
 | "fires requests over flaky mobile connections, sometimes more than once" | adverb | an idempotency key on every POST that moves money (section 4) |
@@ -42,7 +42,7 @@ brief text for Tasks 1 and 2:
 |---|---|---|
 | Ledger | "keeps track", "explain exactly how", "audit trail" | kept: `ledger-svc` |
 | Conversion | verbs "convert", "quoting", "completing"; its own failure domain (slow rate feed) | **added**: `conversion-svc` (missing from the initial list) |
-| Merchant | only "identified by an ID in the request"; "no real authentication or KYC" | dropped: a `MerchantId` value object |
+| Merchant | only "identified by an ID in the request"; "no real authentication or KYC" (KYC: know-your-customer) | dropped: a `MerchantId` value object |
 | Fiat | "fiat" is a kind of currency; fiat payouts are Tasks 3 and 6 | dropped: `CurrencyKind.FIAT` |
 | Crypto | a stablecoin is a kind of currency; on-chain payments are Task 4 | dropped: `CurrencyKind.STABLECOIN` |
 | Settlement | "settle ... next day" (About section), Task 5 | dropped for Tasks 1 + 2 |
@@ -108,9 +108,9 @@ bucket in Redis (Lettuce, compare-and-swap). The design follows from three const
   spikes, loosening the limit when it matters. `SharedBucketIT` runs two gateway contexts on one
   Redis: a burst split across both admits exactly the capacity, and goes red (8 admitted of a
   capacity of 4) when the store is swapped for an in-heap bucket. Bucket4j computes refill from each
-  replica's wall clock, so NTP is a dependency: replicas skewed by d admit up to d x refill rate extra
+  replica's wall clock, so Network Time Protocol (NTP) is a dependency: replicas skewed by d admit up to d x refill rate extra
   per bucket.
-- *Every route is charged.* The limiter decides on the raw request URI only after proving it
+- *Every route is charged.* The limiter decides on the raw request Uniform Resource Identifier (URI) only after proving it
   canonical, on EVERY request: a `%xx` escape, a `;param`, a `.` or `..` segment, `//`, or any
   character outside letters, digits, `_`, `.`, `-` is 400 `MALFORMED_PATH`. A canonical raw path is
   exactly the decoded, normalised path the route matcher sees, so `/%61pi/...` or `/api;x=1/...`
@@ -120,7 +120,7 @@ bucket in Redis (Lettuce, compare-and-swap). The design follows from three const
   on its allow-list (`/v3/api-docs/ledger`, `/v3/api-docs/conversion`): literal paths, GET only,
   uncharged by design, and proven unable to match a merchant path.
 - *Bounded keys.* The key is `gateway:ratelimit:<capacity>-<refill>-<period ms>:merchant:<uuid>`,
-  lower-cased, built only from a strict UUID; anything else is 400 before Redis is touched, so a
+  lower-cased, built only from a strict universally unique identifier (UUID); anything else is 400 before Redis is touched, so a
   client cannot write arbitrary keys. Keys expire 10 s after their bucket would be full again.
   The limits are in the key because Bucket4j replaces a stored configuration only for a higher
   version, which a value derived from the limits cannot promise (lowering a limit could hash lower).
@@ -156,17 +156,17 @@ config-svc to every service. ledger-svc and conversion-svc refuse their public m
 segments cannot step around it) with **403 `GATEWAY_REQUIRED`** unless the header matches, compared
 in constant time. A service with a blank secret refuses to start. This is not authentication: anyone
 who can read the served configuration or the gateway's environment holds the value, and it is sent
-in clear over plain HTTP. It stops a mistaken or casual direct call to a service; the real control is
-network policy or mTLS. `/internal/**` is not covered: it is service-to-service, bound to loopback
+in clear over plain Hypertext Transfer Protocol (HTTP). It stops a mistaken or casual direct call to a service; the real control is
+network policy or mutual Transport Layer Security (mTLS). `/internal/**` is not covered: it is service-to-service, bound to loopback
 locally, and needs a network policy or mTLS in production
 ([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)).
 
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into
-an RFC 9457 problem detail with a stable `code` and i18n text that names no service:
+a Request for Comments (RFC) 9457 problem detail with a stable `code` and internationalised (i18n) text that names no service:
 
 - no registered instance, or a refused connection: **503 `UPSTREAM_UNAVAILABLE`**, the request never
   reached the service;
-- any other upstream I/O failure (connection reset, or no answer within the 10 s proxy read timeout,
+- any other upstream input/output (I/O) failure (connection reset, or no answer within the 10 s proxy read timeout,
   `spring.http.clients.read-timeout`): **504 `UPSTREAM_OUTCOME_UNKNOWN`**, because the request may
   have been processed. The text tells the caller to check the resource's state before retrying.
 
@@ -181,10 +181,11 @@ up to a minute.
 **Database per service.** `docker/postgres/initdb/01-databases.sql` creates role `ledger` owning
 database `ledger` and role `conversion` owning database `conversion`, and revokes `CONNECT` from
 `PUBLIC` on each. Neither role can connect to the other's database. The only path from conversion
-to ledger data is the ledger's HTTP API; conversion stores merchant references as plain UUIDs.
+to ledger data is the ledger's HTTP application programming interface (API); conversion stores merchant references as plain UUIDs.
 
-**Observability.** Every service pushes metrics, traces and logs over OTLP to one Grafana LGTM
-container. Levels such as "how many conversions are overdue" are read from the database on each
+**Observability.** Every service pushes metrics, traces and logs over OpenTelemetry Protocol (OTLP) to one Loki,
+Grafana, Tempo and Mimir (LGTM) container, which runs Grafana, Prometheus, Loki, Tempo, Pyroscope
+and an OpenTelemetry collector. Levels such as "how many conversions are overdue" are read from the database on each
 export, never held in a replica's heap, so every replica reports the same number. Dashboards,
 alerts and rehearsal timings: [docs/observability.md](docs/observability.md).
 
@@ -203,8 +204,8 @@ platform clearing account into the merchant's account.
 
 | Table | Key columns | Constraints |
 |---|---|---|
-| `currency` | `code` (PK: ZAR, NGN, KES, USDT, USDC), `kind` (FIAT, STABLECOIN), `scale` (2 for fiat, 6 for stablecoins) | an amount with more decimals than `scale` is rejected, never rounded |
-| `account` | `id`, `merchant_id` (null for platform accounts), `currency` FK, `type` (MERCHANT, PLATFORM_DEPOSIT_CLEARING, PLATFORM_FX), `balance` NUMERIC(38,18) (MERCHANT only) | UNIQUE (`merchant_id`, `currency`, `type`); partial UNIQUE (`currency`, `type`) WHERE `merchant_id IS NULL` (Postgres treats NULLs as distinct); UNIQUE (`id`, `currency`); CHECK `balance >= 0` when MERCHANT |
+| `currency` | `code`, the primary key (PK): South African rand (ZAR), Nigerian naira (NGN), Kenyan shilling (KES), Tether (USDT), USD Coin (USDC); `kind` (FIAT, STABLECOIN), `scale` (2 for fiat, 6 for stablecoins) | an amount with more decimals than `scale` is rejected, never rounded |
+| `account` | `id`, `merchant_id` (null for platform accounts), `currency` foreign key (FK), `type` (MERCHANT, PLATFORM_DEPOSIT_CLEARING, PLATFORM_FX), `balance` NUMERIC(38,18) (MERCHANT only) | UNIQUE (`merchant_id`, `currency`, `type`); partial UNIQUE (`currency`, `type`) WHERE `merchant_id IS NULL` (Postgres treats NULLs as distinct); UNIQUE (`id`, `currency`); CHECK `balance >= 0` when MERCHANT |
 | `journal` | `id`, `merchant_id`, `type` (DEPOSIT, CONVERSION), `status` (POSTED, VOID, REFUSED), `idempotency_key`, `request_hash`, `reference`, `reason` (REFUSED only), `created` | UNIQUE (`merchant_id`, `type`, `idempotency_key`): a rail reference and a `conversionId` can never collide |
 | `entry` | `id`, `seq`, `journal_id` FK, `account_id`, `currency`, `amount` signed NUMERIC(38,18), `balance_after` (merchant entries only), `created` | FK (`account_id`, `currency`) references `account` (`id`, `currency`); insert-only |
 
@@ -227,7 +228,7 @@ fixed ids, so every environment agrees on them.
 
 The zero-sum rule is code-enforced, not a DB constraint: a per-transaction sum check would need a
 deferred trigger, which is not worth its portability cost here. Reconciliation is the detective
-control; today it runs as a SQL step in the acceptance suite, not as a scheduled job.
+control; today it runs as a Structured Query Language (SQL) step in the acceptance suite, not as a scheduled job.
 
 ### Deposit flow
 
@@ -269,12 +270,12 @@ first and a unique violation means "replay", so concurrent duplicates give one p
 answers. The key lives in the journal row, in the same transaction as the entries, so a crash cannot
 separate them. Keys never expire.
 
-The request hash is SHA-256 over the fields as sent, not the raw body, so re-serialised whitespace
+The request hash is the 256-bit Secure Hash Algorithm (SHA-256) over the fields as sent, not the raw body, so re-serialised whitespace
 replays while `"100.0"` and `"100.00"` are different requests.
 
 ### Wire format
 
-Amounts are decimal strings; a JSON number is refused, so no binary float reaches the service. Too
+Amounts are decimal strings; a JavaScript Object Notation (JSON) number is refused, so no binary float reaches the service. Too
 many decimals for the currency is refused (`"10.500"` is fine for ZAR, `"10.001"` is not), as is
 more than 20 digits before the point. Input Postgres cannot store (a NUL in `reference`, a statement
 window outside 1970 to 9999) is 400 at the edge. `ErrorCode` carries only the stable wire code and
@@ -375,7 +376,7 @@ transaction in one database.
 ### The exchange-rate service contract (an assumption)
 
 The brief says the service exists and can be called; it does not say how. This is the only place
-the assumed contract is written down. The caller-owned DTO is `outbound/rates/RateDto`; WireMock
+the assumed contract is written down. The caller-owned data transfer object (DTO) is `outbound/rates/RateDto`; WireMock
 serves it from `docker/wiremock/mappings/rates.json`, and conversion-svc's acceptance tier loads the
 same files.
 
@@ -386,7 +387,7 @@ GET /rates?base=ZAR&quote=USDT
 
 - `rate` is how many units of `quote` one unit of `base` buys, as a decimal string. Both directions
   of every pair are served, so the platform never inverts a rate.
-- `timestamp` is when the price was taken, as an ISO-8601 instant.
+- `timestamp` is when the price was taken, as an International Organization for Standardization (ISO) 8601 instant.
 - An error status, an unknown pair, a refused connection or no answer within 2 s means "no rate"
   (503). An answer for another pair, an unreadable rate or timestamp, or a rate with more than 14
   decimals is a bad rate (502 `RATE_REJECTED`, reason `RATE_MALFORMED`).
@@ -400,7 +401,7 @@ GET /rates?base=ZAR&quote=USDT
   (`INPUT_REFUSED`) at once; no money moves.
 - **Loopback only, locally.** Every service binds `${SERVER_ADDRESS:127.0.0.1}` and registers that
   address in Eureka. `/internal/**` moves money and has no authentication, so loopback is the local
-  control; `LoopbackOnlyIT` requires a refusal on the host's LAN address.
+  control; `LoopbackOnlyIT` requires a refusal on the host's local area network (LAN) address.
 
 ### Proven by tests
 
@@ -451,7 +452,7 @@ operation can answer and `ErrorStatus` picks each one's status, so a response is
 whose `code` is an enum of exactly those codes. The `public` spec (merchant routes, server
 `http://localhost:8080/api`) is served only with the gateway proof header, the same rule as the routes
 it describes; ledger-svc's `internal` spec follows `/internal/**`: loopback, never routed. The gateway
-serves one Swagger UI over both public specs through two allow-listed, uncharged routes. Three checks
+serves one Swagger user interface (UI) over both public specs through two allow-listed, uncharged routes. Three checks
 keep the description true: `OpenApiContractIT` compares each spec with the controllers' mappings and
 with the snapshot in `docs/openapi`, the acceptance runs fail on any status or code a scenario saw that
 the snapshot does not list, and a gateway test fails if a gateway code is missing from either public
@@ -487,7 +488,7 @@ library, and `architecture/`, the dependency-injection budget gate compiled into
 `test` task only. Splitting into one repository per service later is mechanical.
 
 The rest of 12-factor is followed: config from the environment with committed working defaults (a
-clean clone runs with no `.env`), backing services attached by URL, and no process state (quotes
+clean clone runs with no `.env`), backing services attached by Uniform Resource Locator (URL), and no process state (quotes
 live in the database).
 
 The database choice (PostgreSQL rather than MySQL) is argued in

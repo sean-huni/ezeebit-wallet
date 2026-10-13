@@ -5,16 +5,16 @@ Back to [README](../README.md). This is beyond the brief; see
 
 ## The stack
 
-`compose.yaml` runs `grafana/otel-lgtm:0.36.0`: Grafana, Prometheus, Tempo, Loki and an
-OpenTelemetry collector in one container. Metrics, traces and logs persist in the `lgtmdata` volume.
+`compose.yaml` runs `grafana/otel-lgtm:0.36.0`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an
+OpenTelemetry collector in one container (the image keeps the Loki, Grafana, Tempo and Mimir (LGTM) name; Prometheus stands where Mimir would). Metrics, traces and logs persist in the `lgtmdata` volume.
 Grafana's own database is on tmpfs and resets on every start by design: dashboards, alert rules and
 the contact point re-provision from files in `docker/lgtm/`, and no stale alert state survives a
 restart to page on the next boot. Before that change a restart produced 4 false pages (reproduced
 with Slack disconnected); after it the same script produced 0.
 
-Every service exports metrics (every 10 s), traces (100% sampled) and logs over OTLP (OpenTelemetry
-Protocol) on HTTP to `localhost:4318` (`OTLP_URL` overrides it). A log line written inside a request carries
-its `trace_id` and `span_id`. Each JVM (Java virtual machine) is its own
+Every service exports metrics (every 10 s), traces (100% sampled) and logs over OpenTelemetry
+Protocol (OTLP) on Hypertext Transfer Protocol (HTTP) to `localhost:4318` (`OTLP_URL` overrides it). A log line written inside a request carries
+its `trace_id` and `span_id`. Each Java virtual machine (JVM) is its own
 series: `service.instance.id` is `${HOSTNAME:localhost}:<port>:<pid>` (Prometheus label `instance`) and
 `service.name` is the application name (label `job`), so two instances of one service never write
 into one series. The pid makes a restarted JVM a new series, as a new pod is under Kubernetes: a restart that
@@ -31,7 +31,7 @@ Grafana is at http://localhost:3000 with **anonymous Admin access: local use onl
 Folder **Ezeebit** holds five provisioned, read-only dashboards. They are generated: edit
 `docker/lgtm/generate.py`, run `python3 docker/lgtm/generate.py`, commit the script and its output
 together. `./gradlew check` runs `checkDashboards` (`generate.py --check`), which fails naming any file that
-differs from what the script writes, so a hand edit to the JSON or a forgotten regeneration is red.
+differs from what the script writes, so a hand edit to the JavaScript Object Notation (JSON) or a forgotten regeneration is red.
 
 | Dashboard | Shows | Variables |
 |---|---|---|
@@ -81,7 +81,7 @@ Each span also produces a timer of the same name (`ezeebit_quote_milliseconds_*`
 the same values. A span starts as `outcome=error` and keeps it when the step ends in neither an answer
 nor a refusal. A refusal is an answer, so it is tagged, not recorded as an error (its message can echo
 caller input). A database or transaction failure is recorded on the business span, and the catch-all
-500 handler records the exception on the request span. JDBC (Java Database Connectivity) statements have no
+500 handler records the exception on the request span. Java Database Connectivity (JDBC) statements have no
 spans: no JDBC instrumentation is on the classpath, and Hikari's pool metrics stand in.
 
 Every log line written inside a request carries `trace_id` and `span_id` as Loki structured metadata.
@@ -107,9 +107,9 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 Requests refused before the service layer (malformed JSON, a missing field) are counted only by the
 HTTP metrics.
 
-Beside these, every service exports Spring's RED (rate, errors, duration) timers:
+Beside these, every service exports Spring's rate, errors and duration (RED) timers:
 `http_server_requests_milliseconds_*` per route template and status (with an exact 500 ms bucket for the
-latency service level objective, SLO) and `http_client_requests_milliseconds_*` per called host, both as histograms so p95 and exemplars work. Each business span adds a timer of its
+latency service level objective (SLO)) and `http_client_requests_milliseconds_*` per called host, both as histograms so p95 and exemplars work. Each business span adds a timer of its
 name (`ezeebit_deposit`, `ezeebit_ledger_posting`, `ezeebit_quote`, `ezeebit_conversion_accept`,
 `ezeebit_ratelimit_decision`, `ezeebit_sweep`, all `_milliseconds_*`) with the span's bounded tags. ledger-svc
 and conversion-svc export Hikari's `hikaricp_connections_{active,idle,pending,max,timeout_total}` and
@@ -158,7 +158,7 @@ booting nor a deliberate stop can page.
 
 Notifications go to Slack only when `SLACK_WEBHOOK_URL` is set in the root `.env` (gitignored). The
 container installs the Slack contact point at start only in that case, because Grafana refuses to
-start on a Slack contact point with an empty URL; without it no contact point exists and alerts stay
+start on a Slack contact point with an empty Uniform Resource Locator (URL); without it no contact point exists and alerts stay
 visible in Grafana only. Grafana expands the URL from its environment; it is never written to a file.
 
 ## Rehearsals (local, 2026-10-13)
@@ -175,7 +175,8 @@ visible in Grafana only. Grafana expands the URL from its environment; it is nev
 | Normal | t+146s |
 | RESOLVED delivered (sent=2, failed=0) | t+175s |
 
-Repeated at 16:23 SAST (UTC+2) the same day, with the timings in
+Repeated at 16:23 South African Standard Time, 2 hours ahead of Coordinated Universal Time
+(UTC), the same day, with the timings in
 [observability-evidence.md](observability-evidence.md#alerts-to-slack). Every other rehearsal below ran once.
 
 **Business alerts, Slack disconnected.** ledger-svc frozen with SIGSTOP and a conversion accepted

@@ -6,7 +6,7 @@ A double-entry ledger takes internal deposits and serves balances and a statemen
 quotes a firm price from the exchange-rate service and converts at exactly that price through one
 ledger transaction. Five Spring Boot services route through one gateway, and each domain service
 owns its own PostgreSQL database. The exchange-rate service is assumed to exist; locally a WireMock
-container stands in for it. Design, trade-offs, scope, known gaps and AI usage notes are in
+container stands in for it. Design, trade-offs, scope, known gaps and artificial intelligence (AI) usage notes are in
 [SOLUTION.md](SOLUTION.md).
 
 Walkthrough video: link to be added.
@@ -18,11 +18,11 @@ Walkthrough video: link to be added.
 | Document | What it covers |
 |---|---|
 | [SOLUTION.md](SOLUTION.md) | Tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6 fit, known gaps, AI usage notes |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, API, failure handling |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, application programming interface (API), failure handling |
 | [docs/project-layout.md](docs/project-layout.md) | Every package and class per service, measured dependencies, where new code goes |
-| [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, SAST (static application security testing) and coverage |
-| [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, SBOMs (software bills of materials), how to read the console |
-| [docs/ci.md](docs/ci.md) | The CircleCI pipeline (not yet run) |
+| [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, static application security testing (SAST) and coverage |
+| [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
+| [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
 | [docs/observability-evidence.md](docs/observability-evidence.md) | Screenshots of the dashboards, an end-to-end trace, trace-correlated logs, alert timings |
 | [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
@@ -42,8 +42,8 @@ migration belongs.
 
 | Need | Notes |
 |---|---|
-| JDK 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
-| Docker, running | Postgres, WireMock, Redis and Grafana LGTM for the fleet; Testcontainers (Postgres, Redis) and the secrets scanners during the build |
+| Java Development Kit (JDK) 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
+| Docker, running | Postgres, WireMock, Redis and Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image for the fleet; Testcontainers (Postgres, Redis) and the secrets scanners during the build |
 | zsh and curl | `./fleet.sh` is a zsh script (default shell on macOS). Without zsh, use the manual commands below |
 | Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888 |
 
@@ -57,7 +57,7 @@ Boot 4.1.1, Spring Cloud 2025.1.3.
 ```
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
-HTTP), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached; the
+Hypertext Transfer Protocol (HTTP)), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached; the
 first run also downloads them).
 Test counts are in [SOLUTION.md](SOLUTION.md#1-tasks-chosen-and-status); the tiers and gates are
 described in [docs/quality-gates.md](docs/quality-gates.md).
@@ -87,11 +87,11 @@ fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana
 ```
 
 `up` refuses to start while a fleet from `.fleet/*.pid` is still running. If it stops part way, run
-`./fleet.sh down` before retrying so no JVM keeps a port.
+`./fleet.sh down` before retrying so no Java virtual machine (JVM) keeps a port.
 
 ### Without zsh
 
-The same steps by hand, in any POSIX shell from the repository root:
+The same steps by hand, in any Portable Operating System Interface (POSIX) shell from the repository root:
 
 ```sh
 docker compose up -d --wait postgres wiremock redis
@@ -110,11 +110,11 @@ docker compose up -d --wait lgtm      # optional: Grafana at http://localhost:30
 
 Give the gateway about 10 seconds after the last service is healthy before calling it: it learns
 instances from the registry on a 5 s cycle. To stop:
-`kill $(cat .fleet/*.pid); docker compose down`.
+`docker compose stop lgtm; kill $(cat .fleet/*.pid); docker compose down` (lgtm first, so a deliberate stop never pages).
 
 ## Demo: deposit, quote, convert, read back
 
-With the fleet up. Merchant ids are UUIDs and amounts are decimal strings. A fresh merchant id makes
+With the fleet up. Merchant ids are universally unique identifiers (UUIDs) and amounts are decimal strings. A fresh merchant id makes
 the demo repeatable.
 
 ```sh
@@ -147,7 +147,7 @@ curl -s "localhost:8080/api/v1/merchants/$M/entries?currency=ZAR"
 # two lines: DEPOSIT 1500.00 (balanceAfter 1500.00), then CONVERSION -1000.00 (balanceAfter 500.00)
 ```
 
-Where the numbers come from: the stand-in rate for ZAR to USDT is 0.054254. The 50 bps spread gives
+Where the numbers come from: the stand-in rate for South African rand (ZAR) to Tether (USDT) is 0.054254. The 50 basis-point (bps) spread gives
 `appliedRate = 0.054254 x 9950 / 10000 = 0.05398273`. The merchant receives
 `1000.00 x 0.05398273 = 53.98273`, rounded down to USDT's 6 decimals: 53.982730. ZAR is
 `1500.00 - 1000.00 = 500.00`.
@@ -170,7 +170,7 @@ kill $(cat .fleet/conversion-svc.pid)           # then a quote through the gatew
 ```
 
 Every endpoint and error code is in [ARCHITECTURE.md section 6](ARCHITECTURE.md#6-api-summary), and
-browsable in the Swagger UI below.
+browsable in the Swagger user interface (UI) below.
 
 ## API reference
 
@@ -178,7 +178,7 @@ With the fleet up, **http://localhost:8080/swagger-ui.html** is one Swagger UI o
 specs, picked from "Select a definition": `ledger` (balances, entries) and `conversion` (quotes,
 conversions). Its server is the gateway, so "Try it out" goes through the route table, the rate
 limiter and the proof header like any client call. Every operation lists its success body with the
-demo's values and each error as an RFC 9457 problem with the exact `code` values it can carry.
+demo's values and each error as a Request for Comments (RFC) 9457 problem with the exact `code` values it can carry.
 
 | Spec | Where |
 |---|---|
@@ -190,7 +190,7 @@ The doc routes are not merchant routes, so they are not rate limited; each is on
 only. Straight to a service, the public spec answers 403 `GATEWAY_REQUIRED` without the proof header.
 
 The committed snapshots in [docs/openapi](docs/openapi) are what `check` compares the running specs
-with. After changing a controller, a DTO, a spec annotation or an error code, regenerate and commit them:
+with. After changing a controller, a data transfer object (DTO), a spec annotation or an error code, regenerate and commit them:
 
 ```sh
 ./gradlew generateOpenApiSnapshots    # boots each service on Testcontainers and rewrites docs/openapi/*.json
@@ -209,7 +209,7 @@ Without that, `OpenApiContractIT` fails `./gradlew build` and names the file tha
 | eureka-svc | 8761 | Eureka service registry (dashboard at http://localhost:8761) |
 | wiremock | 8089 | Stand-in for the exchange-rate service (`docker/wiremock/mappings/rates.json`) |
 | redis | 6379 | The gateway's rate-limit buckets, shared by every gateway replica |
-| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Tempo, Loki and an OTLP collector |
+| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry Protocol (OTLP) collector |
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
 `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there.
@@ -293,7 +293,7 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 
 | Variable | Default | Effect |
 |---|---|---|
-| `POSTGRES_PORT` | 5432 | Host port for Postgres, and the port in both services' default JDBC URL |
+| `POSTGRES_PORT` | 5432 | Host port for Postgres, and the port in both services' default Java Database Connectivity (JDBC) Uniform Resource Locator (URL) |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD` | postgres / postgres | Postgres superuser in the container |
 | `DB_URL` | `jdbc:postgresql://localhost:${POSTGRES_PORT}/<ledger or conversion>` | JDBC URL |
 | `DB_USER`, `DB_PASSWORD` | `ledger`/`ledger`, `conversion`/`conversion` | Database credentials. The roles are created in `docker/postgres/initdb/01-databases.sql`: an override needs a matching change there plus `docker compose down -v` |
@@ -322,7 +322,7 @@ per process when starting a service by hand, not in `.env`, or every service pic
 
 Served configuration lives in `services/config-svc/src/main/resources/served/`: `application.yml`
 (shared by all clients: registry settings, the gateway proof secret and the public spec URL), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
-policy: quote TTL, posting grace, sweeper timing, rate-service timeouts and freshness, jump limit,
+policy: quote time to live (TTL), posting grace, sweeper timing, rate-service timeouts and freshness, jump limit,
 ledger client timeouts, currency scales, per-pair band and spread) and `gateway-svc.yml` (the route table with its path rewrite and proof
 header, the two Swagger UI spec routes, the proxy read timeout, and the rate limits and Redis connection).
 
@@ -340,5 +340,8 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | Quote accepted after 15 s answers 409 `QUOTE_EXPIRED` | Expected: re-quote and accept within 15 s |
 | Port 3000, 4317 or 4318 already in use | Stop the other Grafana or collector; these ports are fixed |
 | A dashboard shows no data right after `up` | Metrics export every 10 s; wait one step |
+| `./fleet.sh status` shows a container `down` or `unhealthy` | Start it: `docker compose up -d --wait <name>`; if it stays unhealthy, read `docker compose logs <name>` |
+| `./fleet.sh status` shows a datasource line `FAIL` | That backend inside lgtm is not answering: read `docker compose logs lgtm` |
+| `./fleet.sh status` shows backends `skipped (grafana not answering)`, or grafana or otlp-collector at `000` | lgtm is not running: `docker compose up -d --wait lgtm` |
 
 Run state (pids and logs) lives in `.fleet/`, which is gitignored.

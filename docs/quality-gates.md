@@ -1,7 +1,7 @@
 # Quality gates: tests, static application security testing (SAST) and coverage
 
-Back to [README](../README.md). The supply-chain half (secrets, images, software bills of materials (SBOMs)) is in
-[supply-chain.md](supply-chain.md).
+Back to [README](../README.md). The supply-chain half, covering secrets, images and software bills of materials (SBOMs), is
+in [supply-chain.md](supply-chain.md).
 
 ## Test tiers
 
@@ -11,7 +11,7 @@ listed in `tieredServices`, and to Cucumber by `cucumberServices`):
 
 | Gradle task | Source | What it is |
 |---|---|---|
-| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, i18n bundle, business-metric tags; no Spring context, no Docker |
+| `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, internationalisation (i18n) bundle, business-metric tags; no Spring context, no Docker |
 | `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each database constraint proven by the row it refuses, the gateway proof header, the OpenAPI spec against its committed snapshot in `docs/openapi` (`OpenApiContractIT`); for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the local area network (LAN) address. For gateway-svc: real gateway contexts on Testcontainers Redis (the pinned compose image) against a stub upstream: the rate limit, two gateways sharing one bucket, Redis stopped, paused and absent, the path rewrite and the proof header |
 | `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real Hypertext Transfer Protocol (HTTP), some ending in a Structured Query Language (SQL) check that the books balance; `business-metrics.feature` checks that the counters move on the real path |
 

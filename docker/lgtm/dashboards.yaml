@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: ezeebit
+    folder: Ezeebit
+    folderUid: ezeebit
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /ezeebit/dashboards

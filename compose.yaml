@@ -18,5 +18,29 @@ services:
       timeout: 3s
       retries: 30
 
+  lgtm:
+    # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
+    # Grafana runs with anonymous Admin access.
+    image: 'grafana/otel-lgtm:0.36.0'
+    entrypoint: ['/ezeebit/start.sh']
+    environment:
+      - 'SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}'
+    ports:
+      - '3000:3000'
+      - '4317:4317'
+      - '4318:4318'
+    volumes:
+      - './docker/lgtm:/ezeebit:ro'
+      - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'
+      - './docker/lgtm/alerting/rules.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml:ro'
+      - 'lgtmdata:/data'
+    healthcheck:
+      # run-all.sh writes this file once Grafana, Prometheus, Tempo, Loki and the collector answer.
+      test: ['CMD-SHELL', 'test -f /tmp/ready']
+      interval: 2s
+      timeout: 3s
+      retries: 90
+
 volumes:
   pgdata:
+  lgtmdata:

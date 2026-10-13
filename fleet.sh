@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres in Docker, every service as a JVM.
+# Runs the whole fleet on this host: Postgres and Grafana LGTM in Docker, every service as a JVM.
 # Usage: ./fleet.sh up | down | status
 set -u
 cd "${0:A:h}"
@@ -45,13 +45,16 @@ up() {
   docker compose up -d --wait postgres || return 1
   print "build"
   ./gradlew -q bootJar || return 1
+  # After the build, so ServiceDown's pending window is not spent waiting on Gradle.
+  print "lgtm"
+  docker compose up -d --wait lgtm || return 1
   # Control plane first: every other service fetches config and registers on boot.
   start config-svc; await_healthy config-svc || return 1
   start eureka-svc; await_healthy eureka-svc || return 1
   local svc
   for svc in ledger-svc conversion-svc gateway-svc; do start $svc; done
   for svc in ledger-svc conversion-svc gateway-svc; do await_healthy $svc || return 1; done
-  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc)"
+  print "fleet up: gateway http://localhost:$(port_of gateway-svc), registry http://localhost:$(port_of eureka-svc), grafana http://localhost:3000"
 }
 
 down() {

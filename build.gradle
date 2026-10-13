@@ -27,8 +27,18 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		}
 	}
 
+	// One copy of the OTLP wiring compiled into each service jar; see observability/.
+	sourceSets {
+		main {
+			java.srcDir rootProject.file('observability/src/main/java')
+			resources.srcDir rootProject.file('observability/src/main/resources')
+		}
+	}
+
 	dependencies {
 		implementation 'org.springframework.boot:spring-boot-starter-actuator'
+		implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+		implementation "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:${otelLogbackAppenderVersion}"
 		testImplementation 'org.springframework.boot:spring-boot-starter-test'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	}
@@ -38,6 +48,10 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		// Tests boot each service alone: no config server, no registry.
 		systemProperty 'spring.cloud.config.enabled', 'false'
 		systemProperty 'CONFIG_IMPORT_OPTIONALITY', 'optional:'
+		// Offline: no OTLP collector during the build.
+		systemProperty 'management.otlp.metrics.export.enabled', 'false'
+		systemProperty 'management.tracing.export.otlp.enabled', 'false'
+		systemProperty 'management.logging.export.otlp.enabled', 'false'
 		if (project.name != 'eureka-svc') {
 			// The registry's own server beans hang off the client config, so it keeps it.
 			systemProperty 'eureka.client.enabled', 'false'

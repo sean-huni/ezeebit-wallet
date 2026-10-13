@@ -1,0 +1,46 @@
+{
+  "uid": "ezeebit-fleet",
+  "title": "Fleet Overview",
+  "tags": ["ezeebit"],
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {"from": "now-30m", "to": "now"},
+  "templating": {"list": [
+    {"name": "service", "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "query": {"query": "label_values(jvm_threads_live, job)", "refId": "service"},
+     "refresh": 2, "multi": true, "includeAll": true, "current": {"text": "All", "value": "$__all"}}
+  ]},
+  "panels": [
+    {"id": 1, "type": "stat", "title": "Alive", "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
+     "description": "UP: exported metrics in the last 30s. DOWN: seen in the last hour, silent for 30s. A service never seen in the last hour is not listed; ServiceDown still pages for it.",
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "instant": true, "legendFormat": "{{job}}",
+       "expr": "count by (job) (present_over_time(jvm_threads_live{job=~\"$service\"}[30s])) or (count by (job) (present_over_time(jvm_threads_live{job=~\"$service\"}[1h])) * 0)"}],
+     "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
+       "reduceOptions": {"calcs": ["lastNotNull"]}},
+     "fieldConfig": {"defaults": {
+       "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+       "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}},
+    {"id": 2, "type": "timeseries", "title": "Request rate", "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "legendFormat": "{{job}}",
+       "expr": "sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\"}[1m]))"}],
+     "fieldConfig": {"defaults": {"unit": "reqps"}}},
+    {"id": 3, "type": "timeseries", "title": "5xx error ratio", "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+     "description": "Share of requests answered 5xx. Empty means no 5xx in the window, which is the healthy state. HighErrorRate fires above 5% for 2m.",
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "legendFormat": "{{job}}",
+       "expr": "sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\", status=~\"5..\"}[1m])) / sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\"}[1m]))"}],
+     "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0}}},
+    {"id": 4, "type": "timeseries", "title": "p95 latency", "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "legendFormat": "{{job}}",
+       "expr": "histogram_quantile(0.95, sum by (job, le) (rate(http_server_requests_milliseconds_bucket{job=~\"$service\"}[1m])))"}],
+     "fieldConfig": {"defaults": {"unit": "ms"}}},
+    {"id": 5, "type": "timeseries", "title": "JVM heap used", "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "legendFormat": "{{job}}",
+       "expr": "sum by (job) (jvm_memory_used_bytes{job=~\"$service\", area=\"heap\"})"}],
+     "fieldConfig": {"defaults": {"unit": "bytes"}}}
+  ]
+}

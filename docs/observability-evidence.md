@@ -119,15 +119,22 @@ each transition. URL `/alerting/grafana/ezeebit-rate-feed-refusing/view?tab=hist
 
 ## Alerts to Slack
 
-_To be filled by the lead: the Slack screenshot (page and all-clear) and the rehearsal timeline, from
-one rehearsed outage with `SLACK_WEBHOOK_URL` set._
+One rehearsed outage on 2026-10-13 with `SLACK_WEBHOOK_URL` set: `conversion-svc` was stopped with
+`kill`, left down until `ServiceDown` fired, then started again. State was polled every 5 seconds
+from Grafana's rules API (`/api/prometheus/grafana/api/v1/rules`), so each time is accurate to 5 seconds.
 
 | Event | Time |
 |---|---|
-| service stopped | t+0s |
-| Pending | |
-| Alerting | |
-| delivered to Slack | |
-| service restored | |
-| Normal | |
-| RESOLVED delivered | |
+| `conversion-svc` stopped (16:23:01) | t+0s |
+| `ServiceDown{job="conversion-svc"}` Pending | t+50s |
+| Alerting, page sent to Slack | t+111s |
+| `conversion-svc` restarted | t+151s |
+| Normal, all-clear sent to Slack | t+181s |
+
+Delivery is read from Grafana's own notifier counter rather than from a log line:
+`grafana_alerting_notifications_total{integration="slack"}` read **2** after the rehearsal (the page
+and the all-clear), and no `grafana_alerting_notifications_failed_total` series existed, so no
+delivery failed. The Slack channel screenshot is added in a follow-up commit.
+
+What this does not prove: one channel and one integration is not an on-call rota. A page delivered
+at night reaches a channel, not a person holding a pager.

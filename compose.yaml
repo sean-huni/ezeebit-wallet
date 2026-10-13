@@ -34,6 +34,10 @@ services:
       - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'
       - './docker/lgtm/alerting/rules.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml:ro'
       - 'lgtmdata:/data'
+    tmpfs:
+      # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted
+      # Pending alert restored after downtime fires the instant a booting fleet is first evaluated.
+      - '/data/grafana/data'
     healthcheck:
       # run-all.sh writes this file once Grafana, Prometheus, Tempo, Loki and the collector answer.
       test: ['CMD-SHELL', 'test -f /tmp/ready']

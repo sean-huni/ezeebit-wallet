@@ -16,6 +16,8 @@
 			<Field type="io.ezeebit.ledger.data.repo.AccountRepo"/>
 			<Field type="io.ezeebit.ledger.data.repo.EntryRepo"/>
 			<Field type="io.ezeebit.ledger.data.repo.JournalRepo"/>
+			<Field type="io.ezeebit.ledger.service.conversion.ConversionLegWriter"/>
+			<Field type="io.ezeebit.ledger.service.posting.EntryWriter"/>
 			<Field type="io.ezeebit.conversion.data.repo.ConversionRepo"/>
 			<Field type="io.ezeebit.conversion.data.repo.QuoteRepo"/>
 			<Field type="io.ezeebit.conversion.service.conversion.ConversionSettler"/>
@@ -53,7 +55,7 @@
 		<Bug pattern="CRLF_INJECTION_LOGS"/>
 		<Or>
 			<And><Class name="io.ezeebit.ledger.service.deposit.DepositService"/><Method name="post"/></And>
-			<And><Class name="io.ezeebit.ledger.service.conversion.ConversionPostingService"/><Method name="answer"/></And>
+			<And><Class name="io.ezeebit.ledger.service.conversion.answer.ConversionPostingResponder"/><Method name="answer"/></And>
 			<And><Class name="io.ezeebit.conversion.service.quote.QuoteService"/><Method name="issue"/></And>
 			<And><Class name="io.ezeebit.conversion.service.conversion.ConversionService"/><Method name="acceptAndTag"/></And>
 			<And><Class name="io.ezeebit.gateway.api.filter.RateLimitFilter"/><Method name="limit"/></And>

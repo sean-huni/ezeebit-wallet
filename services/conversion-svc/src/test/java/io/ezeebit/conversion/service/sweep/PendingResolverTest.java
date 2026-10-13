@@ -23,7 +23,6 @@ import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
-import io.ezeebit.conversion.service.quote.QuoteReader;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
@@ -77,10 +76,10 @@ class PendingResolverTest {
 	private PendingResolver resolver(final AbstractPlatformTransactionManager manager) {
 		ConversionProperties properties = new ConversionProperties(null, null, Duration.ofSeconds(30), null, null,
 				null, null);
-		ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class), clock,
-				metrics);
-		return new PendingResolver(new TransactionTemplate(manager), conversions, ledger, settler, properties, clock,
-				metrics);
+		ConversionSettler settler = new ConversionSettler(conversions, clock, metrics);
+		PendingClaimer claimer = new PendingClaimer(conversions, new DueCutoff(properties, clock),
+				new PendingLedgerCheck(ledger, settler));
+		return new PendingResolver(new TransactionTemplate(manager), claimer, metrics);
 	}
 
 	private static class CommitSucceeds extends AbstractPlatformTransactionManager {

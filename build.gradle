@@ -44,6 +44,10 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 			java.srcDir rootProject.file('observability/src/main/java')
 			resources.srcDir rootProject.file('observability/src/main/resources')
 		}
+		// One copy of the dependency-injection gate run by every service's `test`; see architecture/.
+		test {
+			java.srcDir rootProject.file('architecture/src/test/java')
+		}
 	}
 
 	dependencies {
@@ -172,7 +176,7 @@ def coverageFloors = [
 	'eureka-svc'    : [LINE: '0.57'],
 	'gateway-svc'   : [LINE: '0.95', BRANCH: '0.97'],
 	'ledger-svc'    : [LINE: '0.93', BRANCH: '0.87'],
-	'conversion-svc': [LINE: '0.90', BRANCH: '0.84'],
+	'conversion-svc': [LINE: '0.92', BRANCH: '0.84'],
 ]
 def coverageBand = new BigDecimal('0.05')
 def findsecbugsPluginId = 'com.h3xstream.findsecbugs'

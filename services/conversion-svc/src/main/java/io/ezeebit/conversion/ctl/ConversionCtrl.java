@@ -5,6 +5,7 @@ import java.util.UUID;
 import io.ezeebit.conversion.dto.req.ConversionReq;
 import io.ezeebit.conversion.dto.resp.ApiResponse;
 import io.ezeebit.conversion.dto.resp.ConversionResp;
+import io.ezeebit.conversion.service.conversion.ConversionReader;
 import io.ezeebit.conversion.service.conversion.ConversionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,9 +32,11 @@ public class ConversionCtrl {
 	private static final String COMPLETED = "COMPLETED";
 
 	private final ConversionService conversions;
+	private final ConversionReader reader;
 
-	public ConversionCtrl(final ConversionService conversions) {
+	public ConversionCtrl(final ConversionService conversions, final ConversionReader reader) {
 		this.conversions = conversions;
+		this.reader = reader;
 	}
 
 	// 201 when the money moved, 202 while the ledger's answer is still unknown. The swagger ApiResponse is qualified because
@@ -66,7 +69,7 @@ public class ConversionCtrl {
 	public ApiResponse<ConversionResp> find(
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @PathVariable final UUID merchantId,
 			@PathVariable final UUID conversionId) {
-		return new ApiResponse<>(conversions.find(merchantId, conversionId));
+		return new ApiResponse<>(reader.find(merchantId, conversionId));
 	}
 
 }

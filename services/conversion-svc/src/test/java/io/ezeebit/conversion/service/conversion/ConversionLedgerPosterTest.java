@@ -22,15 +22,16 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 
-class ConversionSettlerTest {
+class ConversionLedgerPosterTest {
 
 	private static final Instant NOW = Instant.parse("2026-10-13T10:00:00Z");
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerClient ledger = mock(LedgerClient.class);
-	private final ConversionSettler settler = new ConversionSettler(conversions, ledger, mock(QuoteReader.class),
-			Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry, ObservationRegistry.NOOP));
+	private final ConversionLedgerPoster poster = new ConversionLedgerPoster(ledger, mock(QuoteReader.class),
+			new ConversionSettler(conversions, Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry,
+					ObservationRegistry.NOOP)));
 	private final ConversionEntity pending = new ConversionEntity(UUID.randomUUID(), UUID.randomUUID(),
 			UUID.randomUUID(), "k1", "PENDING", null, NOW.plusSeconds(45), NOW, null, null);
 
@@ -38,7 +39,7 @@ class ConversionSettlerTest {
 	void aSettlementAnotherCallAlreadyMadeIsNotCountedAgain() {
 		givenTheLedgerAnswers(LedgerAnswer.POSTED, 0);
 
-		settler.postAndSettle(pending);
+		poster.postAndSettle(pending);
 
 		assertThat(registry.find(ConversionMetrics.OUTCOMES).counters()).isEmpty();
 	}
@@ -47,7 +48,7 @@ class ConversionSettlerTest {
 	void theCallThatMovesTheRowCountsItOnce() {
 		givenTheLedgerAnswers(LedgerAnswer.INSUFFICIENT_FUNDS, 1);
 
-		settler.postAndSettle(pending);
+		poster.postAndSettle(pending);
 
 		assertThat(registry.get(ConversionMetrics.OUTCOMES).tag("status", "REJECTED")
 				.tag("reason", "INSUFFICIENT_FUNDS").counter().count()).isEqualTo(1.0);

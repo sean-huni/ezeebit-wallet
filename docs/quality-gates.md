@@ -48,6 +48,34 @@ The first run of these gates found a real defect: conversion-svc accepted a curr
 with U+212A (Kelvin sign), which lower-cases onto `kes`. Codes are now ASCII `[A-Z]{3,5}`, as in
 the ledger.
 
+## Architecture gates
+
+Design rules, not security findings, so they are not SAST. They run inside `test`, so `check` and
+`./gradlew build` fail on them like any other gate.
+
+| Gate | Reads | Fails the build when |
+|---|---|---|
+| Dependency-injection budget (`DependencyBudgetTest`; source `architecture/src/test/java`, compiled into every service's `test` task) | every Spring component (`@Component` and its stereotypes, `@Configuration`, advice) found by scanning the service's compiled main classes under `io.ezeebit`, and every `@Bean` method on them | a bean or a `@Bean` method takes more than 3 injected dependencies (the message lists each with its count; no suppression), or the scan does not reach the service's `@SpringBootApplication` class |
+
+What counts as one injected dependency:
+
+- each parameter of the constructor Spring selects (the `@Autowired` one, the greediest of several
+  marked ones, the only one, else the no-argument one);
+- each injected field and each parameter of an injected setter, on the class and every superclass;
+- injection markers, matched by class name and through composed annotations: `@Autowired`, `@Value`,
+  `@Inject` (jakarta and javax), `@Resource` (jakarta and javax);
+- an `ObjectProvider<T>`, `List<T>`, `Set<T>` or `Map<String, T>` parameter is one injection point;
+- an object built inside a `@Bean` method is budgeted by that method's parameters, not by its own
+  constructor.
+
+`InjectionCounterTest` pins each rule with a fixture, and `DependencyBudgetTest` scans a committed
+over-budget fixture package (`architecture/.../fixture`) through the same scan and report path,
+asserting the exact message. Each rule was seen failing before its fix. The gate's first run failed
+on 8 beans (ledger `ConversionPostingService` 10, `DepositService` 6, `ConversionPoster` 5,
+`DepositPoster` 4; conversion `ConversionService` 9, `QuoteService` 8, `PendingResolver` 7,
+`ConversionSettler` 5), which were split by job; [project-layout.md](project-layout.md#dependency-injection-budget)
+has the before and after.
+
 ## SonarQube (opt-in)
 
 It needs no server to build:
@@ -64,7 +92,7 @@ defaults to `http://localhost:9000`; `SONAR_PROJECT_KEY` overrides the default k
 
 ## SAST and SCA read different things
 
-- **SAST** (SpotBugs with Find Security Bugs, Checkstyle, SonarQube) reads this repository's own
-  code. It finds **unknown** defects that no CVE describes.
+- **SAST** (static application security testing: SpotBugs with Find Security Bugs, Checkstyle,
+  SonarQube) reads this repository's own code. It finds **unknown** defects that no CVE describes.
 - **SCA** (trivy, in [supply-chain.md](supply-chain.md)) reads the shipped image: jars, OS
   packages, the JRE, buildpack binaries. It finds **known** CVEs in code nobody here wrote.

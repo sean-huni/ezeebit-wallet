@@ -92,7 +92,7 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 | Metric | Type | Tags | Counted where |
 |---|---|---|---|
 | `ezeebit_ledger_deposits_total` | counter | `currency` (`unknown` when refused for it), `outcome` posted, replayed, refused; `code` | ledger `DepositService`, once per answer |
-| `ezeebit_ledger_conversion_postings_total` | counter | `outcome` posted, replayed, voided, refused; `code` | ledger `ConversionPostingService`, once per answer; a replayed refusal counts again |
+| `ezeebit_ledger_conversion_postings_total` | counter | `outcome` posted, replayed, voided, refused; `code` | ledger `ConversionPostingResponder`, once per answer; a replayed refusal counts again |
 | `ezeebit_conversion_quotes_total` | counter | `pair`, `outcome` issued, refused; `reason`; `detail` (the rate rule for `RATE_REJECTED`) | `QuoteService`. Not counted: a quote that passes every check and then fails to save, which surfaces as a 500 |
 | `ezeebit_conversion_rate_calls_milliseconds_{bucket,count,sum}` | timer, 25 ms to 5 s | `outcome` answered, unavailable, unreadable | `RateClient`, around the HTTP call |
 | `ezeebit_conversion_outcomes_total` | counter | `status` COMPLETED, REJECTED; `reason` | once per conversion across replicas: only the call whose compare-and-set moved the row counts it, after that update committed |

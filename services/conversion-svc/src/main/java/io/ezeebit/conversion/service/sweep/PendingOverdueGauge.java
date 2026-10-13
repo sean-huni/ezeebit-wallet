@@ -1,6 +1,5 @@
 package io.ezeebit.conversion.service.sweep;
 
-import java.time.Clock;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -8,7 +7,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -25,19 +23,16 @@ public class PendingOverdueGauge implements MeterBinder {
 	private static final long TIMEOUT_MILLIS = 2_000;
 
 	private final ConversionRepo conversions;
-	private final ConversionProperties properties;
-	private final Clock clock;
+	private final DueCutoff cutoff;
 	// The read runs here, not on the export thread: a database that does not answer would hold that thread for
 	// the pool's 30 s connection timeout and delay every other metric. One read at a time; extra ones are dropped.
 	private final ThreadPoolExecutor reader = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
 			new ArrayBlockingQueue<>(1), runnable -> Thread.ofPlatform().daemon().name("overdue-gauge").unstarted(runnable),
 			new ThreadPoolExecutor.DiscardPolicy());
 
-	public PendingOverdueGauge(final ConversionRepo conversions, final ConversionProperties properties,
-			final Clock clock) {
+	public PendingOverdueGauge(final ConversionRepo conversions, final DueCutoff cutoff) {
 		this.conversions = conversions;
-		this.properties = properties;
-		this.clock = clock;
+		this.cutoff = cutoff;
 	}
 
 	@Override
@@ -49,7 +44,7 @@ public class PendingOverdueGauge implements MeterBinder {
 
 	// NaN when the database cannot answer within about 2 s: an unknown level, never a guessed zero.
 	public double read() {
-		Future<Long> count = reader.submit(() -> conversions.countDue(clock.instant().minus(properties.maxTransactionTime())));
+		Future<Long> count = reader.submit(() -> conversions.countDue(cutoff.deadlineBefore()));
 		try {
 			return count.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 		}

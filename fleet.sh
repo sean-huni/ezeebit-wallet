@@ -213,31 +213,46 @@ container_row() {
 }
 
 ds_ok() {
-  # One datasource health check of backend $1 through Grafana; sets BODY to the reply.
-  BODY=$(curl -s --max-time 5 "http://localhost:${PORT[lgtm:3000]}/api/datasources/uid/$1/health")
+  # One datasource health check of backend $1 through Grafana, allowed ${2:-5} seconds; sets BODY to the reply.
+  BODY=$(curl -s --max-time ${2:-5} "http://localhost:${PORT[lgtm:3000]}/api/datasources/uid/$1/health")
   [[ $(jq -r '.status // empty' <<< $BODY 2>/dev/null) == OK ]]
 }
 
 installer_mark() {
-  # The last line Grafana's background plugin installer logged; it moves while plugins are still being installed.
-  docker compose exec -T lgtm sh -c "grep -E 'logger=(plugin.backgroundinstaller|plugin.installer|installer.fs) ' /otel-lgtm/grafana/data/log/grafana.log | tail -1" 2>/dev/null
+  # The last line Grafana's background plugin installer logged, within $1 seconds; empty when the log cannot be read.
+  # Killed rather than awaited, so a wedged lgtm cannot hold up the caller (timeout(1) is not on a stock macOS).
+  local pid limit=$(( SECONDS + $1 ))
+  rm -f $RUN/installer.mark
+  docker compose exec -T lgtm awk '/logger=(plugin\.backgroundinstaller|plugin\.installer|installer\.fs) / {l = $0} END {print l}' \
+    /otel-lgtm/grafana/data/log/grafana.log > $RUN/installer.mark 2>/dev/null &
+  pid=$!
+  while kill -0 $pid 2>/dev/null && (( SECONDS < limit )); do sleep 0.2; done
+  kill $pid 2>/dev/null && wait $pid 2>/dev/null
+  [[ -f $RUN/installer.mark ]] && print -r -- "$(<$RUN/installer.mark)"
 }
 
 settle_plugins() {
   # lgtm reports healthy while Grafana still downloads its datasource plugins one by one, and each answers
   # "Plugin not registered" while it is replaced: settled is every backend OK and the installer idle for 5 polls.
+  # An unreadable installer log is never idle, so it waits out SETTLE and leaves the verdict to the status.
   local deadline=$(( SECONDS + SETTLE )) streak=0 name ok mark last=
   print "waiting for grafana plugins to settle"
   while (( streak < 5 && SECONDS < deadline )); do
     ok=1
-    for name in $BACKENDS; do ds_ok $name || ok=0; done
-    mark=$(installer_mark)
-    [[ $mark == *(msg=\"Installing plugin\"|Updating plugin|Downloaded and extracted)* || $mark != "$last" ]] && ok=0
+    for name in $BACKENDS; do
+      (( SECONDS < deadline )) || break 2
+      ds_ok $name $(( deadline - SECONDS < 5 ? deadline - SECONDS + 1 : 5 )) || ok=0
+    done
+    (( SECONDS < deadline )) || break
+    mark=$(installer_mark $(( deadline - SECONDS < 5 ? deadline - SECONDS + 1 : 5 )))
+    [[ -z $mark || $mark == *(msg=\"Installing plugin\"|Updating plugin|Downloaded and extracted)* || $mark != "$last" ]] && ok=0
     last=$mark
     if (( ok )); then streak=$(( streak + 1 )); else streak=0; fi
     (( streak < 5 )) && sleep 1
   done
-  # A timeout falls through to the status, which names the backend that is still down.
+  local took=$(( SECONDS - deadline + SETTLE ))
+  (( streak >= 5 )) && print "grafana plugins settled after ${took}s" ||
+    print "grafana plugins not settled after ${took}s (budget ${SETTLE}s); the status names what is still down"
   return 0
 }
 

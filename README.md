@@ -154,12 +154,10 @@ What `up` and `down` guarantee:
 `FLEET_SETTLE_SECONDS` (default 90) is how long `up` waits for lgtm's backends after the container
 reports healthy. The sweep test [docs/fleet/verification/](docs/fleet/verification/) drives every one
 of these outcomes against a real fleet and asserts each on its exit code and its words. Its last run,
-on 2026-10-14 at `da6db79` (with Kafka, the gRPC port check and the gated conversion), ended
+on 2026-10-14 at `234b5b0` (with Kafka, the gRPC port check and the gated conversion), ended
 `SWEEP: 110 passed, 0 failed` and `sweep_exit=0`
-([script](docs/fleet/verification/2026-10-14-fleet-sweep.zsh); the run log is
-`docs/fleet/verification/2026-10-14-fleet-sweep.log`, written by the controller's run and not
-yet committed; the committed [2026-10-14-fleet-sweep.log](docs/fleet/verification/2026-10-14-fleet-sweep.log)
-is the earlier 110 of 110 run at `495ded4`).
+([script](docs/fleet/verification/2026-10-14-fleet-sweep.zsh),
+[run log](docs/fleet/verification/2026-10-14-fleet-sweep.log)).
 
 ### Without zsh
 

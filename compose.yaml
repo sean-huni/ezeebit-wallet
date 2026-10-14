@@ -44,6 +44,31 @@ services:
       timeout: 3s
       retries: 30
 
+  kafka:
+    # Dead-letter records from conversion-svc. One KRaft broker, loopback only. Pin: gradle.properties kafkaImage (KafkaPinTest).
+    image: 'apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837'
+    environment:
+      - 'KAFKA_NODE_ID=1'
+      - 'KAFKA_PROCESS_ROLES=broker,controller'
+      - 'KAFKA_LISTENERS=PLAINTEXT://:9092,INTERNAL://:29092,CONTROLLER://:9093'
+      # Host clients are sent to the published port; in-container clients (the healthcheck) need a listener that
+      # advertises an address reachable inside the container, or a non-default KAFKA_PORT never turns healthy.
+      - 'KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${KAFKA_PORT:-9092},INTERNAL://localhost:29092'
+      - 'KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL'
+      - 'KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER'
+      - 'KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093'
+      - 'KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT'
+      - 'KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1'
+      - 'KAFKA_AUTO_CREATE_TOPICS_ENABLE=false'
+    ports:
+      - '127.0.0.1:${KAFKA_PORT:-9092}:9092'
+    healthcheck:
+      # Healthy only once the dead-letter topic exists: creating it is idempotent, and a broker that cannot is not ready.
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --create --if-not-exists --topic ezeebit.conversion.ledger.deadletter --partitions 1 --replication-factor 1 --config retention.ms=604800000 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --describe --topic ezeebit.conversion.ledger.deadletter']
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
   lgtm:
     # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
     # Grafana runs with anonymous Admin access.

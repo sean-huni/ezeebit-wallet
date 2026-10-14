@@ -27,6 +27,9 @@ def served = rootProject.file('services/config-svc/src/main/resources/served')
 tasks.withType(Test).configureEach {
 	systemProperty 'spring.config.import', "file:${served}/application.yml,file:${served}/conversion-svc.yml"
 	systemProperty 'served.shared', "${served}/application.yml"
+	systemProperty 'kafka.image', kafkaImage
+	systemProperty 'compose.file', rootProject.file('compose.yaml').absolutePath
+	inputs.file(rootProject.file('compose.yaml')).withPropertyName('composeFile').withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // The acceptance tier runs the real ledger-svc jar as a separate process: real HTTP, its own database.

@@ -1,0 +1,329 @@
+Full gate, branch feat-ledger-grpc at 3b92e9d, 2026-10-14.
+Command: ./gradlew --console=plain --no-build-cache --rerun-tasks --continue clean build -x checkSecrets
+checkSecrets is excluded here and run separately (see 2026-10-14-secrets.log): in a git worktree .git is a file, so its history mount sees 0 commits.
+
+> Task :clean
+> Task :services:config-svc:clean UP-TO-DATE
+> Task :services:conversion-svc:clean UP-TO-DATE
+> Task :services:eureka-svc:clean UP-TO-DATE
+> Task :services:gateway-svc:clean UP-TO-DATE
+> Task :services:ledger-svc:clean UP-TO-DATE
+> Task :assemble UP-TO-DATE
+
+> Task :checkDashboards
+generate.py --check: 7 files match the generator (5 dashboards, 12 rules, 1 promtool mirror)
+
+> Task :checkSingleProto
+checkSingleProto: 1 contract(s), 0 strays
+
+> Task :check
+> Task :build
+> Task :services:config-svc:compileJava
+> Task :services:config-svc:processResources
+> Task :services:config-svc:classes
+> Task :services:config-svc:resolveMainClassName
+> Task :services:config-svc:bootJar
+> Task :services:config-svc:jar SKIPPED
+> Task :services:config-svc:assemble
+> Task :services:config-svc:compileTestJava
+> Task :services:config-svc:processTestResources NO-SOURCE
+> Task :services:config-svc:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-14T13:46:34.968+02:00  INFO 90829 --- [config-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:46:34.970+02:00  INFO 90829 --- [config-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+> Task :services:config-svc:test
+> Task :services:config-svc:spotbugsTest SKIPPED
+> Task :services:conversion-svc:protobufDummy UP-TO-DATE
+> Task :services:config-svc:jacocoTestCoverageVerification
+> Task :services:config-svc:jacocoTestReport
+> Task :services:conversion-svc:extractIncludeProto
+
+> Task :services:config-svc:checkCoverageFloors
+checkCoverageFloors(config-svc): LINE measured 0.6000, floor 0.57
+
+> Task :services:conversion-svc:extractProto
+> Task :services:conversion-svc:generateProto
+> Task :services:config-svc:checkstyleMain
+> Task :services:config-svc:checkstyleTest
+
+> Task :services:conversion-svc:compileJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet-grpc/services/conversion-svc/src/main/java/io/ezeebit/conversion/api/doc/ProblemSchemas.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:conversion-svc:processProtoResources
+> Task :services:conversion-svc:processResources
+> Task :services:conversion-svc:classes
+> Task :services:conversion-svc:resolveMainClassName
+> Task :services:config-svc:spotbugsMain
+> Task :services:conversion-svc:bootJar
+
+> Task :services:config-svc:checkSpotbugsReport
+spotbugs(config-svc): 2 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:config-svc:check
+> Task :services:config-svc:build
+> Task :services:conversion-svc:jar SKIPPED
+> Task :services:conversion-svc:assemble
+> Task :services:conversion-svc:extractIncludeTestProto
+> Task :services:conversion-svc:extractTestProto
+> Task :services:conversion-svc:generateTestProto NO-SOURCE
+
+> Task :services:conversion-svc:compileTestJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet-grpc/services/conversion-svc/src/test/java/io/ezeebit/conversion/scheduler/PendingConversionSweeperTest.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:conversion-svc:processTestProtoResources
+> Task :services:conversion-svc:processTestResources NO-SOURCE
+> Task :services:conversion-svc:testClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.35.1/b933d3f9fc35b0356f28980c2ffc5892d297eebf/protobuf-java-4.35.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :services:conversion-svc:test
+> Task :services:conversion-svc:extractAcceptanceTestProto
+> Task :services:conversion-svc:extractIncludeAcceptanceTestProto
+> Task :services:conversion-svc:generateAcceptanceTestProto NO-SOURCE
+> Task :services:conversion-svc:compileAcceptanceTestJava
+> Task :services:conversion-svc:processAcceptanceTestProtoResources
+> Task :services:conversion-svc:processAcceptanceTestResources
+> Task :services:conversion-svc:acceptanceTestClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-14T13:47:23.396+02:00  INFO 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-10-14T13:47:23.396+02:00  WARN 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:64909) could not be established. Node may not be available.
+2026-10-14T13:47:23.396+02:00  WARN 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:64909 (id: -1 rack: null isFenced: false) disconnected
+2026-10-14T13:47:23.402+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-10-14T13:47:23.403+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-10-14T13:47:23.496+02:00  INFO 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:64909]
+2026-10-14T13:47:23.547+02:00  INFO 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:64909]
+2026-10-14T13:47:23.581+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:47:23.582+02:00  INFO 92045 --- [conversion-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-10-14T13:47:23.585+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown initiated...
+2026-10-14T13:47:23.586+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown completed.
+2026-10-14T13:47:23.598+02:00  INFO 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:64909]
+2026-10-14T13:47:23.649+02:00  INFO 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-10-14T13:47:23.649+02:00  WARN 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:64909) could not be established. Node may not be available.
+2026-10-14T13:47:23.649+02:00  WARN 92045 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:64909 (id: -1 rack: null isFenced: false) disconnected
+2026-10-14T13:47:23.752+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.s.EurekaServiceRegistry        : Unregistering application CONVERSION-SVC with eureka with status DOWN
+2026-10-14T13:47:23.754+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2026-10-14T13:47:23.755+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+2026-10-14T13:47:23.925+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Shutting down DiscoveryClient ...
+2026-10-14T13:47:23.926+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Completed shut down of DiscoveryClient
+2026-10-14T13:47:23.926+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=conversion-svc-producer-2] Closing the Kafka producer with timeoutMillis = 30000 ms.
+2026-10-14T13:47:23.927+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-10-14T13:47:23.927+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-10-14T13:47:23.927+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-10-14T13:47:23.927+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-10-14T13:47:23.928+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.kafka.common.utils.AppInfoParser     : App info kafka.producer for conversion-svc-producer-2 unregistered
+2026-10-14T13:47:23.929+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown initiated...
+2026-10-14T13:47:23.930+02:00  INFO 92045 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown completed.
+> Task :services:conversion-svc:integrationTest
+> Task :services:ledger-svc:protobufDummy UP-TO-DATE
+> Task :services:ledger-svc:extractIncludeProto
+> Task :services:ledger-svc:extractProto
+> Task :services:ledger-svc:generateProto
+
+> Task :services:ledger-svc:compileJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet-grpc/services/ledger-svc/src/main/java/io/ezeebit/ledger/api/doc/ProblemSchemas.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:ledger-svc:processProtoResources
+> Task :services:ledger-svc:processResources
+> Task :services:ledger-svc:classes
+> Task :services:ledger-svc:resolveMainClassName
+> Task :services:ledger-svc:bootJar
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.35.1/b933d3f9fc35b0356f28980c2ffc5892d297eebf/protobuf-java-4.35.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+> Task :services:conversion-svc:acceptanceTest
+
+2026-10-14T13:49:07.647+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:49:07.648+02:00  INFO 92471 --- [conversion-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-10-14T13:49:07.655+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=conversion-svc-producer-1] Closing the Kafka producer with timeoutMillis = 30000 ms.
+2026-10-14T13:49:07.657+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-10-14T13:49:07.657+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-10-14T13:49:07.657+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-10-14T13:49:07.657+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-10-14T13:49:07.658+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.kafka.common.utils.AppInfoParser     : App info kafka.producer for conversion-svc-producer-1 unregistered
+2026-10-14T13:49:07.666+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-10-14T13:49:07.667+02:00  INFO 92471 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+
+> Task :services:conversion-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:conversion-svc:spotbugsTest SKIPPED
+> Task :services:conversion-svc:jacocoTestCoverageVerification
+> Task :services:eureka-svc:compileJava
+> Task :services:eureka-svc:processResources
+> Task :services:eureka-svc:classes
+> Task :services:eureka-svc:resolveMainClassName
+> Task :services:conversion-svc:jacocoTestReport
+> Task :services:eureka-svc:bootJar
+
+> Task :services:conversion-svc:checkCoverageFloors
+checkCoverageFloors(conversion-svc): LINE measured 0.9531, floor 0.92
+checkCoverageFloors(conversion-svc): BRANCH measured 0.8498, floor 0.84
+
+> Task :services:eureka-svc:jar SKIPPED
+> Task :services:eureka-svc:assemble
+> Task :services:conversion-svc:checkstyleAcceptanceTest
+> Task :services:conversion-svc:checkstyleMain
+> Task :services:eureka-svc:compileTestJava
+> Task :services:eureka-svc:processTestResources NO-SOURCE
+> Task :services:eureka-svc:testClasses
+> Task :services:conversion-svc:checkstyleTest
+> Task :services:conversion-svc:spotbugsMain
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.thoughtworks.xstream/xstream/1.4.21/65cb3e7f809b18b9aab43f2338ee5b320f72d7bd/xstream-1.4.21.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-14T13:49:16.870+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.s.EurekaServiceRegistry        : Unregistering application EUREKA-SVC with eureka with status DOWN
+2026-10-14T13:49:16.872+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.server.EurekaServerBootstrap   : Shutting down Eureka Server..
+2026-10-14T13:49:16.872+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shutting down ...
+2026-10-14T13:49:16.872+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shut down
+2026-10-14T13:49:16.872+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.server.EurekaServerBootstrap   : Eureka Service is now shutdown...
+2026-10-14T13:49:16.873+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shutting down ...
+2026-10-14T13:49:16.873+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shut down
+2026-10-14T13:49:16.877+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Shutting down DiscoveryClient ...
+2026-10-14T13:49:16.877+02:00  INFO 92820 --- [eureka-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Completed shut down of DiscoveryClient
+> Task :services:eureka-svc:test
+
+> Task :services:conversion-svc:checkSpotbugsReport
+spotbugs(conversion-svc): 154 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:conversion-svc:check
+> Task :services:conversion-svc:build
+> Task :services:eureka-svc:spotbugsTest SKIPPED
+> Task :services:eureka-svc:jacocoTestCoverageVerification
+> Task :services:eureka-svc:jacocoTestReport
+> Task :services:eureka-svc:checkstyleMain
+> Task :services:eureka-svc:checkstyleTest
+> Task :services:gateway-svc:compileJava
+
+> Task :services:eureka-svc:checkCoverageFloors
+checkCoverageFloors(eureka-svc): LINE measured 0.6000, floor 0.57
+
+> Task :services:gateway-svc:processResources
+> Task :services:gateway-svc:classes
+> Task :services:gateway-svc:resolveMainClassName
+> Task :services:gateway-svc:bootJar
+> Task :services:gateway-svc:jar SKIPPED
+> Task :services:gateway-svc:assemble
+> Task :services:gateway-svc:compileTestJava
+> Task :services:gateway-svc:processTestResources NO-SOURCE
+> Task :services:gateway-svc:testClasses
+> Task :services:eureka-svc:spotbugsMain
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :services:gateway-svc:test
+
+> Task :services:eureka-svc:checkSpotbugsReport
+spotbugs(eureka-svc): 2 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:eureka-svc:check
+> Task :services:eureka-svc:build
+> Task :services:gateway-svc:compileAcceptanceTestJava
+> Task :services:gateway-svc:processAcceptanceTestResources NO-SOURCE
+> Task :services:gateway-svc:acceptanceTestClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-10-14T13:49:53.249+02:00  INFO 92922 --- [gateway-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:49:53.250+02:00  INFO 92922 --- [gateway-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+> Task :services:gateway-svc:integrationTest
+> Task :services:gateway-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:gateway-svc:spotbugsTest SKIPPED
+> Task :services:ledger-svc:jar SKIPPED
+> Task :services:ledger-svc:assemble
+> Task :services:gateway-svc:jacocoTestReport
+> Task :services:gateway-svc:jacocoTestCoverageVerification
+> Task :services:gateway-svc:checkstyleTest
+> Task :services:gateway-svc:checkstyleMain
+> Task :services:gateway-svc:checkstyleAcceptanceTest
+> Task :services:ledger-svc:extractIncludeTestProto
+
+> Task :services:gateway-svc:checkCoverageFloors
+checkCoverageFloors(gateway-svc): LINE measured 0.9897, floor 0.95
+checkCoverageFloors(gateway-svc): BRANCH measured 1.0000, floor 0.97
+
+> Task :services:ledger-svc:extractTestProto
+> Task :services:ledger-svc:generateTestProto NO-SOURCE
+> Task :services:ledger-svc:compileTestJava
+> Task :services:ledger-svc:processTestProtoResources
+> Task :services:ledger-svc:processTestResources NO-SOURCE
+> Task :services:ledger-svc:testClasses
+> Task :services:gateway-svc:spotbugsMain
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.35.1/b933d3f9fc35b0356f28980c2ffc5892d297eebf/protobuf-java-4.35.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+> Task :services:ledger-svc:test
+
+> Task :services:gateway-svc:checkSpotbugsReport
+spotbugs(gateway-svc): 19 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:gateway-svc:check
+> Task :services:gateway-svc:build
+> Task :services:ledger-svc:extractAcceptanceTestProto
+> Task :services:ledger-svc:extractIncludeAcceptanceTestProto
+> Task :services:ledger-svc:generateAcceptanceTestProto NO-SOURCE
+> Task :services:ledger-svc:compileAcceptanceTestJava
+> Task :services:ledger-svc:processAcceptanceTestProtoResources
+> Task :services:ledger-svc:processAcceptanceTestResources
+> Task :services:ledger-svc:acceptanceTestClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.35.1/b933d3f9fc35b0356f28980c2ffc5892d297eebf/protobuf-java-4.35.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+2026-10-14T13:50:16.558+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:50:16.559+02:00  INFO 93138 --- [ledger-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-10-14T13:50:16.569+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-10-14T13:50:16.570+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-10-14T13:50:16.747+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown initiated...
+2026-10-14T13:50:16.747+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown completed.
+2026-10-14T13:50:16.910+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.g.s.lifecycle.GrpcServerLifecycle    : Completed gRPC server shutdown
+2026-10-14T13:50:16.912+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2026-10-14T13:50:16.913+02:00  INFO 93138 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+> Task :services:ledger-svc:integrationTest
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/4.35.1/b933d3f9fc35b0356f28980c2ffc5892d297eebf/protobuf-java-4.35.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil
+WARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release
+2026-10-14T13:50:30.861+02:00  INFO 93220 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.g.s.lifecycle.GrpcServerLifecycle    : Completed gRPC server shutdown
+2026-10-14T13:50:30.862+02:00  INFO 93220 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-10-14T13:50:30.862+02:00  INFO 93220 --- [ledger-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-10-14T13:50:30.869+02:00  INFO 93220 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-10-14T13:50:30.870+02:00  INFO 93220 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+> Task :services:ledger-svc:acceptanceTest
+> Task :services:ledger-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:ledger-svc:spotbugsTest SKIPPED
+> Task :services:ledger-svc:jacocoTestCoverageVerification
+> Task :services:ledger-svc:checkstyleTest
+> Task :services:ledger-svc:checkstyleAcceptanceTest
+> Task :services:ledger-svc:jacocoTestReport
+> Task :services:ledger-svc:checkstyleMain
+
+> Task :services:ledger-svc:checkCoverageFloors
+checkCoverageFloors(ledger-svc): LINE measured 0.9725, floor 0.93
+checkCoverageFloors(ledger-svc): BRANCH measured 0.8871, floor 0.87
+
+> Task :services:ledger-svc:spotbugsMain
+
+> Task :services:ledger-svc:checkSpotbugsReport
+spotbugs(ledger-svc): 147 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:ledger-svc:check
+> Task :services:ledger-svc:build
+
+[Incubating] Problems report is available at: file:///Users/sean/env/repo/be/java/spring/ezeebit-wallet-grpc/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 9s
+106 actionable tasks: 101 executed, 5 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
+gate_exit=0

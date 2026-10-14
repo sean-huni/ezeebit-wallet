@@ -131,7 +131,30 @@ routes_once() {
   probe "$gw/$m/conversions/$m"; q=${CODE:-$WHY}
   ROUTES="balances answered $b, conversions answered $q"
   [[ $b == 200 && $q == 404 ]] || return 1
+  ledger_seen || return 1
   convert_once $m
+}
+
+registry_lag_ms() {
+  # Eureka's response cache, then conversion-svc's registry fetch, then 2s for the fetch itself; Eureka defaults if unset.
+  local cache fetch
+  cache=$(awk '/response-cache-update-interval-ms:/ {print $2}' services/eureka-svc/src/main/resources/application.yml)
+  fetch=$(awk '/registry-fetch-interval-seconds:/ {print $2}' services/config-svc/src/main/resources/served/application.yml)
+  print $(( ${cache:-30000} + ${fetch:-30} * 1000 + 2000 ))
+}
+
+ledger_seen() {
+  # conversion-svc finds ledger's gRPC port in its own registry copy; converting before that copy lists it fails
+  # UNAVAILABLE and writes a dead letter that pages. So: an UP instance with a grpcPort, registered lag ms ago.
+  local since left now=${${(%):-%D{%s%.}}/./}
+  since=$(curl -s --max-time 2 -H 'Accept: application/json' "http://localhost:$(port_of eureka-svc)/eureka/apps/LEDGER-SVC" |
+    jq -r '[.application.instance[]? | select(.status == "UP" and (.metadata.grpcPort // "") != "")
+      | [(.lastUpdatedTimestamp | tonumber), .leaseInfo.registrationTimestamp] | max] | min // empty' 2>/dev/null)
+  [[ $since == <-> ]] || { ROUTES="waiting for ledger-svc to register an UP instance with a grpcPort"; return 1; }
+  left=$(( since + $(registry_lag_ms) - now ))
+  (( left <= 0 )) && return 0
+  ROUTES="waiting ${left}ms for conversion-svc's registry copy to list ledger-svc's grpcPort"
+  return 1
 }
 
 await_healthy() {
@@ -181,6 +204,7 @@ core_row() {
   fi
   if [[ $svc == gateway-svc && $state == UP ]]; then
     if routes_once; then detail="routes to ledger-svc and conversion-svc, a conversion completes"
+    elif [[ $ROUTES == waiting* ]]; then state=STARTING detail=$ROUTES
     elif [[ $ROUTES == 'a conversion'* ]]; then state=DEGRADED detail=$ROUTES
     else state=DEGRADED detail="health 200 but $ROUTES"; fi
   fi

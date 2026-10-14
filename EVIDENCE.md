@@ -197,6 +197,8 @@ Not pictured, measured by the suite: latency exemplars carry a trace id that Tem
 deposit, the `deposit` span and the request span both carry `TransactionSystemException: JDBC rollback
 failed` with status error (trace `1da752b225ab41c41cb44000e260f031`).
 
+Over gRPC (2026-10-14): one demo conversion is one trace, `f9b98a426a168f23f9bbc22fdce2f5e2`, in which the ledger-svc gRPC server span `ConversionPostings/Post` is the child of conversion-svc's gRPC client span; commands and every span in [the gRPC trace check](docs/observability/verification/2026-10-14-grpc-trace.md).
+
 ### Logs
 
 ![A log line and its trace](docs/observability/evidence/logs-trace-correlated.png)

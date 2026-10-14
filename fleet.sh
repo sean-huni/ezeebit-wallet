@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres, WireMock, Redis and Grafana LGTM in Docker, every service as a
+# Runs the whole fleet on this host: Postgres, WireMock, Redis, Kafka and Grafana LGTM in Docker, every service as a
 # Java virtual machine (JVM).
 # Usage: ./fleet.sh up | down | purge | status   (purge also deletes the data volumes)
 set -u
@@ -17,15 +17,15 @@ RUN=.fleet
 SETTLE=${FLEET_SETTLE_SECONDS:-90}
 SERVICES=(config-svc eureka-svc ledger-svc conversion-svc gateway-svc)
 CORE_GROUPS=('Control plane:config-svc eureka-svc' 'Business:ledger-svc conversion-svc' 'Edge:gateway-svc')
-SUPPORT_GROUPS=('Data stores:postgres redis' 'External stand-ins:wiremock' 'Observability:lgtm')
+SUPPORT_GROUPS=('Data stores:postgres redis' 'External stand-ins:wiremock' 'Messaging:kafka' 'Observability:lgtm')
 # Each container with the port it serves inside; the host port is read from compose.yaml.
-CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 lgtm:3000)
+CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 kafka:9092 lgtm:3000)
 # Grafana's datasource uids; each health check runs a real query against that backend.
 BACKENDS=(prometheus loki tempo pyroscope)
 ROW='%-22s %-18s %-5s %-6s %-12s %s\n'
 typeset -A PORT
 typeset -a BAD
-PROJECT= CODE= WHY= ROUTES= ROWS=0 NOCONT=
+PROJECT= CODE= WHY= BODY= ROUTES= ROWS=0 NOCONT=
 
 ours() {
   # A pid file outlives its process, and the pid can be reused: only a JVM of this checkout counts.
@@ -57,19 +57,58 @@ port_var() {
     cur == svc && match($0, /\$\{[A-Z_]+:-[0-9]+\}:[0-9]/) {s = substr($0, RSTART + 2); sub(/:-.*/, "", s); print s; exit}' compose.yaml
 }
 
+curl_why() {
+  # curl's exit code $1 for a request allowed $2 seconds, in words.
+  case $1 in
+    7) print "nothing listening (connection refused)" ;;
+    28) print "no answer within $2s" ;;
+    52) print "connection closed without a reply" ;;
+    56) print "connection reset" ;;
+    *) print "request failed (curl exit $1)" ;;
+  esac
+}
+
 probe() {
   # Sets CODE to the HTTP status, or empty when nothing answered, and WHY to what happened in words.
   local rc
   CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$@"); rc=$?
-  case $rc in
-    0) WHY="HTTP $CODE"; return 0 ;;
-    7) WHY="nothing listening (connection refused)" ;;
-    28) WHY="no answer within 2s" ;;
-    52) WHY="connection closed without a reply" ;;
-    56) WHY="connection reset" ;;
-    *) WHY="request failed (curl exit $rc)" ;;
-  esac
+  (( rc == 0 )) && { WHY="HTTP $CODE"; return 0; }
+  WHY=$(curl_why $rc 2)
   CODE=
+}
+
+call() {
+  # A JSON POST: sets BODY and CODE, or CODE empty and WHY in words when nothing answered.
+  local out rc
+  out=$(curl -s -w '\n%{http_code}' --max-time 15 -X POST -H 'Content-Type: application/json' "$@"); rc=$?
+  (( rc == 0 )) && { BODY=${out%$'\n'*}; CODE=${out##*$'\n'}; WHY="HTTP $CODE"; return 0; }
+  BODY= CODE= WHY=$(curl_why $rc 15)
+}
+
+failed() {
+  # What a failed step answered: its HTTP status and error code, or what happened in words.
+  local code
+  [[ -z $CODE ]] && { print "$1: $WHY"; return; }
+  code=$(jq -r '.code // empty' <<< $BODY 2>/dev/null)
+  print "$1 answered $CODE${code:+ $code}"
+}
+
+convert_once() {
+  # Money in, quote, convert: the one path that crosses gateway, conversion, the rate feed and ledger's gRPC port.
+  local m=$1 gw="http://localhost:$(port_of gateway-svc)/api/v1/merchants/$1" q st
+  call -H "Idempotency-Key: fleet-check-$m" "http://localhost:$(port_of ledger-svc)/internal/v1/deposits" \
+    -d "{\"merchantId\":\"$m\",\"currency\":\"ZAR\",\"amount\":\"100.00\",\"reference\":\"fleet check\"}"
+  [[ $CODE == 201 ]] || { ROUTES="a conversion did not complete: $(failed deposit)"; return 1; }
+  # Quote and convert back to back: the quote lives 15 s.
+  call "$gw/quotes" -d '{"sell":"ZAR","buy":"USDT","sellAmount":"50.00"}'
+  q=$(jq -r '.data.quoteId // empty' <<< $BODY 2>/dev/null)
+  [[ $CODE == 201 && -n $q ]] || { ROUTES="a conversion did not complete: $(failed quote)"; return 1; }
+  call -H "Idempotency-Key: fleet-check-$m" "$gw/conversions" -d "{\"quoteId\":\"$q\"}"
+  st=$(jq -r '.data.status // empty' <<< $BODY 2>/dev/null)
+  [[ $st == COMPLETED ]] && return 0
+  if [[ $CODE == 201 ]]; then ROUTES="a conversion did not complete: status ${st:-missing}"
+  else ROUTES="a conversion did not complete: $(failed convert)"; fi
+  return 1
 }
 
 foreign_holder() {
@@ -91,7 +130,8 @@ routes_once() {
   probe "$gw/$m/balances"; b=${CODE:-$WHY}
   probe "$gw/$m/conversions/$m"; q=${CODE:-$WHY}
   ROUTES="balances answered $b, conversions answered $q"
-  [[ $b == 200 && $q == 404 ]]
+  [[ $b == 200 && $q == 404 ]] || return 1
+  convert_once $m
 }
 
 await_healthy() {
@@ -109,7 +149,7 @@ await_routed() {
   # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
   local deadline=$(( SECONDS + 60 ))
   while (( SECONDS < deadline )); do
-    routes_once && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }
+    routes_once && { print "  gateway routes to ledger-svc and conversion-svc, and a conversion completes"; return 0; }
     sleep 1
   done
   print -u2 "  gateway not routing after 60s ($ROUTES)"
@@ -134,8 +174,15 @@ core_row() {
   # Something else answering on a fleet port is not the fleet, however healthy it says it is.
   [[ $state == UP && $pid == - ]] && { state=UNMANAGED; detail+=", but not a JVM fleet.sh started"; }
   [[ $state == DOWN && $pid != - ]] && detail+="; process $pid alive (starting or hung)"
+  if [[ $svc == ledger-svc && $state == UP && $pid != - ]]; then
+    # conversion-svc posts to ledger over gRPC, so a healthy HTTP side with no gRPC listener cannot convert.
+    lsof -nP -a -p $pid -iTCP:${LEDGER_GRPC_PORT:-9081} -sTCP:LISTEN > /dev/null 2>&1 && detail+=", gRPC :${LEDGER_GRPC_PORT:-9081} listening" ||
+      { state=DEGRADED; detail="gRPC port ${LEDGER_GRPC_PORT:-9081} not listening"; }
+  fi
   if [[ $svc == gateway-svc && $state == UP ]]; then
-    routes_once && detail="routes to ledger-svc and conversion-svc" || { state=DEGRADED; detail="health 200 but $ROUTES"; }
+    if routes_once; then detail="routes to ledger-svc and conversion-svc, a conversion completes"
+    elif [[ $ROUTES == 'a conversion'* ]]; then state=DEGRADED detail=$ROUTES
+    else state=DEGRADED detail="health 200 but $ROUTES"; fi
   fi
   row $svc "Java microservice" $port $pid $state $detail
 }
@@ -246,8 +293,8 @@ up_once() {
   # Returns 2 when a bounce cannot help (the build), 1 when a service did not come up healthy.
   # lgtm left running from an earlier run would watch the JVMs boot and page ServiceDown.
   docker compose stop lgtm > /dev/null 2>&1
-  print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter)"
-  docker compose up -d --wait postgres wiremock redis || return 1
+  print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)"
+  docker compose up -d --wait postgres wiremock redis kafka || return 1
   print "build"
   ./gradlew -q bootJar || return 2
   # Control plane first: every other service fetches config and registers on boot.

@@ -487,6 +487,7 @@ REDIS_PORT=6390
 # POSTGRES_PORT=55432
 # RATES_PORT=8090
 # KAFKA_PORT=9092
+# LEDGER_GRPC_PORT=9081
 
 # Secrets: set here only, never committed
 # SLACK_WEBHOOK_URL=https://hooks.slack.com/services/<your-webhook-path>

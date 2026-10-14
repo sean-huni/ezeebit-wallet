@@ -14,7 +14,7 @@ import java.util.List;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-// The real ledger-svc jar in its own JVM with its own database: conversion-svc reaches it only over HTTP.
+// The real ledger-svc jar in its own JVM with its own database: conversion-svc reaches it over gRPC, the steps over HTTP.
 final class LedgerProcess {
 
 	private static final Duration BOOT_LIMIT = Duration.ofSeconds(90);
@@ -23,14 +23,17 @@ final class LedgerProcess {
 			.withDatabaseName("ledger");
 	private Process process;
 	private int port;
+	private int grpcPort;
 
 	void start() throws IOException, InterruptedException {
 		database.start();
 		port = freePort();
+		grpcPort = freePort();
 		String jar = System.getProperty("ledger.jar");
 		String java = ProcessHandle.current().info().command().orElse("java");
 		ProcessBuilder builder = new ProcessBuilder(List.of(java, "-jar", jar,
 				"--server.port=%d".formatted(port), "--server.address=127.0.0.1",
+				"--spring.grpc.server.port=%d".formatted(grpcPort), "--spring.grpc.server.address=127.0.0.1",
 				"--spring.datasource.url=%s".formatted(database.getJdbcUrl()),
 				"--spring.datasource.username=%s".formatted(database.getUsername()),
 				"--spring.datasource.password=%s".formatted(database.getPassword()),
@@ -49,6 +52,10 @@ final class LedgerProcess {
 
 	String url() {
 		return "http://127.0.0.1:%d".formatted(port);
+	}
+
+	int grpcPort() {
+		return grpcPort;
 	}
 
 	PostgreSQLContainer database() {

@@ -1,0 +1,55 @@
+# ConversionLedgerDeadLettered silent arm (VOID series flat for over 5m, exp_alerts: []) red-proofed 2026-10-14
+# mutant: threshold '> 0' changed to '> -1' in a copy of docker/lgtm/alerting/promtool/rules.yml
+$ docker/lgtm/test-rules.sh /private/tmp/claude-501/rules-mutant.yml
+  FAILED:
+    alertname: ConversionLedgerDeadLettered, time: 5m50s, 
+        exp:[], 
+        got:[
+            0:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="VOID", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{}
+            ]
+    alertname: ConversionLedgerDeadLettered, time: 6m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="POST", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[
+            0:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="POST", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="VOID", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{}
+            ]
+    alertname: ConversionLedgerDeadLettered, time: 7m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="FIND", reason="CIRCUIT_OPEN", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="POST", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[
+            0:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="FIND", reason="CIRCUIT_OPEN", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="POST", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{},
+            2:
+              Labels:{alertname="ConversionLedgerDeadLettered", op="VOID", reason="RETRIES_EXHAUSTED", severity="warning"}
+              Annotations:{}
+            ]
+
+
+
+
+exit=1
+
+$ docker/lgtm/test-rules.sh   (committed rules)
+  SUCCESS
+
+exit=0

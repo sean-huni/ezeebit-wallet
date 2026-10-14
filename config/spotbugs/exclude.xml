@@ -2,6 +2,11 @@
 <!-- One justification per entry; each names the classes it covers, so a new site of the pattern is still reported. -->
 <FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0">
 
+	<!-- protoc and grpc-java output from contracts/: regenerated on every build, so a finding there has no fix here. -->
+	<Match>
+		<Package name="~io\.ezeebit\.contracts\..*"/>
+	</Match>
+
 	<!-- An inventory detector (one per request mapping), not a weakness: it names no flaw and prescribes no fix. -->
 	<Match>
 		<Bug pattern="SPRING_ENDPOINT"/>

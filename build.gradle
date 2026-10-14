@@ -5,6 +5,7 @@ plugins {
 	id 'org.springframework.boot' version "${springBootVersion}" apply false
 	id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
 	id 'com.github.spotbugs' version "${spotbugsPluginVersion}" apply false
+	id 'com.google.protobuf' version "${protobufPluginVersion}" apply false
 	id 'org.sonarqube' version "${sonarPluginVersion}"
 }
 
@@ -138,6 +139,48 @@ configure(subprojects.findAll { it.name in tieredServices }) {
 		tasks.named('check') {
 			dependsOn acceptanceTest
 		}
+	}
+}
+
+// One contract, compiled by both ends: a hand-written mirror on either side is the drift class this replaces.
+def grpcServices = ['ledger-svc', 'conversion-svc']
+configure(subprojects.findAll { it.name in grpcServices }) {
+	apply plugin: 'com.google.protobuf'
+	sourceSets {
+		main {
+			proto { srcDir rootProject.file('contracts') }
+		}
+	}
+	protobuf {
+		protoc { artifact = "com.google.protobuf:protoc:${protocVersion}" }
+		plugins {
+			grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}" }
+		}
+		generateProtoTasks {
+			all()*.plugins { grpc {} }
+		}
+	}
+	dependencies {
+		implementation 'io.grpc:grpc-protobuf'
+		implementation 'io.grpc:grpc-stub'
+		implementation 'com.google.api.grpc:proto-google-common-protos'
+		compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+	}
+}
+
+def checkSingleProto = tasks.register('checkSingleProto') {
+	group = 'verification'
+	description = 'Fails when a .proto file exists anywhere but contracts/.'
+	doLast {
+		def strays = fileTree('services') { include '**/*.proto'; exclude '**/build/**' }.files
+		if (!strays.isEmpty()) {
+			throw new GradleException("checkSingleProto: .proto outside contracts/: ${strays*.path}")
+		}
+		def contracts = fileTree('contracts') { include '**/*.proto' }.files
+		if (contracts.isEmpty()) {
+			throw new GradleException('checkSingleProto: contracts/ holds no .proto, so nothing is being checked')
+		}
+		logger.lifecycle("checkSingleProto: ${contracts.size()} contract(s), 0 strays")
 	}
 }
 
@@ -276,8 +319,11 @@ configure(services) {
 	// One report per service, merged over every test tier it has (unit, integration, acceptance). The snapshot writer
 	// is left out: a check must never depend on a task that rewrites committed files.
 	def testTasks = tasks.withType(Test).matching { it.name != 'generateOpenApiSnapshots' }
+	// Generated contract classes from contracts/ are measured by nobody's tests, so they would only dilute the floors.
+	def measuredClasses = sourceSets.main.output.classesDirs.asFileTree.matching { exclude 'io/ezeebit/contracts/**' }
 	tasks.named('jacocoTestReport') {
 		dependsOn testTasks
+		classDirectories.setFrom(measuredClasses)
 		executionData.setFrom(testTasks.collect { it.extensions.getByType(JacocoTaskExtension).destinationFile })
 		reports {
 			xml.required = true
@@ -287,6 +333,7 @@ configure(services) {
 
 	tasks.named('jacocoTestCoverageVerification') {
 		dependsOn testTasks
+		classDirectories.setFrom(measuredClasses)
 		executionData.setFrom(testTasks.collect { it.extensions.getByType(JacocoTaskExtension).destinationFile })
 		violationRules {
 			rule {
@@ -465,7 +512,7 @@ def checkDashboards = tasks.register('checkDashboards', Exec) {
 }
 
 tasks.named('check') {
-	dependsOn checkSecrets, checkDashboards
+	dependsOn checkSecrets, checkDashboards, checkSingleProto
 }
 
 tasks.register('checkSupplyChain', Exec) {

@@ -17,8 +17,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 
 // A property name Resilience4j does not know binds nothing and fails nothing: read the served values back.
 class RateCallConfigTest {
@@ -39,6 +41,11 @@ class RateCallConfigTest {
 			assertThat(retry.getExceptionPredicate()
 					.test(HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "boom", null, null, null)))
 					.as("5xx").isFalse();
+			assertThat(retry.getExceptionPredicate()
+					.test(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "bad", null, null, null)))
+					.as("4xx").isFalse();
+			assertThat(retry.getExceptionPredicate().test(new RestClientException("unreadable body")))
+					.as("unreadable").isFalse();
 		});
 	}
 

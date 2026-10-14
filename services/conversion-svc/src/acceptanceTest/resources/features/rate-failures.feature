@@ -11,6 +11,7 @@ Feature: An unreliable rate service gives a clear refusal, never a guessed rate
     When "Acme" asks for quote "q2" to sell "1000.00" ZAR for USDT
     Then the request is refused with 503 RATE_UNAVAILABLE
     And the refusal came within 5 seconds
+    And the rate service was asked 2 times
     And only 1 quote is stored for "Acme"
 
   Scenario: A rate service that answers late once is retried and the quote succeeds

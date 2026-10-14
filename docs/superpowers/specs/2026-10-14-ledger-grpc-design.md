@@ -106,8 +106,11 @@ Dead-letter record, written when retries are exhausted or the circuit is open, n
 | `op` | `POST`, `FIND` or `VOID` |
 | `conversionId`, `merchantId` | as sent |
 | `request` | the request message as sent, JSON-encoded |
-| `attempts`, `lastStatus`, `lastReason` | the final gRPC status and `ErrorInfo.reason`, if any |
-| `at`, `traceId` | time of the last attempt, the current trace |
+| `attempts` | attempts made (0 when the circuit is open) |
+| `lastStatus` | the final gRPC status code |
+| `lastReason` | `ErrorInfo.reason`, else the status description |
+| `at` | time the dead letter was recorded (no attempt is made when the circuit is open) |
+| `traceId` | the current trace |
 
 Publishing: asynchronous, `acks=all`, `delivery.timeout.ms=2000`, idempotent producer. A failed
 publish increments `ezeebit_conversion_ledger_deadletter_publish_failed_total` and never reaches the

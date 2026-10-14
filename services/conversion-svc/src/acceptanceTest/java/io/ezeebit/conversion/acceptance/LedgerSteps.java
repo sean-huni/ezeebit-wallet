@@ -193,10 +193,10 @@ public class LedgerSteps {
 				.param("merchant", state.merchant(merchant)).query(Integer.class).single()).isEqualTo(count);
 	}
 
-	// Counts conversions, not Post calls: a retried posting resends the same conversion up to three times.
-	@Then("the ledger was asked to post {int} conversion(s)")
-	public void conversionsPosted(final int count) {
-		assertThat(proxy().distinctPosts()).isEqualTo(count);
+	// Counts Post calls since the ledger answered normally again: retries of the first accept all came before it.
+	@Then("the ledger was not asked to post again")
+	public void notPostedAgain() {
+		assertThat(proxy().postsSinceClear()).as("Post calls after the ledger answered normally again").isZero();
 	}
 
 	@Then("the ledger was asked to void each of them exactly once")

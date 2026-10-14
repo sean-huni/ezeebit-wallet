@@ -61,7 +61,7 @@ public class LedgerReplyMapper {
 	}
 
 	// Only the ledger's own ErrorInfo decides an outcome; a proxy or a library can raise the same status codes.
-	private static Optional<String> reason(final StatusRuntimeException ex) {
+	static Optional<String> reason(final StatusRuntimeException ex) {
 		com.google.rpc.Status status = StatusProto.fromThrowable(ex);
 		if (status == null) {
 			return Optional.empty();

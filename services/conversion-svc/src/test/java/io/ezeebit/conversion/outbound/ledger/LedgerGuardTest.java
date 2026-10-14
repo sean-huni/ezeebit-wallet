@@ -14,6 +14,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.protobuf.Any;
+import com.google.rpc.Code;
+import com.google.rpc.ErrorInfo;
 import io.ezeebit.contracts.ledger.v1.ConversionPostingsGrpc;
 import io.ezeebit.contracts.ledger.v1.PostingRequest;
 import io.ezeebit.contracts.ledger.v1.PostingResult;
@@ -26,6 +29,7 @@ import io.ezeebit.conversion.outbound.discovery.DiscoveryNameResolverProvider;
 import io.ezeebit.conversion.service.port.DeadLetter;
 import io.ezeebit.conversion.service.port.DeadLetters;
 import io.ezeebit.conversion.service.port.LedgerPosting;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalFunction;
@@ -37,6 +41,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.client.discovery.simple.InstanceProperties;
@@ -94,6 +99,29 @@ class LedgerGuardTest {
 	}
 
 	@Test
+	void theLastReasonIsTheLedgersOwnReasonWhenItGivesOne() {
+		LedgerGuard guard = guard(FAST, letters::add);
+
+		assertThatThrownBy(() -> guard.call(Operation.POST, CONVERSION, MERCHANT, REQUEST,
+				failing(withReason("ledger.ezeebit.io", "LEDGER_BUSY")))).isInstanceOf(StatusRuntimeException.class);
+
+		assertThat(letters).singleElement().extracting(DeadLetter::lastReason).isEqualTo("LEDGER_BUSY");
+	}
+
+	// Only the ledger's own ErrorInfo names a reason; a proxy's or a library's falls back to the description.
+	@Test
+	void theLastReasonIsTheStatusDescriptionOtherwise() {
+		LedgerGuard guard = guard(FAST, letters::add);
+
+		assertThatThrownBy(() -> guard.call(Operation.POST, CONVERSION, MERCHANT, REQUEST,
+				failing(withReason("proxy.example", "PROXY_BUSY")))).isInstanceOf(StatusRuntimeException.class);
+		assertThatThrownBy(() -> guard.call(Operation.FIND, CONVERSION, MERCHANT, REQUEST,
+				failing(Status.UNAVAILABLE.withDescription("connection refused")))).isInstanceOf(StatusRuntimeException.class);
+
+		assertThat(letters).extracting(DeadLetter::lastReason).containsExactly("upstream busy", "connection refused");
+	}
+
+	@Test
 	void aLedgerRefusalIsFinalAndNeverRetried() {
 		LedgerGuard guard = guard(FAST, letters::add);
 
@@ -107,11 +135,19 @@ class LedgerGuardTest {
 
 	@Test
 	void twentyExhaustedCallsOpenTheBreakerAndTheNextIsRefusedWithoutReachingTheLedger() {
-		LedgerGuard guard = guard(FAST, letters::add);
+		CircuitBreakerRegistry breakers = breakers();
+		LedgerGuard guard = guard(FAST, letters::add, breakers);
 		for (int i = 0; i < 20; i++) {
 			assertThatThrownBy(() -> guard.call(Operation.POST, CONVERSION, MERCHANT, REQUEST, failing(Status.UNAVAILABLE)))
 					.isInstanceOf(StatusRuntimeException.class);
+			if (i == 18) {
+				assertThat(breakers.circuitBreaker(Operation.POST.instance()).getState()).as("after the 19th call")
+						.isEqualTo(CircuitBreaker.State.CLOSED);
+			}
 		}
+		// Retry inside the breaker: every call makes all 3 attempts and counts once.
+		assertThat(attempts).hasValue(60);
+		assertThat(letters).extracting(DeadLetter::reason).hasSize(20).containsOnly("RETRIES_EXHAUSTED");
 		letters.clear();
 		int before = attempts.get();
 
@@ -216,17 +252,36 @@ class LedgerGuardTest {
 	}
 
 	private LedgerGrpcClient.Attempt failing(final Status status) {
+		return failing(status.asRuntimeException());
+	}
+
+	private LedgerGrpcClient.Attempt failing(final StatusRuntimeException failure) {
 		return () -> {
 			attempts.incrementAndGet();
-			throw status.asRuntimeException();
+			throw failure;
 		};
 	}
 
+	private static StatusRuntimeException withReason(final String domain, final String reason) {
+		return StatusProto.toStatusRuntimeException(com.google.rpc.Status.newBuilder().setCode(Code.UNAVAILABLE.getNumber())
+				.setMessage("upstream busy").addDetails(Any.pack(ErrorInfo.newBuilder().setDomain(domain).setReason(reason)
+						.build())).build());
+	}
+
 	static LedgerGuard guard(final Duration postWait, final DeadLetters deadLetters) {
+		return guard(postWait, deadLetters, breakers());
+	}
+
+	private static LedgerGuard guard(final Duration postWait, final DeadLetters deadLetters,
+			final CircuitBreakerRegistry breakers) {
 		RetryRegistry retries = RetryRegistry.ofDefaults();
 		retries.retry(Operation.POST.instance(), retry(postWait));
 		retries.retry(Operation.FIND.instance(), retry(postWait.multipliedBy(5).dividedBy(2)));
 		retries.retry(Operation.VOID.instance(), retry(postWait.multipliedBy(5).dividedBy(2)));
+		return new LedgerGuard(retries, breakers, deadLetters);
+	}
+
+	private static CircuitBreakerRegistry breakers() {
 		CircuitBreakerConfig ledger = CircuitBreakerConfig.custom()
 				.slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED).slidingWindowSize(20)
 				.minimumNumberOfCalls(20).failureRateThreshold(50).waitDurationInOpenState(Duration.ofSeconds(10))
@@ -235,7 +290,7 @@ class LedgerGuardTest {
 		for (Operation op : Operation.values()) {
 			breakers.circuitBreaker(op.instance(), ledger);
 		}
-		return new LedgerGuard(retries, breakers, deadLetters);
+		return breakers;
 	}
 
 	private static RetryConfig retry(final Duration wait) {

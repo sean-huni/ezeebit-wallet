@@ -72,6 +72,7 @@ final class LedgerFaultProxy {
 	private final Map<String, PostingRequest> posted = new ConcurrentHashMap<>();
 	private final AtomicReference<List<Fault>> faults = new AtomicReference<>(List.of());
 	private final AtomicInteger faultedPosts = new AtomicInteger();
+	private final AtomicInteger postsAtClear = new AtomicInteger();
 	private final Context.Key<String> traceparent = Context.key("traceparent");
 	private Server server;
 
@@ -104,12 +105,14 @@ final class LedgerFaultProxy {
 
 	void clearFaults() {
 		faults.set(List.of());
+		postsAtClear.set(calls("Post"));
 	}
 
 	void reset() {
-		clearFaults();
+		faults.set(List.of());
 		journal.clear();
 		posted.clear();
+		postsAtClear.set(0);
 	}
 
 	void post(final Fault fault) {
@@ -135,8 +138,8 @@ final class LedgerFaultProxy {
 				.map(Call::traceparent).toList();
 	}
 
-	int distinctPosts() {
-		return posted.size();
+	int postsSinceClear() {
+		return calls("Post") - postsAtClear.get();
 	}
 
 	Optional<PostingRequest> posting(final String conversionId) {

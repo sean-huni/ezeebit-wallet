@@ -88,7 +88,8 @@ public class LedgerGuard {
 			final int attempts, final StatusRuntimeException last, final String reason) {
 		try {
 			String lastStatus = last == null ? null : last.getStatus().getCode().name();
-			String lastReason = last == null ? null : last.getStatus().getDescription();
+			String lastReason = last == null ? null
+					: LedgerReplyMapper.reason(last).orElseGet(() -> last.getStatus().getDescription());
 			deadLetters.record(new DeadLetter(op.name(), conversionId, merchantId, json(request), attempts, lastStatus,
 					lastReason, reason, Instant.now(), Span.current().getSpanContext().getTraceId()));
 		}

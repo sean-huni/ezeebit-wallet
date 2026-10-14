@@ -66,9 +66,9 @@ public class LedgerReplyMapper {
 		if (status == null) {
 			return Optional.empty();
 		}
-		return status.getDetailsList().stream().filter(detail -> detail.is(ErrorInfo.class)).findFirst()
-				.flatMap(LedgerReplyMapper::errorInfo).filter(info -> LEDGER_DOMAIN.equals(info.getDomain()))
-				.map(ErrorInfo::getReason);
+		return status.getDetailsList().stream().filter(detail -> detail.is(ErrorInfo.class))
+				.map(LedgerReplyMapper::errorInfo).flatMap(Optional::stream)
+				.filter(info -> LEDGER_DOMAIN.equals(info.getDomain())).findFirst().map(ErrorInfo::getReason);
 	}
 
 	private static Optional<ErrorInfo> errorInfo(final Any detail) {

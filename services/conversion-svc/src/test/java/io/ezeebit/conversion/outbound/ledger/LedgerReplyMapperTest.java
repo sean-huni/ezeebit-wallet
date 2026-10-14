@@ -52,6 +52,8 @@ class LedgerReplyMapperTest {
 			"INVALID_ARGUMENT, AMOUNT_SCALE_EXCEEDED, INPUT_REFUSED",
 			"INVALID_ARGUMENT, AMOUNT_NOT_POSITIVE, INPUT_REFUSED",
 			"INVALID_ARGUMENT, AMOUNT_TOO_LARGE, INPUT_REFUSED",
+			"INVALID_ARGUMENT, INSUFFICIENT_FUNDS, UNKNOWN",
+			"INTERNAL, INTERNAL_ERROR, UNKNOWN",
 			"INTERNAL, null, UNKNOWN",
 			"UNAVAILABLE, null, UNKNOWN",
 			"DEADLINE_EXCEEDED, null, UNKNOWN" })
@@ -72,6 +74,18 @@ class LedgerReplyMapperTest {
 				.addDetails(Any.pack(ErrorInfo.newBuilder().setReason(reason).setDomain("proxy.example").build())).build();
 
 		assertThat(mapper.fromStatus(StatusProto.toStatusRuntimeException(status))).isEqualTo(LedgerAnswer.UNKNOWN);
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "FAILED_PRECONDITION, INSUFFICIENT_FUNDS, INSUFFICIENT_FUNDS", "NOT_FOUND, POSTING_NOT_FOUND, ABSENT" })
+	void theLedgersReasonCountsEvenAfterAnotherDomainsDetail(final Code code, final String reason,
+			final LedgerAnswer answer) {
+		com.google.rpc.Status status = com.google.rpc.Status.newBuilder().setCode(code.getNumber())
+				.addDetails(Any.pack(ErrorInfo.newBuilder().setReason("UPSTREAM_RESET").setDomain("proxy.example").build()))
+				.addDetails(Any.pack(ErrorInfo.newBuilder().setReason(reason).setDomain("ledger.ezeebit.io").build()))
+				.build();
+
+		assertThat(mapper.fromStatus(StatusProto.toStatusRuntimeException(status))).isEqualTo(answer);
 	}
 
 	private static StatusRuntimeException failure(final Code code, final String reason) {

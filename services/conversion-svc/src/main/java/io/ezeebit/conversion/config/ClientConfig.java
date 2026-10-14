@@ -44,12 +44,13 @@ public class ClientConfig {
 	}
 
 	// round_robin over every instance the registry names: HTTP/2 otherwise pins all calls to one replica.
-	// The resolver parameter only orders its registration before this channel is built.
+	// The resolver parameter only orders its registration before this channel is built. No usePlaintext(): the
+	// factory passes ChannelCredentials (insecure without an SSL bundle) and the builder then refuses it.
 	@Bean(destroyMethod = "shutdownNow")
 	ManagedChannel ledgerChannel(final GrpcChannelFactory channels, final DiscoveryNameResolverProvider resolver,
 			final ConversionProperties properties) {
 		return channels.createChannel(properties.ledger().target(), ChannelBuilderOptions.defaults()
-				.withCustomizer((target, builder) -> builder.defaultLoadBalancingPolicy("round_robin").usePlaintext()));
+				.withCustomizer((target, builder) -> builder.defaultLoadBalancingPolicy("round_robin")));
 	}
 
 	private static JdkClientHttpRequestFactory factory(final Duration connect, final Duration read) {

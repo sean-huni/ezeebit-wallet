@@ -1,4 +1,4 @@
-fleet.sh sweep, 2026-10-14T10:51:44Z, commit 495ded4, fleet.sh blob 42cfe0770f2865204caca82202debac83641add3, REDIS_PORT=6390, KAFKA_PORT=9092
+fleet.sh sweep, 2026-10-14T12:31:38Z, commit da6db79, fleet.sh blob 5449160df45ec10f6a4acb237068c8c771a046c0, REDIS_PORT=6390, KAFKA_PORT=9092
 
 === CASE 0: setup: whatever is running stops (not asserted)
 $ ./fleet.sh down
@@ -35,33 +35,37 @@ $ ./fleet.sh down
 $ ./fleet.sh up
   | postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
   |  Network ezeebit-wallet-sweep_default Creating 
+  |  Volume ezeebit-wallet-sweep_pgdata Creating 
+  |  Volume ezeebit-wallet-sweep_kafkadata Creating 
+  |  Volume ezeebit-wallet-sweep_pgdata Creating 
   |  Network ezeebit-wallet-sweep_default Creating 
-  |  Volume ezeebit-wallet-sweep_pgdata Creating 
-  |  Volume ezeebit-wallet-sweep_pgdata Creating 
+  |  Volume ezeebit-wallet-sweep_kafkadata Creating 
   |  Volume ezeebit-wallet-sweep_pgdata Created 
   |  Volume ezeebit-wallet-sweep_pgdata Created 
+  |  Volume ezeebit-wallet-sweep_kafkadata Created 
+  |  Volume ezeebit-wallet-sweep_kafkadata Created 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
-  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
+  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-redis-1 Creating 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Starting 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
+  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
-  |  Container ezeebit-wallet-sweep-postgres-1 Started 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Started 
   |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Started 
+  |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
-  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
-  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
   |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
@@ -85,17 +89,17 @@ $ ./fleet.sh up
   |  Container ezeebit-wallet-sweep-lgtm-1 Waiting 
   |  Container ezeebit-wallet-sweep-lgtm-1 Healthy 
   | waiting for grafana plugins to settle
-  | grafana plugins settled after 57s
+  | grafana plugins settled after 58s
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  39632  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  40193  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  44316  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  44498  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  40356  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  40357  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  44580  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  44581  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  40358  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  44582  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -126,13 +130,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  39632  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  40193  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  44316  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  44498  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  40356  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  40357  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  44580  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  44581  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  40358  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  44582  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -155,20 +159,20 @@ $ ./fleet.sh up
   PASS  exit 0
   PASS  says: fleet already up and healthy
   PASS  never says: bouncing
-  PASS  same PIDs (39632 40193 40356 40357 40358)
+  PASS  same PIDs (44316 44498 44580 44581 44582)
 
 === CASE 3: status on a healthy fleet: grouped, typed, every row in words
 $ ./fleet.sh status
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  39632  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  40193  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  44316  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  44498  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  40356  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  40357  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  44580  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  44581  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  40358  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  44582  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -221,13 +225,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  39632  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  40193  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  44316  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  44498  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  40356  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  40357  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  44580  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  44581  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  40358  DEGRADED     a conversion did not complete: quote answered 503 RATE_UNAVAILABLE
+  |     gateway-svc        Java microservice  8080  44582  DEGRADED     a conversion did not complete: quote answered 503 RATE_UNAVAILABLE
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -248,22 +252,22 @@ $ ./fleet.sh up
   | fleet running but not healthy: bouncing the whole stack
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (40358)
-  | stopped conversion-svc (40357)
-  | stopped ledger-svc (40356)
-  | stopped eureka-svc (40193)
-  | stopped config-svc (39632)
+  | stopped gateway-svc (44582)
+  | stopped conversion-svc (44581)
+  | stopped ledger-svc (44580)
+  | stopped eureka-svc (44498)
+  | stopped config-svc (44316)
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-redis-1 Stopping 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
-  |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removed 
+  |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
   |  Container ezeebit-wallet-sweep-postgres-1 Removed 
@@ -312,24 +316,24 @@ $ ./fleet.sh up
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
-  |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
   |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
+  |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
-  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
+  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-kafka-1 Healthy 
   | build
   |   config-svc UP on :8888
@@ -350,13 +354,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  43362  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  43408  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  54964  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  56032  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  43500  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  43501  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  56406  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  56407  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  43502  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  56408  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -387,13 +391,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  43362  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  43408  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  54964  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  56032  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  43500  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  43501  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  56406  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  56407  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  43502  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  56408  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -414,22 +418,22 @@ $ ./fleet.sh up
   | fleet running but not healthy: bouncing the whole stack
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (43502)
-  | stopped conversion-svc (43501)
-  | stopped ledger-svc (43500)
-  | stopped eureka-svc (43408)
-  | stopped config-svc (43362)
-  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  | stopped gateway-svc (56408)
+  | stopped conversion-svc (56407)
+  | stopped ledger-svc (56406)
+  | stopped eureka-svc (56032)
+  | stopped config-svc (54964)
   |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopped 
-  |  Container ezeebit-wallet-sweep-kafka-1 Removing 
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
-  |  Container ezeebit-wallet-sweep-kafka-1 Removed 
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopped 
+  |  Container ezeebit-wallet-sweep-kafka-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
+  |  Container ezeebit-wallet-sweep-kafka-1 Removed 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
   |  Container ezeebit-wallet-sweep-postgres-1 Removed 
@@ -473,26 +477,26 @@ $ ./fleet.sh up
   |  Network ezeebit-wallet-sweep_default Creating 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Creating 
-  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
-  |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
+  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
+  |  Container ezeebit-wallet-sweep-redis-1 Creating 
+  |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
-  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-postgres-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
-  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
   |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
@@ -512,17 +516,17 @@ $ ./fleet.sh up
   |  Container ezeebit-wallet-sweep-lgtm-1 Waiting 
   |  Container ezeebit-wallet-sweep-lgtm-1 Healthy 
   | waiting for grafana plugins to settle
-  | grafana plugins settled after 6s
+  | grafana plugins settled after 7s
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  44693  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  44743  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  63821  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  63989  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  44813  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  44814  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  64152  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  64154  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  44815  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  64157  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -553,13 +557,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  44693  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  44743  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  63821  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  63989  UP           /actuator/health 200
   |   Business
   |     ledger-svc         Java microservice  8081  -      DOWN         nothing listening (connection refused)
-  |     conversion-svc     Java microservice  8082  44814  UP           /actuator/health 200
+  |     conversion-svc     Java microservice  8082  64154  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  44815  DEGRADED     health 200 but balances answered 503, conversions answered 404
+  |     gateway-svc        Java microservice  8080  64157  DEGRADED     health 200 but balances answered 503, conversions answered 404
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -580,24 +584,24 @@ $ ./fleet.sh up
   | fleet running but not healthy: bouncing the whole stack
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (44815)
-  | stopped conversion-svc (44814)
-  | stopped eureka-svc (44743)
-  | stopped config-svc (44693)
+  | stopped gateway-svc (64157)
+  | stopped conversion-svc (64154)
+  | stopped eureka-svc (63989)
+  | stopped config-svc (63821)
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-redis-1 Stopping 
   |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopped 
-  |  Container ezeebit-wallet-sweep-redis-1 Removing 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
-  |  Container ezeebit-wallet-sweep-redis-1 Removed 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopped 
+  |  Container ezeebit-wallet-sweep-redis-1 Removing 
   |  Container ezeebit-wallet-sweep-postgres-1 Removed 
+  |  Container ezeebit-wallet-sweep-redis-1 Removed 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removed 
@@ -639,28 +643,28 @@ $ ./fleet.sh up
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
-  |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
+  |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
-  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
-  |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
   |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
+  |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
-  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
+  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-kafka-1 Healthy 
   | build
   |   config-svc UP on :8888
@@ -681,13 +685,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  45939  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  45981  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  70022  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  70191  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  46033  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  46034  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  70402  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  70403  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  46035  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  70404  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -716,24 +720,24 @@ $ ./fleet.sh up
 $ ./fleet.sh down
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (46035)
-  | stopped conversion-svc (46034)
-  | stopped ledger-svc (46033)
-  | stopped eureka-svc (45981)
-  | stopped config-svc (45939)
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
-  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
+  | stopped gateway-svc (70404)
+  | stopped conversion-svc (70403)
+  | stopped ledger-svc (70402)
+  | stopped eureka-svc (70191)
+  | stopped config-svc (70022)
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
-  |  Container ezeebit-wallet-sweep-postgres-1 Removed 
   |  Container ezeebit-wallet-sweep-redis-1 Stopped 
   |  Container ezeebit-wallet-sweep-redis-1 Removing 
+  |  Container ezeebit-wallet-sweep-postgres-1 Removed 
   |  Container ezeebit-wallet-sweep-redis-1 Removed 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
@@ -844,17 +848,17 @@ $ ./fleet.sh down
   |     pyroscope          inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
   |     otlp-collector     inside lgtm        4318  -      DOWN         nothing listening (connection refused)
   | fleet NOT fully down:
-  |   port 8081 (ledger-svc) still held by process 47022 (/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python)
+  |   port 8081 (ledger-svc) still held by process 72240 (/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python)
   | exit=1
   PASS  exit 1
   PASS  says: fleet NOT fully down
-  PASS  says: port 8081 (ledger-svc) still held by process 47022
+  PASS  says: port 8081 (ledger-svc) still held by process 72240
 $ ./fleet.sh up
-  |   port 8081 (ledger-svc) is held by process 47022 (/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python)
+  |   port 8081 (ledger-svc) is held by process 72240 (/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python)
   | cannot start: a port the fleet needs is taken, and a bounce would not free it
   | exit=1
   PASS  exit 1
-  PASS  says: port 8081 (ledger-svc) is held by process 47022
+  PASS  says: port 8081 (ledger-svc) is held by process 72240
   PASS  says: cannot start
   PASS  never says: build
   PASS  never says: bouncing
@@ -871,35 +875,35 @@ $ env REDIS_PORT=16399 ./fleet.sh up
   PASS  never says: bouncing
 
 === CASE 10: a supporting service never gets healthy: exactly one bounce, then exit 1
-$ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/opt/homebrew/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/.sdkman/candidates/quarkus/current/bin:/Users/sean/.sdkman/candidates/java/25-tem/bin:/Users/sean/.sdkman/candidates/gradle/current/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/Applications/iTerm.app/Contents/Resources/utilities:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts FLEET_SETTLE_SECONDS=20 ./fleet.sh up
+$ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.EroLsIhTqB:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/opt/homebrew/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/.sdkman/candidates/quarkus/current/bin:/Users/sean/.sdkman/candidates/java/25-tem/bin:/Users/sean/.sdkman/candidates/gradle/current/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/Applications/iTerm.app/Contents/Resources/utilities:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts FLEET_SETTLE_SECONDS=20 ./fleet.sh up
   | postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
   |  Network ezeebit-wallet-sweep_default Creating 
   |  Network ezeebit-wallet-sweep_default Creating 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
-  |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
+  |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
   |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
-  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
+  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-kafka-1 Healthy 
   | build
   |   config-svc UP on :8888
@@ -920,13 +924,13 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  47828  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  47871  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  73069  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  73133  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  47920  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  47921  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  73205  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  73206  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  47922  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  73207  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -947,16 +951,16 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/
   | fleet not healthy: bouncing the whole stack once
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (47922)
-  | stopped conversion-svc (47921)
-  | stopped ledger-svc (47920)
-  | stopped eureka-svc (47871)
-  | stopped config-svc (47828)
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
-  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  | stopped gateway-svc (73207)
+  | stopped conversion-svc (73206)
+  | stopped ledger-svc (73205)
+  | stopped eureka-svc (73133)
+  | stopped config-svc (73069)
   |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
@@ -1006,14 +1010,14 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/
   |  Network ezeebit-wallet-sweep_default Creating 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
+  |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
-  |  Container ezeebit-wallet-sweep-redis-1 Creating 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
   |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
@@ -1049,13 +1053,13 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  49488  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  49532  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  75971  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  76135  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  49591  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  49592  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  76301  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  76302  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  49593  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  76303  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -1084,24 +1088,24 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.mcc62YxO3G:/opt/
 $ ./fleet.sh down
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (49593)
-  | stopped conversion-svc (49592)
-  | stopped ledger-svc (49591)
-  | stopped eureka-svc (49532)
-  | stopped config-svc (49488)
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  | stopped gateway-svc (76303)
+  | stopped conversion-svc (76302)
+  | stopped ledger-svc (76301)
+  | stopped eureka-svc (76135)
+  | stopped config-svc (75971)
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
-  |  Container ezeebit-wallet-sweep-postgres-1 Removed 
   |  Container ezeebit-wallet-sweep-redis-1 Stopped 
   |  Container ezeebit-wallet-sweep-redis-1 Removing 
+  |  Container ezeebit-wallet-sweep-postgres-1 Removed 
   |  Container ezeebit-wallet-sweep-redis-1 Removed 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
@@ -1143,7 +1147,7 @@ $ ./fleet.sh down
   PASS  says: fleet down: no fleet JVM, container or port left
 
 === CASE 12: a fresh start fails once and recovers: exactly one bounce, then exit 0
-$ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/opt/homebrew/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/.sdkman/candidates/quarkus/current/bin:/Users/sean/.sdkman/candidates/java/25-tem/bin:/Users/sean/.sdkman/candidates/gradle/current/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/Applications/iTerm.app/Contents/Resources/utilities:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts FLEET_SETTLE_SECONDS=20 ./fleet.sh up
+$ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.Bikl4mc2e0:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/opt/homebrew/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/opt/homebrew/share/android-commandlinetools/platform-tools:/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin:/Users/sean/fvm/default/bin:/Users/sean/.sdkman/candidates/quarkus/current/bin:/Users/sean/.sdkman/candidates/java/25-tem/bin:/Users/sean/.sdkman/candidates/gradle/current/bin:/Users/sean/go/bin:/Users/sean/.local/bin:/opt/homebrew/opt/python@3.14/libexec/bin:/Applications/iTerm.app/Contents/Resources/utilities:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts:/Users/sean/.docker/bin:/Users/sean/Library/Application Support/JetBrains/Toolbox/scripts FLEET_SETTLE_SECONDS=20 ./fleet.sh up
   | postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
   |  Network ezeebit-wallet-sweep_default Creating 
   |  Network ezeebit-wallet-sweep_default Creating 
@@ -1154,21 +1158,21 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
-  |  Container ezeebit-wallet-sweep-kafka-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Starting 
   |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
-  |  Container ezeebit-wallet-sweep-kafka-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
+  |  Container ezeebit-wallet-sweep-kafka-1 Started 
   |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
-  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
   |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
@@ -1188,17 +1192,17 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
   |  Container ezeebit-wallet-sweep-lgtm-1 Waiting 
   |  Container ezeebit-wallet-sweep-lgtm-1 Healthy 
   | waiting for grafana plugins to settle
-  | grafana plugins settled after 6s
+  | grafana plugins settled after 7s
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  51372  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  51416  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  80302  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  80363  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  51466  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  51467  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  80417  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  80418  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  51468  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  80419  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -1219,16 +1223,16 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
   | fleet not healthy: bouncing the whole stack once
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (51468)
-  | stopped conversion-svc (51467)
-  | stopped ledger-svc (51466)
-  | stopped eureka-svc (51416)
-  | stopped config-svc (51372)
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
+  | stopped gateway-svc (80419)
+  | stopped conversion-svc (80418)
+  | stopped ledger-svc (80417)
+  | stopped eureka-svc (80363)
+  | stopped config-svc (80302)
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
@@ -1279,28 +1283,28 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
   |  Network ezeebit-wallet-sweep_default Created 
   |  Network ezeebit-wallet-sweep_default Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
-  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-redis-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
+  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
-  |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
+  |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-redis-1 Starting 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-redis-1 Started 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
-  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
-  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
+  |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-kafka-1 Healthy 
   | build
   |   config-svc UP on :8888
@@ -1321,13 +1325,13 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  53028  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  53071  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  82288  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  82343  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  53122  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  53123  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  82404  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  82405  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  53124  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  82406  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -1357,16 +1361,16 @@ $ env PATH=/var/folders/52/56v2wr352jj0dxgk7x4mpfh40000gn/T/tmp.gKf8i9FpNV:/opt/
 $ ./fleet.sh down
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (53124)
-  | stopped conversion-svc (53123)
-  | stopped ledger-svc (53122)
-  | stopped eureka-svc (53071)
-  | stopped config-svc (53028)
+  | stopped gateway-svc (82406)
+  | stopped conversion-svc (82405)
+  | stopped ledger-svc (82404)
+  | stopped eureka-svc (82343)
+  | stopped config-svc (82288)
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
-  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
-  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
+  |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
@@ -1414,7 +1418,7 @@ $ ./fleet.sh down
   | exit=0
   PASS  exit 0
 $ ./fleet.sh down
-  | killed config-svc (54021): no graceful stop within 30s
+  | killed config-svc (84861): no graceful stop within 30s
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
@@ -1444,13 +1448,13 @@ $ ./fleet.sh down
   | fleet down: no fleet JVM, container or port left
   | exit=0
   PASS  exit 0
-  PASS  says: killed config-svc (54021): no graceful stop within 30s
+  PASS  says: killed config-svc (84861): no graceful stop within 30s
   PASS  says: fleet down: no fleet JVM, container or port left
-  PASS  pid 54021 is gone
+  PASS  pid 84861 is gone
 
 === CASE 14: a stale pid file naming another program's process: down and status leave it alone
 $ ./fleet.sh down
-  | left ledger-svc's stale pid 54283 alone: that process is not a JVM of this checkout
+  | left ledger-svc's stale pid 86047 alone: that process is not a JVM of this checkout
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
@@ -1480,8 +1484,8 @@ $ ./fleet.sh down
   | fleet down: no fleet JVM, container or port left
   | exit=0
   PASS  exit 0
-  PASS  says: left ledger-svc's stale pid 54283 alone
-  PASS  bystander 54283 still alive
+  PASS  says: left ledger-svc's stale pid 86047 alone
+  PASS  bystander 86047 still alive
 $ ./fleet.sh status
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
@@ -1512,7 +1516,7 @@ $ ./fleet.sh status
   | RESULT: NOT healthy: config-svc DOWN, eureka-svc DOWN, ledger-svc DOWN, conversion-svc DOWN, gateway-svc DOWN, postgres NOT RUNNING, redis NOT RUNNING, wiremock NOT RUNNING, kafka NOT RUNNING, lgtm NOT RUNNING, grafana DOWN, prometheus SKIPPED, loki SKIPPED, tempo SKIPPED, pyroscope SKIPPED, otlp-collector DOWN
   | exit=1
   PASS  a line holds: ledger-svc 8081  -      DOWN nothing listening
-  PASS  never says: 54283  UP
+  PASS  never says: 86047  UP
 
 === CASE 15: a failed build never bounces
 $ env JAVA_HOME=/nonexistent ./fleet.sh up
@@ -1524,27 +1528,27 @@ $ env JAVA_HOME=/nonexistent ./fleet.sh up
   |  Network ezeebit-wallet-sweep_default Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
   |  Container ezeebit-wallet-sweep-redis-1 Creating 
-  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-postgres-1 Creating 
+  |  Container ezeebit-wallet-sweep-kafka-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
+  |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
-  |  Container ezeebit-wallet-sweep-kafka-1 Created 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Starting 
-  |  Container ezeebit-wallet-sweep-kafka-1 Starting 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-kafka-1 Starting 
   |  Container ezeebit-wallet-sweep-postgres-1 Started 
-  |  Container ezeebit-wallet-sweep-kafka-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Started 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
   |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
-  |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
   |  Container ezeebit-wallet-sweep-redis-1 Healthy 
+  |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
   |  Container ezeebit-wallet-sweep-kafka-1 Healthy 
   | build
   | 
@@ -1558,16 +1562,16 @@ $ env JAVA_HOME=/nonexistent ./fleet.sh up
   PASS  never says: bouncing
 $ ./fleet.sh down
   | ours:2: 2: parameter not set
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
-  |  Container ezeebit-wallet-sweep-redis-1 Stopped 
-  |  Container ezeebit-wallet-sweep-redis-1 Removing 
-  |  Container ezeebit-wallet-sweep-redis-1 Removed 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopping 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopped 
   |  Container ezeebit-wallet-sweep-postgres-1 Removing 
+  |  Container ezeebit-wallet-sweep-redis-1 Stopped 
+  |  Container ezeebit-wallet-sweep-redis-1 Removing 
   |  Container ezeebit-wallet-sweep-postgres-1 Removed 
+  |  Container ezeebit-wallet-sweep-redis-1 Removed 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopped 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removing 
   |  Container ezeebit-wallet-sweep-wiremock-1 Removed 
@@ -1615,24 +1619,24 @@ $ ./fleet.sh up
   |  Network ezeebit-wallet-sweep_default Created 
   |  Container ezeebit-wallet-sweep-wiremock-1 Creating 
   |  Container ezeebit-wallet-sweep-redis-1 Creating 
-  |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-kafka-1 Creating 
+  |  Container ezeebit-wallet-sweep-postgres-1 Creating 
   |  Container ezeebit-wallet-sweep-wiremock-1 Created 
   |  Container ezeebit-wallet-sweep-postgres-1 Created 
   |  Container ezeebit-wallet-sweep-kafka-1 Created 
   |  Container ezeebit-wallet-sweep-redis-1 Created 
-  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Starting 
-  |  Container ezeebit-wallet-sweep-redis-1 Starting 
   |  Container ezeebit-wallet-sweep-kafka-1 Starting 
-  |  Container ezeebit-wallet-sweep-postgres-1 Started 
+  |  Container ezeebit-wallet-sweep-redis-1 Starting 
+  |  Container ezeebit-wallet-sweep-postgres-1 Starting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Started 
-  |  Container ezeebit-wallet-sweep-redis-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Started 
-  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Started 
+  |  Container ezeebit-wallet-sweep-postgres-1 Started 
   |  Container ezeebit-wallet-sweep-kafka-1 Waiting 
   |  Container ezeebit-wallet-sweep-postgres-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Waiting 
+  |  Container ezeebit-wallet-sweep-redis-1 Waiting 
   |  Container ezeebit-wallet-sweep-wiremock-1 Healthy 
   |  Container ezeebit-wallet-sweep-redis-1 Healthy 
   |  Container ezeebit-wallet-sweep-postgres-1 Healthy 
@@ -1656,13 +1660,13 @@ $ ./fleet.sh up
   | SERVICE                TYPE               PORT  PID    STATE        DETAIL
   | CORE SERVICES (Java microservices launched by fleet.sh)
   |   Control plane
-  |     config-svc         Java microservice  8888  55076  UP           /actuator/health 200
-  |     eureka-svc         Java microservice  8761  55135  UP           /actuator/health 200
+  |     config-svc         Java microservice  8888  86866  UP           /actuator/health 200
+  |     eureka-svc         Java microservice  8761  86912  UP           /actuator/health 200
   |   Business
-  |     ledger-svc         Java microservice  8081  55204  UP           /actuator/health 200, gRPC :9081 listening
-  |     conversion-svc     Java microservice  8082  55205  UP           /actuator/health 200
+  |     ledger-svc         Java microservice  8081  86966  UP           /actuator/health 200, gRPC :9081 listening
+  |     conversion-svc     Java microservice  8082  86967  UP           /actuator/health 200
   |   Edge
-  |     gateway-svc        Java microservice  8080  55206  UP           routes to ledger-svc and conversion-svc, a conversion completes
+  |     gateway-svc        Java microservice  8080  86968  UP           routes to ledger-svc and conversion-svc, a conversion completes
   | SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
   |   Data stores
   |     postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
@@ -1683,20 +1687,20 @@ $ ./fleet.sh up
   | fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000
   | exit=0
   PASS  exit 0
-  PASS  control: volumes exist before purge (ezeebit-wallet-sweep_lgtmdata
+  PASS  control: volumes exist before purge (ezeebit-wallet-sweep_kafkadata
 $ ./fleet.sh purge
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
-  | stopped gateway-svc (55206)
-  | stopped conversion-svc (55205)
-  | stopped ledger-svc (55204)
-  | stopped eureka-svc (55135)
-  | stopped config-svc (55076)
+  | stopped gateway-svc (86968)
+  | stopped conversion-svc (86967)
+  | stopped ledger-svc (86966)
+  | stopped eureka-svc (86912)
+  | stopped config-svc (86866)
+  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
   |  Container ezeebit-wallet-sweep-postgres-1 Stopping 
   |  Container ezeebit-wallet-sweep-wiremock-1 Stopping 
-  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-redis-1 Stopping 
-  |  Container ezeebit-wallet-sweep-kafka-1 Stopping 
+  |  Container ezeebit-wallet-sweep-lgtm-1 Stopping 
   |  Container ezeebit-wallet-sweep-lgtm-1 Stopped 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removing 
   |  Container ezeebit-wallet-sweep-lgtm-1 Removed 
@@ -1741,10 +1745,12 @@ $ ./fleet.sh purge
   |     pyroscope          inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
   |     otlp-collector     inside lgtm        4318  -      DOWN         nothing listening (connection refused)
   | fleet down: no fleet JVM, container or port left
-  | removing volumes: ezeebit-wallet-sweep_lgtmdata ezeebit-wallet-sweep_pgdata (every ledger and conversion row, Prometheus and Tempo history)
+  | removing volumes: ezeebit-wallet-sweep_kafkadata ezeebit-wallet-sweep_lgtmdata ezeebit-wallet-sweep_pgdata (every ledger and conversion row, the dead-letter topic, Prometheus and Tempo history)
   |  Volume ezeebit-wallet-sweep_lgtmdata Removing 
   |  Volume ezeebit-wallet-sweep_pgdata Removing 
+  |  Volume ezeebit-wallet-sweep_kafkadata Removing 
   |  Volume ezeebit-wallet-sweep_lgtmdata Removed 
+  |  Volume ezeebit-wallet-sweep_kafkadata Removed 
   |  Volume ezeebit-wallet-sweep_pgdata Removed 
   | fleet purged: containers, network, volumes and .fleet/ released; pulled images are kept
   | exit=0

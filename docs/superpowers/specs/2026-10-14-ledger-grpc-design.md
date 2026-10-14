@@ -1,6 +1,7 @@
 # Conversion to Ledger over gRPC, with retries, a dead-letter topic and Slack alerts
 
-Date: 2026-10-14. Status: design approved in conversation, awaiting review of this written spec.
+Date: 2026-10-14. Status: built on `feat-ledger-grpc`; where the build differs from the design, the
+row or line says "as built".
 Branch for implementation: `feat-ledger-grpc` (off `dev` at `87ac6c0` or later).
 
 ## 1. Goal and decisions
@@ -50,7 +51,7 @@ outbound/deadletter/KafkaDeadLetterPublisher  -> ezeebit.conversion.ledger.deadl
 | ledger `grpc/GrpcErrors` | Map an `ErrorCode` to a gRPC status plus `google.rpc.ErrorInfo` | nothing |
 | conversion `service/port/LedgerPostings` | What the service layer needs from a ledger, in conversion's words | domain types only |
 | conversion `outbound/ledger/LedgerGrpcClient` | Implement the port over gRPC, decorated by Resilience4j | generated stub, answer mapper, dead-letter port |
-| conversion `outbound/ledger/EurekaNameResolver` (or the library's, if one exists) | Turn `ledger-svc` into the gRPC addresses of every instance | `DiscoveryClient` |
+| conversion `outbound/ledger/EurekaNameResolver` (or the library's, if one exists). As built: no library resolver exists, so `outbound/discovery/DiscoveryNameResolverProvider` and `DiscoveryNameResolver` | Turn `ledger-svc` into the gRPC addresses of every instance | `DiscoveryClient` |
 | conversion `service/port/DeadLetters` + `outbound/deadletter/KafkaDeadLetterPublisher` | Publish one record per exhausted call, count it, never block the caller | `KafkaTemplate`, metrics |
 
 - The `.proto` file lives once, in a shared source set both services compile; a build check fails if
@@ -107,8 +108,9 @@ Dead-letter record, written when retries are exhausted or the circuit is open, n
 | `conversionId`, `merchantId` | as sent |
 | `request` | the request message as sent, JSON-encoded |
 | `attempts` | attempts made (0 when the circuit is open) |
-| `lastStatus` | the final gRPC status code |
-| `lastReason` | `ErrorInfo.reason`, else the status description |
+| `lastStatus` | the final gRPC status code; null when the circuit is open, because no call was made |
+| `lastReason` | `ErrorInfo.reason`, else the status description; null when the circuit is open |
+| `reason` | `RETRIES_EXHAUSTED` or `CIRCUIT_OPEN` (as built; also the counter's `reason` tag) |
 | `at` | time the dead letter was recorded (no attempt is made when the circuit is open) |
 | `traceId` | the current trace |
 

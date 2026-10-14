@@ -61,10 +61,12 @@ class OpenApiContractIT {
 	private static final Map<String, Set<Integer>> EXPECTED_STATUSES = Map.of(
 			"GET /v1/merchants/{merchantId}/balances", Set.of(200, 400, 403, 500),
 			"GET /v1/merchants/{merchantId}/entries", Set.of(200, 400, 403, 500),
-			"POST /internal/v1/deposits", Set.of(201, 400, 415, 422, 500),
-			"POST /internal/v1/conversion-postings", Set.of(201, 400, 409, 415, 422, 500),
-			"GET /internal/v1/conversion-postings/{conversionId}", Set.of(200, 400, 404, 500),
-			"POST /internal/v1/conversion-postings/{conversionId}/void", Set.of(201, 400, 409, 415, 500));
+			"POST /internal/v1/deposits", Set.of(201, 400, 415, 422, 500));
+
+	// Answered only by the conversion gRPC services since their REST endpoints went; GrpcErrorsTest maps each one.
+	private static final Set<ErrorCode> GRPC_ONLY = EnumSet.of(ErrorCode.SAME_CURRENCY, ErrorCode.POSTING_DEADLINE_PASSED,
+			ErrorCode.CONVERSION_VOIDED, ErrorCode.CONVERSION_ALREADY_POSTED, ErrorCode.INSUFFICIENT_FUNDS,
+			ErrorCode.POSTING_NOT_FOUND);
 
 	@LocalServerPort
 	private int port;
@@ -126,6 +128,7 @@ class OpenApiContractIT {
 	@Test
 	void everyErrorCodeIsPublishedByAnOperationOrAsARoutingAnswer() {
 		Set<ErrorCode> published = EnumSet.copyOf(OperationErrors.ROUTING);
+		published.addAll(GRPC_ONLY);
 		for (String group : List.of("public", "internal")) {
 			eachOperation(spec(group), (key, operation) -> codes(operation).forEach(code -> published.add(ErrorCode.valueOf(code))));
 			assertThat(spec(group).at("/components/schemas/ErrorCode/enum").valueStream().map(JsonNode::asString))

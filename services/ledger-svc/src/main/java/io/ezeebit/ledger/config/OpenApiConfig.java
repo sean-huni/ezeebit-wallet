@@ -24,7 +24,8 @@ class OpenApiConfig {
 			503 RATE_LIMITER_UNAVAILABLE (with Retry-After), 503 UPSTREAM_UNAVAILABLE and 504 UPSTREAM_OUTCOME_UNKNOWN.""";
 
 	private static final String INTERNAL = """
-			Service-to-service calls: deposits from the money-in rail, conversion postings from conversion-svc. \
+			Service-to-service calls: deposits from the money-in rail. Conversion postings from conversion-svc \
+			arrive over gRPC (ezeebit.ledger.v1 ConversionPostings and ConversionSettlement), not here. \
 			Never routed by the gateway; the service listens on loopback.""";
 
 	@Bean

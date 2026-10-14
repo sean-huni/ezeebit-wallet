@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.outbound.discovery;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,6 +18,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.client.ServiceInstance;
@@ -46,13 +48,42 @@ class DiscoveryNameResolverTest {
 			assertThat(a.get()).as("instance one").isPositive();
 			assertThat(b.get()).as("instance two").isPositive();
 
-			// Graceful stop models a rolling restart (SIGTERM); abrupt kill: LedgerGuardTest, Task 8.
+			// Graceful stop models a rolling restart (SIGTERM); abrupt kill: LedgerGuardTest.anAbruptlyKilledInstanceLosesNoPosting.
 			one.shutdown().awaitTermination(5, SECONDS);
 			int before = b.get();
 			for (int i = 0; i < 5; i++) {
 				stub.post(PostingRequest.getDefaultInstance());
 			}
 			assertThat(b.get() - before).as("calls served after one instance stopped").isEqualTo(5);
+		}
+		finally {
+			close(provider, channel, one, two);
+		}
+	}
+
+	@Test
+	void aReplicaRegisteredAfterStartIsReachedOnceTheServerAgesConnectionsOut() throws Exception {
+		AtomicInteger a = new AtomicInteger();
+		AtomicInteger b = new AtomicInteger();
+		Server one = agingServer(a);
+		Server two = agingServer(b);
+		SimpleDiscoveryProperties registry = registry(port(one.getPort()));
+		DiscoveryNameResolverProvider provider = new DiscoveryNameResolverProvider(new SimpleDiscoveryClient(registry));
+		ManagedChannel channel = channel(TARGET);
+		try {
+			ConversionPostingsGrpc.ConversionPostingsBlockingStub stub = ConversionPostingsGrpc.newBlockingStub(channel);
+			for (int i = 0; i < 5; i++) {
+				stub.post(PostingRequest.getDefaultInstance());
+			}
+			assertThat(b.get()).as("instance two before it registers").isZero();
+
+			registry.setInstances(Map.of("ledger-svc", List.of(port(one.getPort()), port(two.getPort()))));
+			long deadline = System.nanoTime() + SECONDS.toNanos(5);
+			while (b.get() == 0 && System.nanoTime() < deadline) {
+				stub.post(PostingRequest.getDefaultInstance());
+				MILLISECONDS.sleep(50);
+			}
+			assertThat(b.get()).as("calls reaching the replica registered after start, within 5s").isPositive();
 		}
 		finally {
 			close(provider, channel, one, two);
@@ -152,6 +183,12 @@ class DiscoveryNameResolverTest {
 		return ServerBuilder.forPort(0).addService(counting(calls)).build().start();
 	}
 
+	// The same GOAWAY the ledger sends at spring.grpc.server.keepalive.connection.max-age, shortened for the test.
+	private static Server agingServer(final AtomicInteger calls) throws Exception {
+		return NettyServerBuilder.forPort(0).maxConnectionAge(1, SECONDS).maxConnectionAgeGrace(1, SECONDS)
+				.addService(counting(calls)).build().start();
+	}
+
 	private static void close(final DiscoveryNameResolverProvider provider, final ManagedChannel channel,
 			final Server... servers) {
 		provider.destroy();
@@ -173,9 +210,13 @@ class DiscoveryNameResolverTest {
 	}
 
 	private static SimpleDiscoveryClient discovery(final InstanceProperties... instances) {
+		return new SimpleDiscoveryClient(registry(instances));
+	}
+
+	private static SimpleDiscoveryProperties registry(final InstanceProperties... instances) {
 		SimpleDiscoveryProperties properties = new SimpleDiscoveryProperties();
 		properties.setInstances(Map.of("ledger-svc", List.of(instances)));
-		return new SimpleDiscoveryClient(properties);
+		return properties;
 	}
 
 	private static InstanceProperties port(final int grpcPort) {

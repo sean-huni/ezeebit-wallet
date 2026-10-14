@@ -17,6 +17,11 @@ spring:
       port: ${LEDGER_GRPC_PORT:9081}
       # Loopback by default, like the HTTP port: these calls move money and carry no credential.
       address: ${SERVER_ADDRESS:127.0.0.1}
+      keepalive:
+        connection:
+          # A client re-reads Eureka only when a connection ends: a 30s GOAWAY lets a new replica in within ~30s; 5s grace outlives a 2s attempt.
+          max-age: 30s
+          grace-period: 5s
 eureka:
   instance:
     metadata-map:

@@ -395,7 +395,11 @@ status with `ErrorInfo`.
 `outbound/discovery/DiscoveryNameResolverProvider` reads every UP instance of `ledger-svc` from
 Eureka, with the gRPC port each one publishes as `grpcPort` metadata, and the channel balances
 `round_robin` over them; HTTP/2 would otherwise pin every call to one replica. The resolver re-reads
-the registry when a connection fails.
+the registry only when a connection ends, so a healthy channel would never see a replica added later.
+The ledger therefore ages every gRPC connection out (`spring.grpc.server.keepalive.connection.max-age`
+30 s, 5 s grace for calls in flight): each GOAWAY makes the client reconnect and re-read Eureka, so a
+new replica takes traffic within about 30 s plus Eureka's own registration delay
+(`DiscoveryNameResolverTest.aReplicaRegisteredAfterStartIsReachedOnceTheServerAgesConnectionsOut`).
 
 **The service layer owns the seam.** `service/port/LedgerPostings` is the interface the use cases
 call, in conversion's own words; `outbound/ledger/LedgerGrpcClient` implements it. `service/` imports
@@ -415,6 +419,12 @@ needs.
 
 A breaker opens at a 50% failure rate over the last 20 calls, stays open 10 s, then lets 3 trial
 calls through. While it is open a call returns UNKNOWN at once and the conversion stays PENDING.
+Breaker state is per replica: each conversion-svc replica counts only its own calls and opens its
+own breakers, so at N replicas there are N independent breakers per operation and one can be open
+while another is closed. That is acceptable because the breaker is a fast local signal and holds no
+business state: correctness never depends on it, every PENDING conversion is settled by the sweeper
+whichever replica's breaker refused the call, and the dashboard shows the worst replica
+(`max by (name)`).
 
 **Dead letters.** When retries are exhausted or the circuit is open (never for a refusal),
 `outbound/deadletter/KafkaDeadLetterPublisher` publishes one record to the Kafka topic

@@ -30,7 +30,7 @@ Walkthrough video: link to be added.
 
 **This README**
 
-[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Databases, schemas and tables](#databases-schemas-and-tables) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [Troubleshooting](#troubleshooting)
+[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Databases, schemas and tables](#databases-schemas-and-tables) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [The `.env` file](#the-env-file-keep-every-run-on-the-same-settings) · [Troubleshooting](#troubleshooting)
 
 ## Find your way around
 
@@ -408,6 +408,50 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 `DB_URL`, `DB_USER`, `DB_PASSWORD` and `SERVER_PORT` carry the same name in every service: set them
 per process when starting a service by hand, not in `.env`, or every service picks up the same value.
 
+### The `.env` file: keep every run on the same settings
+
+**Put any setting your machine needs in `.env`, not in one shell's environment.** `fleet.sh up`,
+`status` and `down` each resolve the ports again on every run. If `up` ran with
+`REDIS_PORT=6390` exported and a later `status` runs in a shell without it, that `status` resolves
+6379 and reports the running Redis as wrong:
+
+```
+redis   Docker container   6390  -   MISMATCH   published on 6390, but the environment now says 6379
+RESULT: NOT healthy: redis MISMATCH
+```
+
+Nothing is broken: the gateway still dials 6390. The two runs saw different settings. `.env` is read
+by every run, by `fleet.sh` and by `docker compose`, so a value there reaches all of them. A value
+exported in one shell still wins over `.env` for that shell's runs.
+
+What belongs in it: values specific to this machine (a port another program already holds) and
+secrets (`SLACK_WEBHOOK_URL`). What does not: `DB_URL`, `DB_USER`, `DB_PASSWORD` and `SERVER_PORT`
+(see above). `.env` is gitignored; never commit it, and never paste a secret from it into an issue or
+a log. A clean clone needs no `.env` at all.
+
+Create it at the repository root:
+
+```sh
+# .env: local overrides for this machine. Gitignored. Every line is optional.
+
+# Ports already held on this machine (another project's Redis holds 6379 here)
+REDIS_PORT=6390
+# POSTGRES_PORT=55432
+# RATES_PORT=8090
+
+# Secrets: set here only, never committed
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/services/<your-webhook-path>
+
+# Shared local credentials: change them for anything that is not a laptop
+# REDIS_PASSWORD=redis-local
+# GATEWAY_SHARED_SECRET=local-gateway-proof
+```
+
+Check what the fleet will use before starting it:
+`docker compose config --format json | jq '.services.redis.ports'` shows the resolved Redis port.
+After editing `.env` while the fleet is running, run `./fleet.sh down` and then `./fleet.sh up`, so the
+containers and the gateway pick up the new value together.
+
 Served configuration lives in `services/config-svc/src/main/resources/served/`: `application.yml`
 (shared by all clients: registry settings, the gateway proof secret and the public spec URL), `ledger-svc.yml` (datasource), `conversion-svc.yml` (datasource and pricing
 policy: quote time to live (TTL), posting grace, sweeper timing, rate-service timeouts and freshness, jump limit,
@@ -420,6 +464,7 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 |---|---|
 | `up` says `port 5432 (postgres) is held by ...` | `POSTGRES_PORT=55432 ./fleet.sh up` (or set it in `.env`); the services follow it |
 | `up` says `port 6379 (redis) is held by ...` | `REDIS_PORT=6390 ./fleet.sh up` (or set it in `.env`); the gateway follows it |
+| `status` says `redis MISMATCH`, `published on 6390, but the environment now says 6379` | The fleet was started with a setting this shell lacks. Put it in `.env` ([The `.env` file](#the-env-file-keep-every-run-on-the-same-settings)), or run `REDIS_PORT=6390 ./fleet.sh status` |
 | `up` says `port 8081 (ledger-svc) is held by process ...` | A JVM from an earlier run, or another program, holds a service port: stop it (the line gives its process id) |
 | `up` says `fleet still not healthy after one bounce` | The table above that line names each failing row and why. The stack is left running for diagnosis; `./fleet.sh down` when done |
 | `down` says `fleet NOT fully down` | The lines below it name the port holder or container that survived; stop it before the next `up` |

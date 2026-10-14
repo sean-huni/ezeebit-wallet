@@ -12,6 +12,15 @@ spring:
   messages:
     basename: i18n/messages
     fallback-to-system-locale: false
+  grpc:
+    server:
+      port: ${LEDGER_GRPC_PORT:9081}
+      # Loopback by default, like the HTTP port: these calls move money and carry no credential.
+      address: ${SERVER_ADDRESS:127.0.0.1}
+eureka:
+  instance:
+    metadata-map:
+      grpcPort: ${spring.grpc.server.port}
 springdoc:
   # Sorted keys keep the committed snapshots in docs/openapi stable; responses come from api/doc, not the advice classes.
   writer-with-order-by-keys: true

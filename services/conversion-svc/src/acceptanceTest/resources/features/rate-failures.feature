@@ -10,14 +10,27 @@ Feature: An unreliable rate service gives a clear refusal, never a guessed rate
     And the rate service answers too slowly
     When "Acme" asks for quote "q2" to sell "1000.00" ZAR for USDT
     Then the request is refused with 503 RATE_UNAVAILABLE
-    And the refusal came within 3 seconds
+    And the refusal came within 5 seconds
     And only 1 quote is stored for "Acme"
+
+  Scenario: A rate service that answers late once is retried and the quote succeeds
+    Given the rate service answers its first request after 3 seconds and then normally
+    When "Acme" asks for quote "q1" to sell "100.00" ZAR for USDT
+    Then quote "q1" is created
+    And the rate service was asked 2 times
 
   Scenario: A failing rate service is refused
     Given the rate service fails with status 500
     When "Acme" asks for quote "q1" to sell "1000.00" ZAR for USDT
     Then the request is refused with 503 RATE_UNAVAILABLE
     And no quote is stored for "Acme"
+
+  Scenario: A rate service error is not retried and is never dead-lettered
+    Given the rate service fails with status 500
+    When "Acme" asks for quote "q1" to sell "100.00" ZAR for USDT
+    Then the request is refused with 503 RATE_UNAVAILABLE
+    And the rate service was asked 1 time
+    And no dead letter was recorded
 
   Scenario Outline: A bad rate is refused with its reason
     Given the rate service <answer>

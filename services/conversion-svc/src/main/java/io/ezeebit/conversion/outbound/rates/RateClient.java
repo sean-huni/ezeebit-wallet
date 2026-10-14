@@ -12,10 +12,8 @@ import io.ezeebit.conversion.exception.ErrorCode;
 import io.ezeebit.conversion.service.port.RateSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -25,13 +23,12 @@ public class RateClient implements RateSource {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RateClient.class);
 
-	private final RestClient rates;
+	private final RateCall call;
 	private final RateMapper mapper;
 	private final ConversionMetrics metrics;
 
-	public RateClient(@Qualifier("rateRestClient") final RestClient rates, final RateMapper mapper,
-			final ConversionMetrics metrics) {
-		this.rates = rates;
+	public RateClient(final RateCall call, final RateMapper mapper, final ConversionMetrics metrics) {
+		this.call = call;
 		this.mapper = mapper;
 		this.metrics = metrics;
 	}
@@ -39,10 +36,10 @@ public class RateClient implements RateSource {
 	@Override
 	public MarketRate fetch(final String base, final String quote) {
 		RateDto dto;
+		// Started before the retry, so the timer and its one outcome cover every attempt of this fetch.
 		long started = System.nanoTime();
 		try {
-			// A template, so the client timer's uri tag is the route and not one value per pair.
-			dto = rates.get().uri("/rates?base={base}&quote={quote}", base, quote).retrieve().body(RateDto.class);
+			dto = call.get(base, quote);
 		}
 		catch (ResourceAccessException | RestClientResponseException ex) {
 			metrics.rateCall(since(started), "unavailable");

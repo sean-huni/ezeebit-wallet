@@ -62,6 +62,11 @@ resilience4j:
       ledgerPost: { max-attempts: 3, wait-duration: 200ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
       ledgerFind: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
       ledgerVoid: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      # Rate feed: only a timeout or an IO failure is retried, never an error status. 2 x 2s + 200ms = 4.2s.
+      rates:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions: [org.springframework.web.client.ResourceAccessException]
   circuitbreaker:
     configs:
       ledger:

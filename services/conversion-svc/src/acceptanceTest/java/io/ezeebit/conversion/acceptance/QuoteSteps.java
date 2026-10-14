@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
@@ -71,7 +73,7 @@ public class QuoteSteps {
 	@Given("quote {string} has expired")
 	public void hasExpired(final String name) {
 		conversionDb.sql("UPDATE quote SET expires_at = now() - interval '1 second' WHERE id = :id")
-				.param("id", java.util.UUID.fromString(state.quoteId(name))).update();
+				.param("id", UUID.fromString(state.quoteId(name))).update();
 	}
 
 	@Then("quote {string} is offered:")
@@ -83,11 +85,19 @@ public class QuoteSteps {
 				.as(field).isEqualTo(value));
 	}
 
+	@Then("quote {string} is created")
+	public void isCreated(final String name) {
+		Reply quote = state.quote(name);
+		assertThat(quote.status()).as(quote.body()).isEqualTo(201);
+		assertThat(conversionDb.sql("SELECT count(*) FROM quote WHERE id = :id")
+				.param("id", UUID.fromString(state.quoteId(name))).query(Integer.class).single()).isEqualTo(1);
+	}
+
 	@Then("quote {string} expires {int} seconds after it was made")
 	public void expiresAfter(final String name, final int seconds) {
 		Instant expires = Instant.parse(state.quote(name).read("$.data.expiresAt"));
 		Instant created = conversionDb.sql("SELECT created FROM quote WHERE id = :id")
-				.param("id", java.util.UUID.fromString(state.quoteId(name))).query(java.time.OffsetDateTime.class).single().toInstant();
+				.param("id", UUID.fromString(state.quoteId(name))).query(OffsetDateTime.class).single().toInstant();
 		assertThat(Duration.between(created, expires)).isBetween(Duration.ofSeconds(seconds - 1),
 				Duration.ofSeconds(seconds + 1));
 	}

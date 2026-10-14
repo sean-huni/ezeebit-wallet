@@ -212,22 +212,51 @@ container_row() {
   row $name "Docker container" $port - $state $detail
 }
 
+ds_ok() {
+  # One datasource health check of backend $1 through Grafana; sets BODY to the reply.
+  BODY=$(curl -s --max-time 5 "http://localhost:${PORT[lgtm:3000]}/api/datasources/uid/$1/health")
+  [[ $(jq -r '.status // empty' <<< $BODY 2>/dev/null) == OK ]]
+}
+
+installer_mark() {
+  # The last line Grafana's background plugin installer logged; it moves while plugins are still being installed.
+  docker compose exec -T lgtm sh -c "grep -E 'logger=(plugin.backgroundinstaller|plugin.installer|installer.fs) ' /otel-lgtm/grafana/data/log/grafana.log | tail -1" 2>/dev/null
+}
+
+settle_plugins() {
+  # lgtm reports healthy while Grafana still downloads its datasource plugins one by one, and each answers
+  # "Plugin not registered" while it is replaced: settled is every backend OK and the installer idle for 5 polls.
+  local deadline=$(( SECONDS + SETTLE )) streak=0 name ok mark last=
+  print "waiting for grafana plugins to settle"
+  while (( streak < 5 && SECONDS < deadline )); do
+    ok=1
+    for name in $BACKENDS; do ds_ok $name || ok=0; done
+    mark=$(installer_mark)
+    [[ $mark == *(msg=\"Installing plugin\"|Updating plugin|Downloaded and extracted)* || $mark != "$last" ]] && ok=0
+    last=$mark
+    if (( ok )); then streak=$(( streak + 1 )); else streak=0; fi
+    (( streak < 5 )) && sleep 1
+  done
+  # A timeout falls through to the status, which names the backend that is still down.
+  return 0
+}
+
 observability_rows() {
-  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name body msg try grafana=0
+  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name msg try up grafana=0
   probe "http://localhost:$g/api/health"
   if [[ $CODE == 200 ]]; then grafana=1; row grafana "inside lgtm" $g - UP "/api/health 200"
   else row grafana "inside lgtm" $g - DOWN "${CODE:+/api/health answered }${CODE:-$WHY}"; fi
   for name in $BACKENDS; do
     if (( ! grafana )); then row $name "inside lgtm" - - SKIPPED "Grafana not answering, so its datasource check cannot run"; continue; fi
     # Grafana answers a datasource health check with a transient error now and then; only 3 in a row is DOWN.
+    up=0
     for try in 1 2 3; do
-      body=$(curl -s --max-time 5 "http://localhost:$g/api/datasources/uid/$name/health")
-      [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]] && break
+      ds_ok $name && { up=1; break; }
       (( try < 3 )) && sleep 1
     done
-    if [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]]; then row $name "inside lgtm" - - UP "datasource health OK"
-    elif [[ -z $body ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s, 3 tries 1s apart"
-    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}, 3 tries 1s apart"; fi
+    if (( up )); then row $name "inside lgtm" - - UP "datasource health OK"
+    elif [[ -z $BODY ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s, 3 tries 1s apart"
+    else msg=$(jq -r '.message // empty' <<< $BODY 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}, 3 tries 1s apart"; fi
   done
   # An empty export is the cheapest request only a live collector answers with 200.
   probe -X POST -H 'Content-Type: application/json' -d '{}' "http://localhost:$o/v1/metrics"
@@ -312,6 +341,7 @@ up_once() {
   # Last, so neither a slow boot nor a failed up can page: ServiceDown only ever sees a healthy fleet.
   print "lgtm"
   docker compose up -d --wait lgtm || return 1
+  settle_plugins
 }
 
 up() {

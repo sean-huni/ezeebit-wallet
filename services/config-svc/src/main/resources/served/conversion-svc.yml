@@ -3,12 +3,25 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/conversion}
     username: ${DB_USER:conversion}
     password: ${DB_PASSWORD:conversion}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:${KAFKA_PORT:9092}}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 2000
+        request.timeout.ms: 1500
+        linger.ms: 0
+        # send() blocks for metadata up to this: the merchant's request must never wait on a dead broker.
+        max.block.ms: 250
 conversion:
   quote-ttl: 15s
   # Deadline sent to the ledger = quote expiry + grace; no posting commits after it.
   posting-grace: 30s
   # The sweeper resolves a PENDING conversion only after deadline + this, when no posting can still commit.
   max-transaction-time: 30s
+  # Record-and-alert only: nothing consumes it. The sweeper settles the conversion.
+  dead-letter-topic: ezeebit.conversion.ledger.deadletter
   sweep-interval: 10s
   rates:
     url: ${RATES_URL:http://localhost:${RATES_PORT:8089}}

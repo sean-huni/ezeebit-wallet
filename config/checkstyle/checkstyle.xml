@@ -33,6 +33,11 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]outbound[\\/]ledger[\\/]LedgerGuard\.java$"/>
 	</module>
+	<!-- The same promise at the sink itself: a closed producer throws IllegalStateException, not a KafkaException. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]deadletter[\\/]KafkaDeadLetterPublisher\.java$"/>
+	</module>
 
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">

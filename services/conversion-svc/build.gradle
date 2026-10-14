@@ -16,10 +16,12 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
 	implementation "io.github.resilience4j:resilience4j-spring-boot4:${resilience4jVersion}"
 	implementation 'com.google.protobuf:protobuf-java-util'
+	implementation 'org.springframework.boot:spring-boot-starter-kafka'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'io.grpc:grpc-netty-shaded'
 	testImplementation 'io.grpc:grpc-inprocess'
 	acceptanceTestImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
+	acceptanceTestImplementation 'org.testcontainers:testcontainers-kafka'
 }
 
 // Spring tests read the same files config-svc serves, so pairs, bands, timeouts and the gateway secret have one home.

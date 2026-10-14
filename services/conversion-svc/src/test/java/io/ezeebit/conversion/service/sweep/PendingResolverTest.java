@@ -74,7 +74,7 @@ class PendingResolverTest {
 	}
 
 	private PendingResolver resolver(final AbstractPlatformTransactionManager manager) {
-		ConversionProperties properties = new ConversionProperties(null, null, Duration.ofSeconds(30), null, null,
+		ConversionProperties properties = new ConversionProperties(null, null, Duration.ofSeconds(30), null, null, null,
 				null, null);
 		ConversionSettler settler = new ConversionSettler(conversions, clock, metrics);
 		PendingClaimer claimer = new PendingClaimer(conversions, new DueCutoff(properties, clock),

@@ -45,9 +45,9 @@ outbound/deadletter/KafkaDeadLetterPublisher  -> ezeebit.conversion.ledger.deadl
 
 | Unit | One job | Depends on |
 |---|---|---|
-| `ledger/v1/conversion_postings.proto` | The contract: `Post`, `Find`, `Void` and their messages | nothing |
-| ledger `grpc/ConversionPostingGrpcService` | Translate gRPC to the two existing services and back | the two services, an error translator |
-| ledger `grpc/GrpcErrorTranslator` | Map an `ErrorCode` to a gRPC status plus `google.rpc.ErrorInfo` | nothing |
+| `contracts/ledger/v1/conversion_postings.proto` | The contract: service `ConversionPostings` (`Post`) and service `ConversionSettlement` (`Find`, `Void`), split so each server class stays within 3 dependencies | nothing |
+| ledger `grpc/ConversionPostingRpc`, `grpc/ConversionSettlementRpc` | Translate gRPC to the existing services and back | those services, `PostingMessages` |
+| ledger `grpc/GrpcErrors` | Map an `ErrorCode` to a gRPC status plus `google.rpc.ErrorInfo` | nothing |
 | conversion `service/port/LedgerPostings` | What the service layer needs from a ledger, in conversion's words | domain types only |
 | conversion `outbound/ledger/LedgerGrpcClient` | Implement the port over gRPC, decorated by Resilience4j | generated stub, answer mapper, dead-letter port |
 | conversion `outbound/ledger/EurekaNameResolver` (or the library's, if one exists) | Turn `ledger-svc` into the gRPC addresses of every instance | `DiscoveryClient` |
@@ -60,6 +60,10 @@ outbound/deadletter/KafkaDeadLetterPublisher  -> ezeebit.conversion.ledger.deadl
   concrete `outbound/` client on the ledger seam. The rate seam gets the same port in this change.
 - Every new bean stays at or under 3 injected dependencies (`rules/be/java/dependency-injection.md`).
 - `ConversionPostingCtrl`, its request and response DTOs, and their tests are deleted (D5).
+- The conversion acceptance tier injects ledger faults through a WireMock HTTP proxy today; it becomes a
+  small gRPC forwarding proxy in test code. One scenario step changes wording: with 3 attempts it counts
+  distinct conversions posted, not `Post` calls. The rate retry is 2 attempts (4.2s worst case).
+- Implementation plan: `docs/superpowers/plans/2026-10-14-ledger-grpc.md`.
 
 ## 3. Errors, retries and dead letters
 

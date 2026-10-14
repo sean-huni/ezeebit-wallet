@@ -22,6 +22,8 @@
       letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 1.25rem; }
     .diagram-container { width: 100%; overflow-x: auto; }
     svg { width: 100%; min-width: 1360px; display: block; pointer-events: none; }
+    .detail-link { font-size: 0.875rem; color: var(--color-muted); margin-top: 1rem; }
+    .detail-link a { color: #22e6ff; }
     @media print {
       .diagram-container { overflow-x: visible; }
       svg { min-width: 0; }
@@ -31,14 +33,15 @@
 <body>
   <div class="frame">
     <p class="eyebrow">Architecture · ezeebit-wallet · fleet.sh</p>
-    <h1>The wallet fleet: five Java services, four containers</h1>
+    <h1>The wallet fleet: five Java services, five containers</h1>
     <div class="diagram-container">
     <svg viewBox="0 0 1360 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fleet-architecture-title fleet-architecture-desc">
       <title id="fleet-architecture-title">Ezeebit wallet fleet</title>
-      <desc id="fleet-architecture-desc">Merchant calls enter the gateway, which routes balance reads to ledger-svc and quotes and conversions to conversion-svc; conversion posts to the ledger and reads rates from WireMock, each service owns a Postgres database, the gateway keeps rate limits in Redis, every JVM sends telemetry to LGTM, and LGTM pages Slack through its webhook.</desc>
+      <desc id="fleet-architecture-desc">Merchant calls enter the gateway, which routes balance reads to ledger-svc and quotes and conversions to conversion-svc; conversion posts to the ledger over gRPC on port 9081 found through Eureka, reads rates from WireMock over HTTP and publishes dead letters to the Kafka topic ezeebit.conversion.ledger.deadletter, each service owns a Postgres database, the gateway keeps rate limits in Redis, every JVM sends telemetry to LGTM, and LGTM pages Slack through its webhook.</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8b93b8"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#39ff14"/></marker>
+        <marker id="arrow-grpc" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff5ce1"/></marker>
         <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22e6ff"/></marker>
         <radialGradient id="wall" gradientUnits="userSpaceOnUse" cx="680" cy="380" r="820">
           <stop offset="0" stop-color="#0f1225"/><stop offset="1" stop-color="#07080e"/>
@@ -76,10 +79,11 @@
       <line x1="16" y1="406" x2="118" y2="406" stroke="#e6ffe0" stroke-width="0.6" stroke-linecap="round"/>
       <path d="M 336,394 H 440 Q 448,394 448,386 V 342 Q 448,334 456,334 H 616" fill="none" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
       <path d="M 336,418 H 472 Q 480,418 480,426 V 470 Q 480,478 488,478 H 616" fill="none" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
-      <line x1="720" y1="440" x2="720" y2="372" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <line x1="720" y1="440" x2="720" y2="372" stroke="#ff5ce1" stroke-width="1.4" marker-end="url(#arrow-grpc)" filter="url(#neon-soft)"/>
       <line x1="824" y1="320" x2="1036" y2="320" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <path d="M 824,464 H 900 Q 908,464 908,456 V 356 Q 908,348 916,348 H 1036" fill="none" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <line x1="824" y1="492" x2="1036" y2="492" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <path d="M 824,452 H 900 Q 908,452 908,444 V 356 Q 908,348 916,348 H 1036" fill="none" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 824,478 H 964 Q 972,478 972,470 V 442 Q 972,434 980,434 H 1036" fill="none" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <path d="M 824,504 H 992 Q 1000,504 1000,512 V 526 Q 1000,534 1008,534 H 1036" fill="none" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
       <path d="M 232,444 V 614 Q 232,622 240,622 H 1036" fill="none" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
       <line x1="860" y1="166" x2="1036" y2="166" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
       <line x1="1248" y1="128" x2="1248" y2="52" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
@@ -90,14 +94,16 @@
       <text x="536" y="322" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">BALANCES</text>
       <rect x="500" y="486" width="104" height="16" rx="2" fill="url(#wall)"/>
       <text x="552" y="498" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">QUOTE+CONVERT</text>
-      <rect x="728" y="398" width="68" height="16" rx="2" fill="url(#wall)"/>
-      <text x="762" y="410" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">POSTINGS</text>
+      <rect x="728" y="398" width="80" height="16" rx="2" fill="url(#wall)"/>
+      <text x="768" y="410" fill="#ff5ce1" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">GRPC :9081</text>
       <rect x="892" y="296" width="76" height="16" rx="2" fill="url(#wall)"/>
       <text x="930" y="308" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">LEDGER DB</text>
       <rect x="916" y="400" width="104" height="16" rx="2" fill="url(#wall)"/>
       <text x="968" y="412" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">CONVERSION DB</text>
-      <rect x="906" y="500" width="48" height="16" rx="2" fill="url(#wall)"/>
-      <text x="930" y="512" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RATES</text>
+      <rect x="916" y="446" width="48" height="16" rx="2" fill="url(#wall)"/>
+      <text x="940" y="458" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RATES</text>
+      <rect x="904" y="512" width="84" height="16" rx="2" fill="url(#wall)"/>
+      <text x="946" y="524" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">DEAD LETTER</text>
       <rect x="892" y="598" width="96" height="16" rx="2" fill="url(#wall)"/>
       <text x="940" y="610" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RATE BUCKETS</text>
       <rect x="892" y="142" width="112" height="16" rx="2" fill="url(#wall)"/>
@@ -105,7 +111,7 @@
       <rect x="1256" y="82" width="96" height="16" rx="2" fill="url(#wall)"/>
       <text x="1304" y="94" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">SLACK ALERTS</text>
       <!-- Callout -->
-      <text x="128" y="256" fill="#8b93b8" font-size="15" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">Every JVM reads config-svc at boot and finds its peers through eureka-svc (lb://).</text>
+      <text x="128" y="256" fill="#8b93b8" font-size="15" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">Every JVM reads config-svc at boot and finds its peers through eureka-svc (lb://, and discovery:/// for gRPC).</text>
       <!-- Core nodes: Java microservices -->
       <rect x="360" y="128" width="208" height="76" rx="6" fill="url(#wall)"/>
       <rect x="360" y="128" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
@@ -132,7 +138,7 @@
       <rect x="624" y="304" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
       <text x="644" y="316" fill="#e8ecff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">JAVA</text>
       <text x="720" y="342" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Ledger</text>
-      <text x="720" y="360" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">ledger-svc :8081</text>
+      <text x="720" y="360" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">ledger-svc :8081 · gRPC :9081</text>
       <rect x="616" y="440" width="208" height="76" rx="6" fill="url(#wall)"/>
       <rect x="616" y="440" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
       <rect x="624" y="448" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
@@ -152,18 +158,24 @@
       <text x="1058" y="316" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DB</text>
       <text x="1152" y="342" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Postgres</text>
       <text x="1152" y="360" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">postgres:18.6 :5432</text>
-      <rect x="1036" y="440" width="232" height="76" rx="6" fill="url(#wall)"/>
-      <rect x="1036" y="440" width="232" height="76" rx="6" fill="rgba(122,131,168,0.12)" stroke="#7a83a8" stroke-width="1" stroke-dasharray="4,3"/>
-      <rect x="1044" y="448" width="40" height="16" rx="2" fill="transparent" stroke="rgba(122,131,168,0.55)" stroke-width="0.8"/>
-      <text x="1064" y="460" fill="#7a83a8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">STUB</text>
-      <text x="1152" y="486" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">WireMock rates</text>
-      <text x="1152" y="504" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">wiremock :8089</text>
-      <rect x="1036" y="584" width="232" height="76" rx="6" fill="url(#wall)"/>
-      <rect x="1036" y="584" width="232" height="76" rx="6" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
-      <rect x="1044" y="592" width="28" height="16" rx="2" fill="transparent" stroke="rgba(139,147,184,0.55)" stroke-width="0.8"/>
-      <text x="1058" y="604" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">KV</text>
-      <text x="1152" y="630" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Redis</text>
-      <text x="1152" y="648" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">redis:8.10.2 :6379</text>
+      <rect x="1036" y="396" width="232" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="1036" y="396" width="232" height="76" rx="6" fill="rgba(122,131,168,0.12)" stroke="#7a83a8" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="1044" y="404" width="40" height="16" rx="2" fill="transparent" stroke="rgba(122,131,168,0.55)" stroke-width="0.8"/>
+      <text x="1064" y="416" fill="#7a83a8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">STUB</text>
+      <text x="1152" y="442" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">WireMock rates</text>
+      <text x="1152" y="460" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">wiremock :8089</text>
+      <rect x="1036" y="496" width="232" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="1036" y="496" width="232" height="76" rx="6" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
+      <rect x="1044" y="504" width="28" height="16" rx="2" fill="transparent" stroke="rgba(139,147,184,0.55)" stroke-width="0.8"/>
+      <text x="1058" y="516" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">MQ</text>
+      <text x="1152" y="542" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Kafka dead letters</text>
+      <text x="1152" y="560" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">apache/kafka:4.3.1 :9092</text>
+      <rect x="1036" y="596" width="232" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="1036" y="596" width="232" height="76" rx="6" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
+      <rect x="1044" y="604" width="28" height="16" rx="2" fill="transparent" stroke="rgba(139,147,184,0.55)" stroke-width="0.8"/>
+      <text x="1058" y="616" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">KV</text>
+      <text x="1152" y="642" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Redis</text>
+      <text x="1152" y="660" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">redis:8.10.2 :6379</text>
       <!-- External endpoint -->
       <rect x="1180" y="8" width="136" height="44" rx="6" fill="url(#wall)"/>
       <rect x="1180" y="8" width="136" height="44" rx="6" fill="url(#surface)" stroke="#22e6ff" stroke-opacity="0.7" stroke-width="1"/>
@@ -182,15 +194,18 @@
       <text x="536" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">External stand-in</text>
       <rect x="664" y="754" width="16" height="12" rx="2" fill="url(#surface)" stroke="#22e6ff" stroke-opacity="0.7" stroke-width="1"/>
       <text x="688" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">External service</text>
-      <line x1="808" y1="760" x2="836" y2="760" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
-      <text x="844" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">HTTP call</text>
-      <line x1="920" y1="760" x2="948" y2="760" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
-      <text x="956" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Database or Redis connection</text>
-      <line x1="1144" y1="760" x2="1172" y2="760" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
-      <text x="1180" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Telemetry push</text>
+      <line x1="64" y1="782" x2="92" y2="782" stroke="#ff5ce1" stroke-width="1.4" marker-end="url(#arrow-grpc)" filter="url(#neon-soft)"/>
+      <text x="100" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">gRPC call, port from Eureka</text>
+      <line x1="288" y1="782" x2="316" y2="782" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <text x="324" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">HTTP call</text>
+      <line x1="408" y1="782" x2="436" y2="782" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="444" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Database or Redis connection</text>
+      <line x1="632" y1="782" x2="660" y2="782" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <text x="668" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Async: telemetry push, dead-letter publish</text>
       <rect x="0" y="176" width="480" height="460" fill="url(#spill-green)" style="mix-blend-mode: screen" pointer-events="none"/>
     </svg>
     </div>
+    <p class="detail-link">Detail: <a href="fleet-ledger-grpc.html">conversion to ledger over gRPC, with retries, breakers and dead letters to the Kafka topic ezeebit.conversion.ledger.deadletter</a></p>
   </div>
 </body>
 </html>

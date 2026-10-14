@@ -4,20 +4,14 @@ import static io.ezeebit.ledger.exception.ErrorCode.AMOUNT_NOT_POSITIVE;
 import static io.ezeebit.ledger.exception.ErrorCode.AMOUNT_SCALE_EXCEEDED;
 import static io.ezeebit.ledger.exception.ErrorCode.AMOUNT_TOO_LARGE;
 import static io.ezeebit.ledger.exception.ErrorCode.BALANCE_LIMIT_EXCEEDED;
-import static io.ezeebit.ledger.exception.ErrorCode.CONVERSION_ALREADY_POSTED;
-import static io.ezeebit.ledger.exception.ErrorCode.CONVERSION_VOIDED;
 import static io.ezeebit.ledger.exception.ErrorCode.CURRENCY_MISMATCH;
 import static io.ezeebit.ledger.exception.ErrorCode.GATEWAY_REQUIRED;
 import static io.ezeebit.ledger.exception.ErrorCode.IDEMPOTENCY_KEY_MISSING;
 import static io.ezeebit.ledger.exception.ErrorCode.IDEMPOTENCY_KEY_REUSED;
-import static io.ezeebit.ledger.exception.ErrorCode.INSUFFICIENT_FUNDS;
 import static io.ezeebit.ledger.exception.ErrorCode.INTERNAL_ERROR;
 import static io.ezeebit.ledger.exception.ErrorCode.MALFORMED_REQUEST;
 import static io.ezeebit.ledger.exception.ErrorCode.METHOD_NOT_ALLOWED;
 import static io.ezeebit.ledger.exception.ErrorCode.NOT_FOUND;
-import static io.ezeebit.ledger.exception.ErrorCode.POSTING_DEADLINE_PASSED;
-import static io.ezeebit.ledger.exception.ErrorCode.POSTING_NOT_FOUND;
-import static io.ezeebit.ledger.exception.ErrorCode.SAME_CURRENCY;
 import static io.ezeebit.ledger.exception.ErrorCode.UNBALANCED_POSTING;
 import static io.ezeebit.ledger.exception.ErrorCode.UNKNOWN_CURRENCY;
 import static io.ezeebit.ledger.exception.ErrorCode.UNSUPPORTED_API_VERSION;
@@ -44,11 +38,7 @@ public final class OperationErrors {
 	private static final Map<String, Set<ErrorCode>> BY_OPERATION = Map.of(
 			"getBalances", EnumSet.of(VALIDATION_FAILED, GATEWAY_REQUIRED, INTERNAL_ERROR),
 			"listEntries", EnumSet.of(VALIDATION_FAILED, UNKNOWN_CURRENCY, GATEWAY_REQUIRED, INTERNAL_ERROR),
-			"createDeposit", union(BODY, MONEY, EnumSet.of(IDEMPOTENCY_KEY_MISSING, IDEMPOTENCY_KEY_REUSED, BALANCE_LIMIT_EXCEEDED)),
-			"postConversion", union(BODY, MONEY, EnumSet.of(SAME_CURRENCY, POSTING_DEADLINE_PASSED, CONVERSION_VOIDED,
-					IDEMPOTENCY_KEY_REUSED, INSUFFICIENT_FUNDS, BALANCE_LIMIT_EXCEEDED)),
-			"findConversionPosting", EnumSet.of(VALIDATION_FAILED, POSTING_NOT_FOUND, INTERNAL_ERROR),
-			"voidConversionPosting", union(BODY, EnumSet.of(CONVERSION_ALREADY_POSTED)));
+			"createDeposit", union(BODY, MONEY, EnumSet.of(IDEMPOTENCY_KEY_MISSING, IDEMPOTENCY_KEY_REUSED, BALANCE_LIMIT_EXCEEDED)));
 
 	private OperationErrors() {
 	}

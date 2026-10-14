@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Runs the whole fleet on this host: Postgres, WireMock, Redis and Grafana LGTM in Docker, every service as a
+# Runs the whole fleet on this host: Postgres, WireMock, Redis, Kafka and Grafana LGTM in Docker, every service as a
 # Java virtual machine (JVM).
 # Usage: ./fleet.sh up | down | purge | status   (purge also deletes the data volumes)
 set -u
@@ -17,15 +17,15 @@ RUN=.fleet
 SETTLE=${FLEET_SETTLE_SECONDS:-90}
 SERVICES=(config-svc eureka-svc ledger-svc conversion-svc gateway-svc)
 CORE_GROUPS=('Control plane:config-svc eureka-svc' 'Business:ledger-svc conversion-svc' 'Edge:gateway-svc')
-SUPPORT_GROUPS=('Data stores:postgres redis' 'External stand-ins:wiremock' 'Observability:lgtm')
+SUPPORT_GROUPS=('Data stores:postgres redis' 'External stand-ins:wiremock' 'Messaging:kafka' 'Observability:lgtm')
 # Each container with the port it serves inside; the host port is read from compose.yaml.
-CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 lgtm:3000)
+CONTAINERS=(postgres:5432 wiremock:8080 redis:6379 kafka:9092 lgtm:3000)
 # Grafana's datasource uids; each health check runs a real query against that backend.
 BACKENDS=(prometheus loki tempo pyroscope)
 ROW='%-22s %-18s %-5s %-6s %-12s %s\n'
 typeset -A PORT
 typeset -a BAD
-PROJECT= CODE= WHY= ROUTES= ROWS=0 NOCONT=
+PROJECT= CODE= WHY= BODY= ROUTES= ROWS=0 NOCONT=
 
 ours() {
   # A pid file outlives its process, and the pid can be reused: only a JVM of this checkout counts.
@@ -57,19 +57,58 @@ port_var() {
     cur == svc && match($0, /\$\{[A-Z_]+:-[0-9]+\}:[0-9]/) {s = substr($0, RSTART + 2); sub(/:-.*/, "", s); print s; exit}' compose.yaml
 }
 
+curl_why() {
+  # curl's exit code $1 for a request allowed $2 seconds, in words.
+  case $1 in
+    7) print "nothing listening (connection refused)" ;;
+    28) print "no answer within $2s" ;;
+    52) print "connection closed without a reply" ;;
+    56) print "connection reset" ;;
+    *) print "request failed (curl exit $1)" ;;
+  esac
+}
+
 probe() {
   # Sets CODE to the HTTP status, or empty when nothing answered, and WHY to what happened in words.
   local rc
   CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$@"); rc=$?
-  case $rc in
-    0) WHY="HTTP $CODE"; return 0 ;;
-    7) WHY="nothing listening (connection refused)" ;;
-    28) WHY="no answer within 2s" ;;
-    52) WHY="connection closed without a reply" ;;
-    56) WHY="connection reset" ;;
-    *) WHY="request failed (curl exit $rc)" ;;
-  esac
+  (( rc == 0 )) && { WHY="HTTP $CODE"; return 0; }
+  WHY=$(curl_why $rc 2)
   CODE=
+}
+
+call() {
+  # A JSON POST: sets BODY and CODE, or CODE empty and WHY in words when nothing answered.
+  local out rc
+  out=$(curl -s -w '\n%{http_code}' --max-time 15 -X POST -H 'Content-Type: application/json' "$@"); rc=$?
+  (( rc == 0 )) && { BODY=${out%$'\n'*}; CODE=${out##*$'\n'}; WHY="HTTP $CODE"; return 0; }
+  BODY= CODE= WHY=$(curl_why $rc 15)
+}
+
+failed() {
+  # What a failed step answered: its HTTP status and error code, or what happened in words.
+  local code
+  [[ -z $CODE ]] && { print "$1: $WHY"; return; }
+  code=$(jq -r '.code // empty' <<< $BODY 2>/dev/null)
+  print "$1 answered $CODE${code:+ $code}"
+}
+
+convert_once() {
+  # Money in, quote, convert: the one path that crosses gateway, conversion, the rate feed and ledger's gRPC port.
+  local m=$1 gw="http://localhost:$(port_of gateway-svc)/api/v1/merchants/$1" q st
+  call -H "Idempotency-Key: fleet-check-$m" "http://localhost:$(port_of ledger-svc)/internal/v1/deposits" \
+    -d "{\"merchantId\":\"$m\",\"currency\":\"ZAR\",\"amount\":\"100.00\",\"reference\":\"fleet check\"}"
+  [[ $CODE == 201 ]] || { ROUTES="a conversion did not complete: $(failed deposit)"; return 1; }
+  # Quote and convert back to back: the quote lives 15 s.
+  call "$gw/quotes" -d '{"sell":"ZAR","buy":"USDT","sellAmount":"50.00"}'
+  q=$(jq -r '.data.quoteId // empty' <<< $BODY 2>/dev/null)
+  [[ $CODE == 201 && -n $q ]] || { ROUTES="a conversion did not complete: $(failed quote)"; return 1; }
+  call -H "Idempotency-Key: fleet-check-$m" "$gw/conversions" -d "{\"quoteId\":\"$q\"}"
+  st=$(jq -r '.data.status // empty' <<< $BODY 2>/dev/null)
+  [[ $CODE == 201 && $st == COMPLETED ]] && return 0
+  if [[ $CODE == 201 ]]; then ROUTES="a conversion did not complete: status ${st:-missing}"
+  else ROUTES="a conversion did not complete: $(failed convert)"; fi
+  return 1
 }
 
 foreign_holder() {
@@ -91,7 +130,31 @@ routes_once() {
   probe "$gw/$m/balances"; b=${CODE:-$WHY}
   probe "$gw/$m/conversions/$m"; q=${CODE:-$WHY}
   ROUTES="balances answered $b, conversions answered $q"
-  [[ $b == 200 && $q == 404 ]]
+  [[ $b == 200 && $q == 404 ]] || return 1
+  ledger_seen || return 1
+  convert_once $m
+}
+
+registry_lag_ms() {
+  # Eureka's response cache, then conversion-svc's registry fetch, then 2s for the fetch itself; Eureka defaults if unset.
+  local cache fetch
+  cache=$(awk '/response-cache-update-interval-ms:/ {print $2}' services/eureka-svc/src/main/resources/application.yml)
+  fetch=$(awk '/registry-fetch-interval-seconds:/ {print $2}' services/config-svc/src/main/resources/served/application.yml)
+  print $(( ${cache:-30000} + ${fetch:-30} * 1000 + 2000 ))
+}
+
+ledger_seen() {
+  # conversion-svc finds ledger's gRPC port in its own registry copy; converting before that copy lists it fails
+  # UNAVAILABLE and writes a dead letter that pages. So: an UP instance with a grpcPort, registered lag ms ago.
+  local since left now=${${(%):-%D{%s%.}}/./}
+  since=$(curl -s --max-time 2 -H 'Accept: application/json' "http://localhost:$(port_of eureka-svc)/eureka/apps/LEDGER-SVC" |
+    jq -r '[.application.instance[]? | select(.status == "UP" and (.metadata.grpcPort // "") != "")
+      | [(.lastUpdatedTimestamp | tonumber), .leaseInfo.registrationTimestamp] | max] | min // empty' 2>/dev/null)
+  [[ $since == <-> ]] || { ROUTES="waiting for ledger-svc to register an UP instance with a grpcPort"; return 1; }
+  left=$(( since + $(registry_lag_ms) - now ))
+  (( left <= 0 )) && return 0
+  ROUTES="waiting ${left}ms for conversion-svc's registry copy to list ledger-svc's grpcPort"
+  return 1
 }
 
 await_healthy() {
@@ -109,7 +172,7 @@ await_routed() {
   # Healthy is not routable: the gateway learns instances from the registry a few seconds later.
   local deadline=$(( SECONDS + 60 ))
   while (( SECONDS < deadline )); do
-    routes_once && { print "  gateway routes to ledger-svc and conversion-svc"; return 0; }
+    routes_once && { print "  gateway routes to ledger-svc and conversion-svc, and a conversion completes"; return 0; }
     sleep 1
   done
   print -u2 "  gateway not routing after 60s ($ROUTES)"
@@ -134,8 +197,16 @@ core_row() {
   # Something else answering on a fleet port is not the fleet, however healthy it says it is.
   [[ $state == UP && $pid == - ]] && { state=UNMANAGED; detail+=", but not a JVM fleet.sh started"; }
   [[ $state == DOWN && $pid != - ]] && detail+="; process $pid alive (starting or hung)"
+  if [[ $svc == ledger-svc && $state == UP && $pid != - ]]; then
+    # conversion-svc posts to ledger over gRPC, so a healthy HTTP side with no gRPC listener cannot convert.
+    lsof -nP -a -p $pid -iTCP:${LEDGER_GRPC_PORT:-9081} -sTCP:LISTEN > /dev/null 2>&1 && detail+=", gRPC :${LEDGER_GRPC_PORT:-9081} listening" ||
+      { state=DEGRADED; detail="gRPC port ${LEDGER_GRPC_PORT:-9081} not listening"; }
+  fi
   if [[ $svc == gateway-svc && $state == UP ]]; then
-    routes_once && detail="routes to ledger-svc and conversion-svc" || { state=DEGRADED; detail="health 200 but $ROUTES"; }
+    if routes_once; then detail="routes to ledger-svc and conversion-svc, a conversion completes"
+    elif [[ $ROUTES == waiting* ]]; then state=STARTING detail=$ROUTES
+    elif [[ $ROUTES == 'a conversion'* ]]; then state=DEGRADED detail=$ROUTES
+    else state=DEGRADED detail="health 200 but $ROUTES"; fi
   fi
   row $svc "Java microservice" $port $pid $state $detail
 }
@@ -165,17 +236,66 @@ container_row() {
   row $name "Docker container" $port - $state $detail
 }
 
+ds_ok() {
+  # One datasource health check of backend $1 through Grafana, allowed ${2:-5} seconds; sets BODY to the reply.
+  BODY=$(curl -s --max-time ${2:-5} "http://localhost:${PORT[lgtm:3000]}/api/datasources/uid/$1/health")
+  [[ $(jq -r '.status // empty' <<< $BODY 2>/dev/null) == OK ]]
+}
+
+installer_mark() {
+  # The last line Grafana's background plugin installer logged, within $1 seconds; empty when the log cannot be read.
+  # Killed rather than awaited, so a wedged lgtm cannot hold up the caller (timeout(1) is not on a stock macOS).
+  local pid limit=$(( SECONDS + $1 ))
+  rm -f $RUN/installer.mark
+  docker compose exec -T lgtm awk '/logger=(plugin\.backgroundinstaller|plugin\.installer|installer\.fs) / {l = $0} END {print l}' \
+    /otel-lgtm/grafana/data/log/grafana.log > $RUN/installer.mark 2>/dev/null &
+  pid=$!
+  while kill -0 $pid 2>/dev/null && (( SECONDS < limit )); do sleep 0.2; done
+  kill $pid 2>/dev/null && wait $pid 2>/dev/null
+  [[ -f $RUN/installer.mark ]] && print -r -- "$(<$RUN/installer.mark)"
+}
+
+settle_plugins() {
+  # lgtm reports healthy while Grafana still downloads its datasource plugins one by one, and each answers
+  # "Plugin not registered" while it is replaced: settled is every backend OK and the installer idle for 5 polls.
+  # An unreadable installer log is never idle, so it waits out SETTLE and leaves the verdict to the status.
+  local deadline=$(( SECONDS + SETTLE )) streak=0 name ok mark last=
+  print "waiting for grafana plugins to settle"
+  while (( streak < 5 && SECONDS < deadline )); do
+    ok=1
+    for name in $BACKENDS; do
+      (( SECONDS < deadline )) || break 2
+      ds_ok $name $(( deadline - SECONDS < 5 ? deadline - SECONDS + 1 : 5 )) || ok=0
+    done
+    (( SECONDS < deadline )) || break
+    mark=$(installer_mark $(( deadline - SECONDS < 5 ? deadline - SECONDS + 1 : 5 )))
+    [[ -z $mark || $mark == *(msg=\"Installing plugin\"|Updating plugin|Downloaded and extracted)* || $mark != "$last" ]] && ok=0
+    last=$mark
+    if (( ok )); then streak=$(( streak + 1 )); else streak=0; fi
+    (( streak < 5 )) && sleep 1
+  done
+  local took=$(( SECONDS - deadline + SETTLE ))
+  (( streak >= 5 )) && print "grafana plugins settled after ${took}s" ||
+    print "grafana plugins not settled after ${took}s (budget ${SETTLE}s); the status names what is still down"
+  return 0
+}
+
 observability_rows() {
-  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name body msg grafana=0
+  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name msg try up grafana=0
   probe "http://localhost:$g/api/health"
   if [[ $CODE == 200 ]]; then grafana=1; row grafana "inside lgtm" $g - UP "/api/health 200"
   else row grafana "inside lgtm" $g - DOWN "${CODE:+/api/health answered }${CODE:-$WHY}"; fi
   for name in $BACKENDS; do
     if (( ! grafana )); then row $name "inside lgtm" - - SKIPPED "Grafana not answering, so its datasource check cannot run"; continue; fi
-    body=$(curl -s --max-time 5 "http://localhost:$g/api/datasources/uid/$name/health")
-    if [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]]; then row $name "inside lgtm" - - UP "datasource health OK"
-    elif [[ -z $body ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s"
-    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}"; fi
+    # Grafana answers a datasource health check with a transient error now and then; only 3 in a row is DOWN.
+    up=0
+    for try in 1 2 3; do
+      ds_ok $name && { up=1; break; }
+      (( try < 3 )) && sleep 1
+    done
+    if (( up )); then row $name "inside lgtm" - - UP "datasource health OK"
+    elif [[ -z $BODY ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s, 3 tries 1s apart"
+    else msg=$(jq -r '.message // empty' <<< $BODY 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}, 3 tries 1s apart"; fi
   done
   # An empty export is the cheapest request only a live collector answers with 200.
   probe -X POST -H 'Content-Type: application/json' -d '{}' "http://localhost:$o/v1/metrics"
@@ -246,8 +366,8 @@ up_once() {
   # Returns 2 when a bounce cannot help (the build), 1 when a service did not come up healthy.
   # lgtm left running from an earlier run would watch the JVMs boot and page ServiceDown.
   docker compose stop lgtm > /dev/null 2>&1
-  print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter)"
-  docker compose up -d --wait postgres wiremock redis || return 1
+  print "postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)"
+  docker compose up -d --wait postgres wiremock redis kafka || return 1
   print "build"
   ./gradlew -q bootJar || return 2
   # Control plane first: every other service fetches config and registers on boot.
@@ -260,6 +380,7 @@ up_once() {
   # Last, so neither a slow boot nor a failed up can page: ServiceDown only ever sees a healthy fleet.
   print "lgtm"
   docker compose up -d --wait lgtm || return 1
+  settle_plugins
 }
 
 up() {
@@ -331,7 +452,7 @@ purge() {
   down || return 1
   local -a vols
   vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})
-  print "removing volumes: ${vols:-none} (every ledger and conversion row, Prometheus and Tempo history)"
+  print "removing volumes: ${vols:-none} (every ledger and conversion row, the dead-letter topic, Prometheus and Tempo history)"
   docker compose down --volumes --remove-orphans || return 1
   rm -r -f -- $RUN
   vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})

@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestClient;
@@ -53,13 +54,15 @@ class GatewayProofIT {
 		assertThat(get("/v1/merchants/%s/balances".formatted(MERCHANT), secret).getStatusCode().value()).isEqualTo(200);
 	}
 
+	// Without the header the deposit reaches validation: 400 for the empty body, never the guard's 403.
 	@Test
 	void internalRoutesAreNotCovered() {
-		String path = "/internal/v1/conversion-postings/%s?merchantId=%s".formatted(UUID.randomUUID(), MERCHANT);
-		ResponseEntity<String> reply = get(path, null);
+		ResponseEntity<String> reply = CLIENT.post().uri(URI.create("http://127.0.0.1:%d/internal/v1/deposits".formatted(port)))
+				.contentType(MediaType.APPLICATION_JSON).header("Idempotency-Key", UUID.randomUUID().toString()).body("{}")
+				.retrieve().toEntity(String.class);
 
-		assertThat(reply.getStatusCode().value()).as(reply.getBody()).isEqualTo(404);
-		assertThat(reply.getBody()).contains("\"code\":\"POSTING_NOT_FOUND\"");
+		assertThat(reply.getStatusCode().value()).as(reply.getBody()).isEqualTo(400);
+		assertThat(reply.getBody()).contains("\"code\":\"VALIDATION_FAILED\"");
 	}
 
 	// The routing matcher ignores ;params and resolves dot segments, so the guard must read the same normalised path.

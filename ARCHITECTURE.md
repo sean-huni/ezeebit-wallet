@@ -71,15 +71,17 @@ which is beyond the brief (section 3, "Rate limiting").
                           |                   |
              lb://ledger-svc            lb://conversion-svc
                           v                   v
-            +------------------+   POST /internal/...   +----------------------+      HTTP, 2s timeouts
+            +------------------+   gRPC :9081, HTTP/2   +----------------------+      HTTP, 2s timeouts, 1 retry
             | ledger-svc :8081 |<-----------------------| conversion-svc :8082 |-----> exchange-rate service
-            +------------------+   (lb://ledger-svc)    +----------------------+       (assumed; WireMock :8089 locally)
-                     |                                             |
-                     v                                             v
-            +---------------------------------------------------------------+
-            |  postgres:18.6-alpine (one container)                         |
-            |  db "ledger" (role ledger)  db "conversion" (role conversion) |
-            +---------------------------------------------------------------+
+            +------------------+  discovery:///ledger-  +----------------------+       (assumed; WireMock :8089 locally)
+                     |            svc, round_robin            |           |
+                     |                                        |           | dead letters, record and alert only
+                     v                                        v           v
+            +---------------------------------------------------------------+   +----------------------------------+
+            |  postgres:18.6-alpine (one container)                         |   | kafka :9092 (apache/kafka:4.3.1) |
+            |  db "ledger" (role ledger)  db "conversion" (role conversion) |   | ezeebit.conversion.ledger.       |
+            +---------------------------------------------------------------+   | deadletter, 7-day retention      |
+                                                                                +----------------------------------+
 
    control plane, started first:
      config-svc :8888  (Spring Cloud Config, native backend, serves served/*.yml)
@@ -88,6 +90,11 @@ which is beyond the brief (section 3, "Rate limiting").
 
    observability: lgtm :3000 Grafana, :4317/:4318 OTLP (grafana/otel-lgtm:0.36.0)
 ```
+
+The arrows between services are HTTP except one: conversion-svc calls ledger-svc over gRPC Remote
+Procedure Call (gRPC), the default for synchronous calls between services this platform owns. The
+gateway's routes, the rate feed (an external service) and the deposit rail stay HTTP. The gRPC call
+is [section 5, "Conversion to ledger over gRPC"](#conversion-to-ledger-over-grpc).
 
 **The edge.** The gateway publishes one route table (`served/gateway-svc.yml` in config-svc):
 balances and entries go to the ledger, quotes and conversions to conversion-svc, and nothing else
@@ -157,9 +164,12 @@ segments cannot step around it) with **403 `GATEWAY_REQUIRED`** unless the heade
 in constant time. A service with a blank secret refuses to start. This is not authentication: anyone
 who can read the served configuration or the gateway's environment holds the value, and it is sent
 in clear over plain Hypertext Transfer Protocol (HTTP). It stops a mistaken or casual direct call to a service; the real control is
-network policy or mutual Transport Layer Security (mTLS). `/internal/**` is not covered: it is service-to-service, bound to loopback
-locally, and needs a network policy or mTLS in production
-([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)).
+network policy or mutual Transport Layer Security (mTLS). `/internal/**` and ledger-svc's gRPC port are not covered: both are
+service-to-service, plaintext, bound to loopback locally, and need a network policy or mTLS in production
+([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)). `[!CONVENTION-OVERRIDE]` Least
+privilege (https://owasp.org/Top10/A01_2021-Broken_Access_Control/) wants the gRPC port to admit
+only conversion-svc; on Kubernetes that is mTLS or a mesh plus a NetworkPolicy naming conversion-svc
+as its one client. Not built here, because locally loopback is the control.
 
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into
 a Request for Comments (RFC) 9457 problem detail with a stable `code` and internationalised (i18n) text that names no service:
@@ -181,7 +191,7 @@ up to a minute.
 **Database per service.** `docker/postgres/initdb/01-databases.sql` creates role `ledger` owning
 database `ledger` and role `conversion` owning database `conversion`, and revokes `CONNECT` from
 `PUBLIC` on each. Neither role can connect to the other's database. The only path from conversion
-to ledger data is the ledger's HTTP application programming interface (API); conversion stores merchant references as plain UUIDs.
+to ledger data is the ledger's gRPC contract (`contracts/ledger/v1/conversion_postings.proto`); conversion stores merchant references as plain UUIDs.
 
 **Observability.** Every service pushes metrics, traces and logs over OpenTelemetry Protocol (OTLP) to one Loki,
 Grafana, Tempo and Mimir (LGTM) container, which runs Grafana, Prometheus, Loki, Tempo, Pyroscope
@@ -261,7 +271,7 @@ go negative.
 |---|---|
 | `POST /internal/v1/deposits` | header `Idempotency-Key` = the rail's transfer reference |
 | `POST .../conversions` | header `Idempotency-Key` chosen by the merchant |
-| `POST /internal/v1/conversion-postings` | the `conversionId` |
+| gRPC `ConversionPostings.Post` | the `conversion_id` |
 | `POST .../quotes` | none: a quote moves no money and is cheap to repeat |
 
 The stored identity is (`merchant_id`, `type`, key). Same key and same request hash replays the
@@ -286,8 +296,8 @@ published status.
 ## 5. Conversion design (Task 2)
 
 Code: `services/conversion-svc`, package `io.ezeebit.conversion`; schema changesets
-`001-quote.xml`, `002-conversion.xml`. Ledger side: `ConversionPostingCtrl` and the
-`service/conversion` package (`ConversionPostingService`, `ConversionPoster`, `ConversionVoider` and
+`001-quote.xml`, `002-conversion.xml`. Ledger side: `grpc/ConversionPostingRpc`,
+`grpc/ConversionSettlementRpc` and the `service/conversion` package (`ConversionPostingService`, `ConversionPoster`, `ConversionVoider` and
 their collaborators, mapped in [docs/project-layout.md](docs/project-layout.md)).
 
 ### Two steps: quote, then accept
@@ -299,7 +309,8 @@ their collaborators, mapped in [docs/project-layout.md](docs/project-layout.md))
 
 **Quote** (`POST .../quotes` with `{sell, buy, sellAmount | buyAmount}`):
 
-1. Call the exchange-rate service: 2 s connect and 2 s read timeouts, no retry.
+1. Call the exchange-rate service: 2 s connect and 2 s read timeouts. A timeout or an I/O failure is
+   tried once more after 200 ms (Resilience4j, 4.2 s at worst); an error status is never retried.
 2. Validate the rate, in order: positive; fresh (within 10 s); inside the pair's configured band;
    and, if the pair's newest quote is younger than 5 minutes, within 5% of its market rate.
 3. Apply the spread in the platform's favour: `appliedRate = rate x (10000 - spread_bps) / 10000`,
@@ -324,8 +335,9 @@ re-pricing at accept was rejected: it makes the merchant's price non-firm.
    under a different key (409 `QUOTE_ALREADY_USED`).
 2. Insert the conversion as PENDING. UNIQUE (`quote_id`) makes a double accept impossible across
    replicas; a unique violation on (`merchant_id`, `idempotency_key`) replays.
-3. Call the ledger's internal posting with `conversionId` as its key and a **deadline** = quote
-   expiry + 30 s (1 s connect and 3 s read timeouts, no retry).
+3. Call the ledger's gRPC `Post` with `conversionId` as its key and a **deadline** = quote expiry
+   + 30 s: 2 s per attempt, up to 3 attempts, only on `UNAVAILABLE` or `DEADLINE_EXCEEDED`
+   ([Conversion to ledger over gRPC](#conversion-to-ledger-over-grpc)).
 4. The ledger, in **one local transaction**, opens the merchant's target account if absent, locks
    both merchant accounts in ascending id order, checks the source balance, posts four entries, and
    as its last statement refuses if its own `clock_timestamp()` is past the deadline:
@@ -343,18 +355,93 @@ settle one row.
 
 ### How each ledger answer settles a conversion
 
-| Ledger answer | Conversion |
+The ledger's `ErrorCode` travels as `google.rpc.ErrorInfo.reason` (domain `ledger.ezeebit.io`) inside
+the gRPC status. conversion-svc decides on that code; the status code only says whether to retry. A
+status with no ledger `ErrorInfo` (from a proxy or the gRPC library) settles nothing.
+
+| Ledger answer (gRPC status, `ErrorInfo.reason`) | Conversion |
 |---|---|
-| 201 POSTED (first or replayed) | COMPLETED, 201 |
-| 422 `INSUFFICIENT_FUNDS` or `BALANCE_LIMIT_EXCEEDED` | REJECTED, 422. Final: the ledger first commits a REFUSED journal (no entries) under the same identity, so that `conversionId` can never post later, even after the merchant is funded |
-| 400 on the posting's content (`AMOUNT_SCALE_EXCEEDED`, `AMOUNT_TOO_LARGE`, `AMOUNT_NOT_POSITIVE`, `UNKNOWN_CURRENCY`, `SAME_CURRENCY`, `VALIDATION_FAILED`, `MALFORMED_REQUEST`) | REJECTED with reason `INPUT_REFUSED` at once (409 `CONVERSION_REJECTED`). Safe without a marker: the ledger decides it from the body alone, and conversion-svc only ever sends one body per `conversionId` |
-| 409 `POSTING_DEADLINE_PASSED` / `CONVERSION_VOIDED` | REJECTED, reason `DEADLINE_PASSED` / `VOIDED` |
-| timeout, reset, 5xx, `IDEMPOTENCY_KEY_REUSED`, any other code | stays PENDING (202) for the sweeper. `IDEMPOTENCY_KEY_REUSED` means another journal holds the id, possibly a POSTED one, so only the lookup can settle it |
+| OK, `PostingResult` POSTED (first or replayed) | COMPLETED, 201 |
+| `FAILED_PRECONDITION`, `INSUFFICIENT_FUNDS` or `BALANCE_LIMIT_EXCEEDED` | REJECTED, 422. Final: the ledger first commits a REFUSED journal (no entries) under the same identity, so that `conversionId` can never post later, even after the merchant is funded |
+| `INVALID_ARGUMENT` on the posting's content (`AMOUNT_SCALE_EXCEEDED`, `AMOUNT_TOO_LARGE`, `AMOUNT_NOT_POSITIVE`, `UNKNOWN_CURRENCY`, `SAME_CURRENCY`, `VALIDATION_FAILED`, `MALFORMED_REQUEST`) | REJECTED with reason `INPUT_REFUSED` at once (409 `CONVERSION_REJECTED`). Safe without a marker: the ledger decides it from the message alone, and conversion-svc only ever sends one message per `conversionId` |
+| `FAILED_PRECONDITION`, `POSTING_DEADLINE_PASSED` / `CONVERSION_VOIDED` | REJECTED, reason `DEADLINE_PASSED` / `VOIDED` |
+| `ALREADY_EXISTS`, `CONVERSION_ALREADY_POSTED` (on a void) | POSTED, so COMPLETED |
+| `UNAVAILABLE` or `DEADLINE_EXCEEDED` after the last attempt, an open circuit, `INTERNAL`, `FAILED_PRECONDITION` `IDEMPOTENCY_KEY_REUSED`, any other status | stays PENDING (202) for the sweeper, and an exhausted call or an open circuit writes a dead letter. `IDEMPOTENCY_KEY_REUSED` means another journal holds the id, possibly a POSTED one, so only the lookup can settle it |
 
 At the ledger, a repeated posting is answered from what it holds for the `conversionId`: a VOID
-marker answers 409 `CONVERSION_VOIDED` for any body; otherwise the request hash is checked first (a
-different body is 422 `IDEMPOTENCY_KEY_REUSED`), and then a REFUSED marker replays its 422 and a
-POSTED journal replays its 201.
+marker answers `CONVERSION_VOIDED` for any message; otherwise the request hash is checked first (a
+different message is `IDEMPOTENCY_KEY_REUSED`), and then a REFUSED marker replays its refusal and a
+POSTED journal replays its result.
+
+### Conversion to ledger over gRPC
+
+conversion-svc reaches ledger-svc in exactly three calls, all gRPC over HTTP/2, all on ledger-svc's
+gRPC port (`LEDGER_GRPC_PORT`, default 9081, bound to `SERVER_ADDRESS`). The contract is one file,
+[`contracts/ledger/v1/conversion_postings.proto`](contracts/ledger/v1/conversion_postings.proto),
+compiled by both services; a build check (`checkSingleProto`) fails if any other copy appears.
+
+| gRPC service | Method | Caller | Ledger class |
+|---|---|---|---|
+| `ConversionPostings` | `Post(PostingRequest)` | the accept path (`ConversionLedgerPoster`) | `grpc/ConversionPostingRpc` |
+| `ConversionSettlement` | `Find(PostingLookup)` | the sweeper (`PendingLedgerCheck`) | `grpc/ConversionSettlementRpc` |
+| `ConversionSettlement` | `Void(PostingLookup)` | the sweeper | `grpc/ConversionSettlementRpc` |
+
+The methods sit in two services so each server class stays within 3 injected dependencies. Both
+call the existing `ConversionPostingService` and `ConversionVoidService` unchanged;
+`grpc/PostingMessages` translates messages and `grpc/GrpcErrors` turns a `LedgerException` into a
+status with `ErrorInfo`.
+
+**Finding the ledger.** The channel target is `discovery:///ledger-svc`.
+`outbound/discovery/DiscoveryNameResolverProvider` reads every UP instance of `ledger-svc` from
+Eureka, with the gRPC port each one publishes as `grpcPort` metadata, and the channel balances
+`round_robin` over them; HTTP/2 would otherwise pin every call to one replica. The resolver re-reads
+the registry only when a connection ends, so a healthy channel would never see a replica added later.
+The ledger therefore ages every gRPC connection out (`spring.grpc.server.keepalive.connection.max-age`
+30 s, 5 s grace for calls in flight): each GOAWAY makes the client reconnect and re-read Eureka, so a
+new replica takes traffic within about 30 s plus Eureka's own registration delay
+(`DiscoveryNameResolverTest.aReplicaRegisteredAfterStartIsReachedOnceTheServerAgesConnectionsOut`).
+
+**The service layer owns the seam.** `service/port/LedgerPostings` is the interface the use cases
+call, in conversion's own words; `outbound/ledger/LedgerGrpcClient` implements it. `service/` imports
+no `outbound/` class (`ServiceImportsNoOutboundTest`). The rate feed has the same shape
+(`service/port/RateSource`, `outbound/rates/RateClient`).
+
+**Retries and circuit breakers** (Resilience4j, `outbound/ledger/LedgerGuard`, one instance per
+operation so a failing `Void` cannot open the breaker in front of `Post`). Only `UNAVAILABLE` and
+`DEADLINE_EXCEEDED` are retried, inside the breaker, so one exhausted sequence counts as one breaker
+failure. Every retry resends the identical message, deadline included, which the ledger's replay
+needs.
+
+| Operation | Deadline per attempt | Attempts | Backoff | Worst case | Caller |
+|---|---|---|---|---|---|
+| `Post` | 2 s | 3 | 200 ms, x2 | 6.6 s | merchant convert request, inside the gateway's 10 s |
+| `Find`, `Void` | 2 s | 3 | 500 ms, x2 | 7.5 s | sweeper (10 s interval) |
+
+A breaker opens at a 50% failure rate over the last 20 calls, stays open 10 s, then lets 3 trial
+calls through. While it is open a call returns UNKNOWN at once and the conversion stays PENDING.
+Breaker state is per replica: each conversion-svc replica counts only its own calls and opens its
+own breakers, so at N replicas there are N independent breakers per operation and one can be open
+while another is closed. That is acceptable because the breaker is a fast local signal and holds no
+business state: correctness never depends on it, every PENDING conversion is settled by the sweeper
+whichever replica's breaker refused the call, and the dashboard shows the worst replica
+(`max by (name)`).
+
+**Dead letters.** When retries are exhausted or the circuit is open (never for a refusal),
+`outbound/deadletter/KafkaDeadLetterPublisher` publishes one record to the Kafka topic
+`ezeebit.conversion.ledger.deadletter`, keyed by the conversion id. It is **record and alert only**:
+nothing consumes it, and the sweeper stays the only settler of a PENDING conversion, because a
+dead-lettered posting may have committed and after its deadline the ledger refuses it anyway. Each
+record carries `op` (`POST`, `FIND`, `VOID`), `conversionId`, `merchantId`, the `request` as sent
+(JSON), `attempts` (0 when the circuit is open), `lastStatus` and `lastReason` (both null when the
+circuit is open), `reason` (`RETRIES_EXHAUSTED` or `CIRCUIT_OPEN`), `at` and `traceId`. Publishing is
+asynchronous (`acks=all`, idempotent producer, `delivery.timeout.ms=2000`, `max.block.ms=250`), so a
+dead broker never slows the merchant's request; a failed publish is counted and paged instead. The
+topic has one partition, 7-day retention, and lives on the `kafkadata` volume, so it survives
+`fleet.sh down` and is deleted only by `purge`. The counters and the three alert rules are in
+[docs/observability.md](docs/observability.md#alert-rules).
+
+The design, its rejected options and the as-built notes are in
+[docs/superpowers/specs/2026-10-14-ledger-grpc-design.md](docs/superpowers/specs/2026-10-14-ledger-grpc-design.md).
 
 ### PENDING recovery, and why there is no saga
 
@@ -366,8 +453,9 @@ transaction time, when no posting can still commit. It claims one due row per tr
 `SELECT ... FOR UPDATE OF c SKIP LOCKED`, so every replica can run it, and asks the ledger. The
 lookup answers POSTED, VOID or REFUSED (with its reason), else 404 `POSTING_NOT_FOUND`. Found:
 settle accordingly. `POSTING_NOT_FOUND`: write a VOID marker under the posting's identity, so a late
-posting hits the unique index and is refused, then mark REJECTED. Only `POSTING_NOT_FOUND` leads to a
-void: an unmapped-route 404 (`NOT_FOUND`) says nothing about the id, so the row stays PENDING.
+posting hits the unique index and is refused, then mark REJECTED. Only `NOT_FOUND` carrying the
+ledger's `POSTING_NOT_FOUND` leads to a void: a bare `NOT_FOUND` says nothing about the id, so the row
+stays PENDING.
 
 A posting and a void race on one unique index and the first commit wins, so correctness does not
 depend on the two databases' clocks. No saga is needed: the only money movement is one atomic
@@ -388,8 +476,8 @@ GET /rates?base=ZAR&quote=USDT
 - `rate` is how many units of `quote` one unit of `base` buys, as a decimal string. Both directions
   of every pair are served, so the platform never inverts a rate.
 - `timestamp` is when the price was taken, as an International Organization for Standardization (ISO) 8601 instant.
-- An error status, an unknown pair, a refused connection or no answer within 2 s means "no rate"
-  (503). An answer for another pair, an unreadable rate or timestamp, or a rate with more than 14
+- An error status, an unknown pair, a refused connection or no answer within 2 s (on each of the two
+  attempts a timeout or an I/O failure gets) means "no rate" (503). An answer for another pair, an unreadable rate or timestamp, or a rate with more than 14
   decimals is a bad rate (502 `RATE_REJECTED`, reason `RATE_MALFORMED`).
 
 ### Notes on the build
@@ -420,7 +508,7 @@ Each was seen red with its control removed, or before its fix:
 
 ## 6. API summary
 
-The `/internal/v1/...` rows are never routed: the gateway answers 404 for them. The `/api/v1/...`
+The `/internal/v1/...` row is never routed: the gateway answers 404 for it. The `/api/v1/...`
 rows are the gateway's paths; each service serves the same row under `/v1/...` and requires the
 gateway proof header there (403 `GATEWAY_REQUIRED` without it). Every `/api/v1/merchants/...` row can
 also answer, from the gateway, 400 `INVALID_MERCHANT_ID` or `MALFORMED_PATH`, 429 `RATE_LIMITED` and
@@ -435,11 +523,19 @@ details with a stable `code`.
 | POST | `/api/v1/merchants/{merchantId}/conversions` | `Idempotency-Key`, required; quote single-use | 201 COMPLETED; 202 PENDING; 400 `IDEMPOTENCY_KEY_MISSING`, `VALIDATION_FAILED`; 404 `QUOTE_NOT_FOUND` (also another merchant's quote); 409 `QUOTE_EXPIRED`, `QUOTE_ALREADY_USED`, `CONVERSION_REJECTED` (reason `INPUT_REFUSED`, `DEADLINE_PASSED`, `VOIDED`); 422 `INSUFFICIENT_FUNDS`, `BALANCE_LIMIT_EXCEEDED` (with `conversionId`), `IDEMPOTENCY_KEY_REUSED` |
 | GET | `/api/v1/merchants/{merchantId}/conversions/{conversionId}` | n/a | 200 with `status` and `reason` when rejected; 404 `CONVERSION_NOT_FOUND` |
 | POST | `/internal/v1/deposits` (money-in rail only) | `Idempotency-Key` = the rail's transfer reference | 201 created or replayed; 400 amount, currency, key or validation errors; 422 `IDEMPOTENCY_KEY_REUSED`, `BALANCE_LIMIT_EXCEEDED` |
-| POST | `/internal/v1/conversion-postings` | idempotent on `conversionId`; carries a deadline | 201 posted or replayed; 400 content errors; 409 `POSTING_DEADLINE_PASSED`, `CONVERSION_VOIDED` (any body); 422 `INSUFFICIENT_FUNDS`, `BALANCE_LIMIT_EXCEEDED` (recorded as REFUSED first, replayed for the same body), `IDEMPOTENCY_KEY_REUSED` |
-| GET | `/internal/v1/conversion-postings/{conversionId}?merchantId=` (sweeper) | n/a | 200 `status` POSTED, VOID, or REFUSED with `reason`; 400 without `merchantId`; 404 `POSTING_NOT_FOUND` |
-| POST | `/internal/v1/conversion-postings/{conversionId}/void` (sweeper) | identity (`merchantId`, CONVERSION, `conversionId`) | 201 voided, replayed, or the stored REFUSED journal; 409 `CONVERSION_ALREADY_POSTED` |
 
-A path no controller maps answers 404 `NOT_FOUND`, distinct from `POSTING_NOT_FOUND`; that includes
+The conversion postings are not HTTP. They are three gRPC methods on ledger-svc's gRPC port (9081),
+called only by conversion-svc and never routed by the gateway
+([section 5](#conversion-to-ledger-over-grpc)). Each answer is a `PostingResult` or a status whose
+`ErrorInfo.reason` is the ledger's code:
+
+| gRPC method | Idempotency | Answers |
+|---|---|---|
+| `ConversionPostings.Post` | idempotent on `conversion_id`; carries a deadline | OK posted or replayed; `INVALID_ARGUMENT` content errors; `FAILED_PRECONDITION` `POSTING_DEADLINE_PASSED`, `CONVERSION_VOIDED` (any message), `INSUFFICIENT_FUNDS`, `BALANCE_LIMIT_EXCEEDED` (recorded as REFUSED first, replayed for the same message), `IDEMPOTENCY_KEY_REUSED` |
+| `ConversionSettlement.Find` (sweeper) | n/a | OK with `status` POSTED, VOID, or REFUSED with `reason`; `INVALID_ARGUMENT` without `merchant_id`; `NOT_FOUND` `POSTING_NOT_FOUND` |
+| `ConversionSettlement.Void` (sweeper) | identity (`merchant_id`, CONVERSION, `conversion_id`) | OK voided, replayed, or the stored REFUSED journal; `ALREADY_EXISTS` `CONVERSION_ALREADY_POSTED` |
+
+A path no controller maps answers 404 `NOT_FOUND`; that includes
 any `/api/...` path sent straight to a service. An unsupported version on a service itself
 (`/v2/...`) is 400 `UNSUPPORTED_API_VERSION`; through the gateway it is 404, because the route table
 publishes v1 only.
@@ -470,8 +566,10 @@ spec's description.
 | A merchant over its limit | 429 `RATE_LIMITED` with `Retry-After`, nothing forwarded | yes: burst of capacity + 1, and split across two gateways |
 | config-svc or eureka-svc down | running services keep their config and last registry; a restarting service cannot boot | no (framework behaviour) |
 | Postgres down | the affected service fails its requests; nothing is half-written, every posting is one transaction | no (by design) |
-| Rate service slow, down or wrong | quote refused in about 2 s, at most about 4 s (2 s connect plus 2 s read) (503) or with the broken rule (502); nothing stored, no default rate | yes: slow, 500, zero, negative, stale, out of band, jump, unreadable |
-| Ledger slow or silent during accept | 202 PENDING; same-key retry re-posts only while the quote is live; the sweeper settles or voids | yes: answer never sent, answer lost, retry live, retry expired |
+| Rate service slow, down or wrong | a timeout or I/O failure is tried once more after 200 ms, so a slow feed is refused in about 4.2 s (503); an error status at once (503), a broken rule with that rule (502); nothing stored, no default rate | yes: slow (two calls), 500 (one call, no retry), zero, negative, stale, out of band, jump, unreadable |
+| Ledger slow, silent or unreachable during accept | `Post` retried up to 3 attempts (6.6 s at worst), then 202 PENDING and a dead letter; same-key retry re-posts only while the quote is live; the sweeper settles or voids | yes: answer never sent, answer lost, retry live, retry expired, success on the third attempt, worst case under 7 s, ledger killed mid-run (no conversion posted twice) |
+| Ledger failing repeatedly | the operation's breaker opens (50% of 20 calls), calls return UNKNOWN at once for 10 s, each writes a `CIRCUIT_OPEN` dead letter | yes: opens at its threshold; live, the `Find` breaker opened in the rehearsed outage |
+| Kafka down | dead letters cannot be published: counted (`..._publish_failed_total`) and paged critical; the caller is not slowed; the sweeper still settles the money | yes: broker stopped, counter moves, caller not slowed |
 | Ledger refuses, then money arrives | the REFUSED marker makes the retry get the same 422 | yes |
 | Duplicate request | replayed, never posted twice | yes: 20 concurrent deposits, 5 concurrent conversions |
 | Concurrent debits of one account | serialised by the row lock; the losers get `INSUFFICIENT_FUNDS` | yes |
@@ -484,8 +582,8 @@ All five services live in one repository with one Gradle build root, which depar
 that builds and runs with one command. The cost is contained: the services share no business code,
 database or runtime, and each ships as its own jar. The only shared code is `observability/` (a
 logback-to-OpenTelemetry bridge and its config), compiled into each jar rather than published as a
-library, and `architecture/`, the dependency-injection budget gate compiled into each service's
-`test` task only. Splitting into one repository per service later is mechanical.
+library, `architecture/`, the dependency-injection budget gate compiled into each service's
+`test` task only, and `contracts/`, the one `.proto` file both conversion-svc and ledger-svc compile. Splitting into one repository per service later is mechanical.
 
 The rest of 12-factor is followed: config from the environment with committed working defaults (a
 clean clone runs with no `.env`), backing services attached by Uniform Resource Locator (URL), and no process state (quotes

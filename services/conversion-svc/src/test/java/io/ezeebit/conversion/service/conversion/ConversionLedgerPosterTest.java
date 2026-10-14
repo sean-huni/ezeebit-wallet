@@ -16,7 +16,7 @@ import io.ezeebit.conversion.common.metrics.ConversionMetrics;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
-import io.ezeebit.conversion.outbound.ledger.LedgerClient;
+import io.ezeebit.conversion.service.port.LedgerPostings;
 import io.ezeebit.conversion.service.quote.QuoteReader;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -28,7 +28,7 @@ class ConversionLedgerPosterTest {
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
-	private final LedgerClient ledger = mock(LedgerClient.class);
+	private final LedgerPostings ledger = mock(LedgerPostings.class);
 	private final ConversionLedgerPoster poster = new ConversionLedgerPoster(ledger, mock(QuoteReader.class),
 			new ConversionSettler(conversions, Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry,
 					ObservationRegistry.NOOP)));
@@ -55,7 +55,7 @@ class ConversionLedgerPosterTest {
 	}
 
 	private void givenTheLedgerAnswers(final LedgerAnswer answer, final int rowsMoved) {
-		when(ledger.post(any(), any(), any(), any())).thenReturn(answer);
+		when(ledger.post(any())).thenReturn(answer);
 		when(conversions.settle(any(), anyString(), any(), any())).thenReturn(rowsMoved);
 		when(conversions.find(pending.id(), pending.merchantId())).thenReturn(Optional.of(pending));
 	}

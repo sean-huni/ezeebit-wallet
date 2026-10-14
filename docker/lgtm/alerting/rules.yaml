@@ -325,3 +325,107 @@ groups:
           runbook: 'Logs for ledger-svc, search ''ledger invariant violated'': the trace_id opens the request that broke it. Stop postings until fixed.'
           __dashboardUid__: ezeebit-alerts
           __panelId__: '12'
+      - uid: ezeebit-conversion-ledger-dead-lettered
+        title: ConversionLedgerDeadLettered
+        condition: B
+        # conversion-svc gave up on a ledger call after its retries or an open breaker and recorded a dead letter.
+        # Counted before the send, so this pages whether or not Kafka took it. The counter is born with the first
+        # dead letter, so each count includes a series born inside the window, which increase() cannot see.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 360, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (op, reason) (clamp_min(ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} - ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} unless ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} offset 5m))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No dead letter since conversion-svc started returns no series: nothing to report.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.op }} to the ledger was dead-lettered ({{ $labels.reason }})'
+          runbook: 'Read the topic: docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ezeebit.conversion.ledger.deadletter --from-beginning. The sweeper settles the conversion once the ledger answers; check ledger-svc with ./fleet.sh status.'
+          __dashboardUid__: ezeebit-alerts
+          __panelId__: '13'
+      - uid: ezeebit-dead-letter-publish-failing
+        title: DeadLetterPublishFailing
+        condition: B
+        # A dead letter that Kafka did not take: the record of a ledger call conversion-svc gave up on exists only
+        # in its log. Born with the first failure, so counted with the series-born arm.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 360, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (op) (clamp_min(ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} - ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} unless ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} offset 5m))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No failed publish since conversion-svc started returns no series: nothing to report.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: 'conversion-svc could not publish a {{ $labels.op }} dead letter to Kafka: it is only in the log'
+          runbook: 'docker compose ps kafka; then .fleet/conversion-svc.log, search ''dead letter not published'' for the conversion ids and the cause.'
+          __dashboardUid__: ezeebit-alerts
+          __panelId__: '14'
+      - uid: ezeebit-kafka-absent
+        title: KafkaAbsent
+        condition: B
+        # Spring creates the producer at the first dead letter, so before one there is no series: absent_over_time()
+        # would page every healthy fleet that never dead-lettered, and a first send that cannot reach Kafka is
+        # DeadLetterPublishFailing's. Measured: 0 within 10s of the broker stopping; idle for 17m it held 1 connection
+        # (the 5m metadata refresh), so an idle producer does not page. last_over_time: a pushed gauge has no
+        # staleness marker.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 60, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (job) (last_over_time(kafka_producer_connection_count{job="conversion-svc"}[30s])) == bool 0
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No producer yet (no dead letter since conversion-svc started) returns no series: OK, see above.
+        noDataState: OK
+        execErrState: Error
+        # The producer reconnects within seconds of a broker restart (measured); 60s is a broker that stays away.
+        for: 60s
+        labels:
+          severity: critical
+        annotations:
+          summary: 'conversion-svc''s Kafka producer has had no broker connection for 60s: dead letters cannot be published'
+          runbook: 'docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then.'
+          __dashboardUid__: ezeebit-alerts
+          __panelId__: '15'

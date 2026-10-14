@@ -61,30 +61,33 @@ What exists:
   deposit returns the identical answer and credits once; the same key with a different body is 422.
 - **Task 2, conversion.** A quote calls the exchange-rate service (2 s timeouts, no fallback rate),
   validates the rate, applies a 50 basis-point (bps) spread, rounds in the platform's favour and lives 15 s.
-  Accepting it asks the ledger to post four entries in one transaction under row locks, with funds
-  and a deadline checked. An answer that never arrives leaves the conversion PENDING (202) for a
-  sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
+  Accepting it asks the ledger, over gRPC Remote Procedure Call (gRPC) with up to 3 attempts, to post
+  four entries in one transaction under row locks, with funds and a deadline checked. An answer that
+  never arrives leaves the conversion PENDING (202), records a dead letter on a Kafka topic that pages
+  Slack, and leaves the money to a sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
   in the ledger before it is answered, so money arriving later can never let that conversion post.
 - **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3) behind one gateway, each
   domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** `./gradlew clean build` on 2026-10-13, counted from the JUnit Extensible Markup Language (XML) reports:
-**538 tests, 0 failures, 0 skipped.** Each unit count includes the 13 tests of the shared
+**Tests.** `./gradlew --no-build-cache --rerun-tasks clean build` on 2026-10-14, counted from the JUnit
+Extensible Markup Language (XML) reports
+([gate log](docs/fleet/verification/2026-10-14-gate.log); `checkSecrets` ran separately, 0 leaks):
+**608 tests, 0 failures, 0 skipped** (538 on 2026-10-13, before the gRPC change). Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected
 dependencies (`DependencyBudgetTest`, `InjectionCounterTest`; see
 [docs/quality-gates.md](docs/quality-gates.md#architecture-gates)).
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 87 | 33 | 61 |
-| conversion-svc | 136 | 27 | 47 |
+| ledger-svc | 106 | 42 | 61 |
+| conversion-svc | 172 | 31 | 49 |
 | gateway-svc | 65 | 54 | |
 | config-svc | 14 | | |
 | eureka-svc | 14 | | |
 
 conversion-svc's acceptance scenarios run against the real ledger jar as its own process, with
-WireMock scripting rate-feed faults and ledger faults. Across both services' suites: 50 concurrent deposits sum
+WireMock scripting rate-feed faults and a small gRPC forwarding proxy scripting ledger faults. Across both services' suites: 50 concurrent deposits sum
 exactly, 20 concurrent copies of one deposit credit once, and 8 concurrent conversions from one
 balance succeed exactly as often as the funds allow. Each concurrency, idempotency and
 currency-integrity test was seen failing with its control removed (row lock, unique constraint,
@@ -190,8 +193,9 @@ In order:
    keeping its own copy.
 5. **A two-instance run of conversion-svc** to prove the sweeper live across processes.
 6. **A transactional outbox** for ledger events, which Task 5 depends on.
-7. **Generated client data transfer objects (DTOs)** for the conversion-to-ledger seam, from ledger-svc's committed internal
-   spec (`docs/openapi/ledger-svc-internal.json`); today `PostingDto` and `LedgerReplyDto` are hand-written.
+7. **Mutual Transport Layer Security (mTLS) on the gRPC seam.** The conversion-to-ledger messages are
+   already generated from one `.proto` (`contracts/ledger/v1/`), so no hand-written mirror is left
+   between the services; the channel itself is still plaintext.
 8. **Quote retention**, and a MySQL 8 run of the same suite to back the portability claim.
 
 ## 7. Known gaps and unfinished work
@@ -200,9 +204,13 @@ This is the single list; the other documents link here.
 
 **Security and deployment**
 
-- `/internal/**` has no authentication. Locally every service binds loopback; production needs a
-  network policy or mTLS before these endpoints are deployable. The gateway proof header does not
-  cover it.
+- `/internal/**` and ledger-svc's gRPC port (9081) have no authentication and the gRPC channel is
+  plaintext. Locally every service binds loopback; production needs a network policy or mTLS before
+  these endpoints are deployable. On Kubernetes the gRPC port needs mTLS or a service mesh plus a
+  NetworkPolicy naming conversion-svc as its only client. The gateway proof header covers neither.
+- Kafka runs as one broker with replication 1. A dead letter Kafka does not take is counted and
+  paged (DeadLetterPublishFailing) and stays in conversion-svc's log only; nothing consumes the topic
+  by design, so it is a record, not a queue.
 - The gateway proof header (`X-Ezeebit-Gateway`) is a shared secret, not authentication: it travels
   in clear over plain Hypertext Transfer Protocol (HTTP), every service and anyone who can read config-svc's served files holds
   it, and the committed default is public. It only stops a direct call to a service that does not
@@ -244,19 +252,22 @@ This is the single list; the other documents link here.
   reads NaN as Normal.
 - HighErrorRate has no minimum-traffic guard: one 500 in a quiet minute reads as 100% and fires.
 - The sweeper holds the claimed row's lock, and so a pooled connection, while it calls the ledger:
-  up to about 8 s per row (two calls at 1 s connect and 3 s read).
+  up to about 15 s per row (a `Find` and a `Void`, each up to 3 attempts of 2 s with backoff, 7.5 s).
 - The sweeper's two-replica behaviour is proven in-process (two concurrent sweeps on one database),
   not with two running conversion-svc instances.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
 - RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
-  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests five of the nine rules (ServiceDown,
-  RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken) and is run by hand, not
-  by the Gradle build or the CircleCI pipeline.
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 8 of the 12 rules (ServiceDown,
+  RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken,
+  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent) and is run by hand, not by the
+  Gradle build or the CircleCI pipeline.
+- KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
+  the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.
 
 **Not built**
 
-- Tasks 3 to 6 (section 5). No generated client DTOs between services. Quotes are never deleted.
+- Tasks 3 to 6 (section 5). Quotes are never deleted.
 
 ## 8. AI usage notes
 

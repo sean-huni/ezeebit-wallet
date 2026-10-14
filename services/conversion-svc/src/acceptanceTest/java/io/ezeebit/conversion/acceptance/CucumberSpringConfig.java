@@ -15,7 +15,7 @@ import org.springframework.test.context.DynamicPropertySource;
 // conversion-svc reaches the ledger by its registry name; here that name resolves to the fault-injecting proxy.
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = { "conversion.sweep-interval=1h", "conversion.ledger.read-timeout=2s" })
+		properties = "conversion.sweep-interval=1h")
 @ActiveProfiles("acceptance")
 @Import({ TestcontainersConfiguration.class, CucumberSpringConfig.Glue.class })
 public class CucumberSpringConfig {
@@ -23,8 +23,10 @@ public class CucumberSpringConfig {
 	@DynamicPropertySource
 	static void externals(final DynamicPropertyRegistry registry) {
 		registry.add("conversion.rates.url", () -> Externals.get().rates().baseUrl());
-		registry.add("spring.cloud.discovery.client.simple.instances.ledger-svc[0].uri",
-				() -> Externals.get().ledgerProxy().baseUrl());
+		// Only the host and the grpcPort metadata are read: conversion-svc no longer calls the ledger over HTTP.
+		registry.add("spring.cloud.discovery.client.simple.instances.ledger-svc[0].uri", () -> "http://127.0.0.1:1");
+		registry.add("spring.cloud.discovery.client.simple.instances.ledger-svc[0].metadata.grpcPort",
+				() -> Externals.get().ledgerProxy().port());
 	}
 
 	@TestConfiguration(proxyBeanMethods = false)

@@ -23,7 +23,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 public class MetricSteps {
 
 	private static final List<String> COUNTERS = List.of(ConversionMetrics.QUOTES, ConversionMetrics.OUTCOMES,
-			ConversionMetrics.LEFT_PENDING, ConversionMetrics.SWEEPS);
+			ConversionMetrics.LEFT_PENDING, ConversionMetrics.SWEEPS, ConversionMetrics.DEAD_LETTERS);
 
 	private final MeterRegistry registry;
 	private final JdbcClient conversionDb;
@@ -83,6 +83,14 @@ public class MetricSteps {
 	@Then("conversion-svc timed {int} rate-service call(s) that was/were unavailable")
 	public void timedUnavailable(final int calls) {
 		assertTimed("unavailable", calls);
+	}
+
+	// Absent and zero both mean none: the counter is created by the first dead letter.
+	@Then("no dead letter was recorded")
+	public void noDeadLetter() {
+		assertThat(registry.find(ConversionMetrics.DEAD_LETTERS).counters())
+				.allSatisfy(counter -> assertThat(counter.count() - baseline.getOrDefault(counter.getId(), 0.0))
+						.as("%s", counter.getId()).isZero());
 	}
 
 	@Then("conversion-svc reports {int} more overdue PENDING conversion(s) than at the start")

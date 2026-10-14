@@ -8,7 +8,8 @@ meant to show.
 
 Captured on 2026-10-13 at commit `d538b32` (`git rev-parse --short HEAD`), on one laptop, with
 uncommitted changes in the working tree (the refreshed images themselves). Times are South African
-Standard Time, 2 hours ahead of Coordinated Universal Time (UTC).
+Standard Time, 2 hours ahead of Coordinated Universal Time (UTC). The one exception is
+[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14), captured on 2026-10-14 at `3b92e9d`.
 
 How to reproduce each section:
 
@@ -20,7 +21,8 @@ How to reproduce each section:
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
 
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
-[Metrics](#metrics) · [Traces](#traces) · [Logs](#logs) · [Alerts](#alerts)) ·
+[Metrics](#metrics) · [Traces](#traces) · [Logs](#logs) · [Alerts](#alerts) ·
+[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14)) ·
 [SAST](#static-application-security-testing-sast) · [SCA](#software-composition-analysis-sca) ·
 [What this evidence does not prove](#what-this-evidence-does-not-prove)
 
@@ -195,6 +197,8 @@ Not pictured, measured by the suite: latency exemplars carry a trace id that Tem
 deposit, the `deposit` span and the request span both carry `TransactionSystemException: JDBC rollback
 failed` with status error (trace `1da752b225ab41c41cb44000e260f031`).
 
+Over gRPC (2026-10-14): one demo conversion is one trace, `f9b98a426a168f23f9bbc22fdce2f5e2`, in which the ledger-svc gRPC server span `ConversionPostings/Post` is the child of conversion-svc's gRPC client span; commands and every span in [the gRPC trace check](docs/observability/verification/2026-10-14-grpc-trace.md).
+
 ### Logs
 
 ![A log line and its trace](docs/observability/evidence/logs-trace-correlated.png)
@@ -286,6 +290,84 @@ and the all-clear), and no `grafana_alerting_notifications_failed_total` series 
 failed. That rehearsal's state history no longer exists in Grafana: `fleet.sh up` recreated the lgtm
 container at 21:03:51, and Grafana's own database is on a tmpfs mount (`compose.yaml`), so the
 recreate wiped it.
+
+### Ledger outage over gRPC (2026-10-14)
+
+A rehearsed outage of the conversion-to-ledger gRPC seam, with `SLACK_WEBHOOK_URL` set: ledger-svc
+killed with `kill -9` at 12:00:04 UTC, five fresh merchants then quoted and converted 50.00 ZAR each,
+and `./fleet.sh up` restored the fleet. Alert states were polled every 2 s from Grafana's alerts API.
+Every query, the dead-letter records and the chaos audit are in
+[2026-10-14-ledger-grpc-outage.md](docs/observability/verification/2026-10-14-ledger-grpc-outage.md);
+the images were taken during the outage by
+[2026-10-14-ledger-grpc-capture.mjs](docs/observability/verification/2026-10-14-ledger-grpc-capture.mjs)
+at 1440 x 900. The panels show local time (UTC+2), so 14:00 on them is 12:00 UTC.
+
+| Event | Time |
+|---|---|
+| ledger-svc killed (12:00:04 UTC) | t+0s |
+| 5 conversions answered 202 PENDING; 5 `POST` dead letters written | t+1s to t+4s |
+| `ConversionLedgerDeadLettered{op="POST",reason="RETRIES_EXHAUSTED"}` Alerting (`for: 0s`, no Pending stage) | t+16s |
+| Page delivered to Slack (`grafana_alerting_notifications_total{integration="slack"}` 0 to 1) | t+27s |
+| `ServiceDown{job="ledger-svc"}` Pending, then Alerting | t+35s, t+95s |
+| `FIND` breaker open (`reason="CIRCUIT_OPEN"` Alerting) | t+167s |
+| `./fleet.sh up` started; it bounced the stack once | t+257s |
+| Sweeper voided all 5 conversions on both sides | t+350s |
+| `up` exit 0, 16 of 16 checks; PENDING count 0 | t+361s, t+369s |
+
+| Fact | Number | Universe | Command |
+|---|---|---|---|
+| Dead-letter records | 60, matching the counter: POST/RETRIES_EXHAUSTED 5, FIND/RETRIES_EXHAUSTED 41, FIND/CIRCUIT_OPEN 14 | topic end offset at t+248s | `kafka-get-offsets.sh` in the kafka container; `sum by (op, reason) (ezeebit_conversion_ledger_deadletter_total)` |
+| Duplicate postings | 0: 41 conversion journals over 41 distinct conversion ids | the whole ledger database after the restore | `SELECT count(*), count(DISTINCT idempotency_key) FROM journal WHERE type = 'CONVERSION'` |
+| COMPLETED with exactly one POSTED journal | 28 of 28, positive control detected | both databases, compared with `comm` | the outage doc's cross-database check |
+| PENDING left | 0 | the whole conversion database | `SELECT count(*) FROM conversion WHERE status = 'PENDING'` |
+| `Post` p95 over gRPC | 16.75 ms | conversion-svc, 4 calls before the outage | `histogram_quantile(0.95, ... grpc_client_milliseconds_bucket ...)` |
+
+![The Ledger gRPC row during the outage](docs/observability/evidence/2026-10-14-fleet-overview-ledger-grpc-row.png)
+
+Fleet Overview, the Ledger gRPC row expanded, Last 15 minutes. Calls by method and status: "Post
+UNAVAILABLE" last 0.285 req/s, max 0.355 req/s, "Post OK" 0 req/s. Error ratio by method: Post 100%.
+Latency: Post p95 down to 2.50 ms, mean 0.482 ms, because a refused connection fails fast. Circuit
+breakers: ledgerFind, ledgerVoid and ledgerPost all CLOSED at capture. Dead letters: POST
+RETRIES_EXHAUSTED at 5.
+
+**Proves** the row reads the gRPC client metrics and the breaker state live, and a ledger outage shows
+as `UNAVAILABLE` attempts and dead letters rather than as HTTP errors. The `Post` breaker never
+opened: 5 exhausted calls are below its 20-call window, as configured.
+
+![The Dead letters panel](docs/observability/evidence/2026-10-14-fleet-overview-dead-letters.png)
+
+The Dead letters panel alone: one series, POST RETRIES_EXHAUSTED, steps from 0 to 5 at 14:00, above
+the dashed threshold line.
+
+**Proves** a dead letter is counted per op and reason, including the counter's first event, which
+`rate()` and `increase()` cannot see.
+
+![Alerts dashboard with the dead-letter rule firing](docs/observability/evidence/2026-10-14-alerts-dead-letter-firing.png)
+
+The Alerts dashboard. "Every rule, every state" lists ConversionLedgerDeadLettered "Firing for 39s",
+then ConversionsStuckPending, DbPoolSaturated, DeadLetterPublishFailing and HighErrorRate Normal, and
+KafkaAbsent at the bottom edge. "Firing and pending": ConversionLedgerDeadLettered, 1 instance,
+Alerting, created 2026-10-14 14:00:20; ServiceDown "Pending for 29s". The ServiceDown input's
+visible legend rows are config-svc and conversion-svc at 1; the rest of its legend is cut off, so the
+picture cannot say which instances those series are.
+
+**Proves** the new rule loads, evaluates and fires on the first dead letter, while ServiceDown for the
+same outage is still pending.
+
+![The rule input of ConversionLedgerDeadLettered](docs/observability/evidence/2026-10-14-alerts-dead-letter-input.png)
+
+The Alerts board's rule-input grid, scrolled to the bottom row. ConversionLedgerDeadLettered: POST
+RETRIES_EXHAUSTED steps to 5 with a red state-change annotation. DeadLetterPublishFailing: No data
+(nothing failed to publish). KafkaAbsent: "conversion-svc producer" at 0, so the producer stayed
+connected. LatencySLOBurn and LedgerInvariantBroken: No data.
+
+**Proves** each of the three new rules has its input on the board, and the dead-letter rule's state
+change is annotated on its own expression.
+
+What this section does not prove: the restore's whole-stack bounce wiped Grafana's alert state, so
+the page at t+27s never got an all-clear, and the rules re-fired once after recovery (a second page,
+cleared at t+589s). That run also found the dead-letter topic deleted by the bounce; it has since
+moved to the `kafkadata` volume. The Slack channel itself was not read.
 
 ## Static application security testing (SAST)
 
@@ -433,8 +515,9 @@ the console; the distinct totals match the console's distinct column.
   carrying the page and the all-clear was not captured; delivery rests on Grafana's notifier counter.
   One channel and one integration is not an on-call rota either: a page at night reaches a channel,
   not a person.
-- **No alert is pictured Firing.** RateFeedRefusing only reached Pending (1 minute against a 2-minute
-  hold), and nothing else left Normal. Producing a Firing capture needs a deliberate outage.
+- **No 2026-10-13 alert is pictured Firing.** RateFeedRefusing only reached Pending (1 minute against
+  a 2-minute hold), and nothing else left Normal. The 2026-10-14 ledger outage is the one Firing
+  capture (ConversionLedgerDeadLettered).
 - **One laptop, one run.** Every screenshot comes from one local fleet on 2026-10-13, over a working
   tree with uncommitted changes, not a clean checkout of `d538b32`.
 - **Continuous integration (CI) has never run.** No CircleCI project reads `.circleci/config.yml` yet

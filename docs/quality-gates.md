@@ -12,7 +12,7 @@ listed in `tieredServices`, and to Cucumber by `cucumberServices`):
 | Gradle task | Source | What it is |
 |---|---|---|
 | `test` | `src/test` | unit tests: domain (money, pricing, rate rules, quote expiry, state machine), mapping, internationalisation (i18n) bundle, business-metric tags; no Spring context, no Docker |
-| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each database constraint proven by the row it refuses, the gateway proof header, the OpenAPI spec against its committed snapshot in `docs/openapi` (`OpenApiContractIT`); for conversion-svc also the Eureka client wiring; for ledger-svc also that it refuses connections on the local area network (LAN) address. For gateway-svc: real gateway contexts on Testcontainers Redis (the pinned compose image) against a stub upstream: the rate limit, two gateways sharing one bucket, Redis stopped, paused and absent, the path rewrite and the proof header |
+| `integrationTest` | `src/acceptanceTest` (JUnit) | Spring Boot on Testcontainers Postgres: migrations (including a re-run on an existing schema), each database constraint proven by the row it refuses, the gateway proof header, the OpenAPI spec against its committed snapshot in `docs/openapi` (`OpenApiContractIT`); for conversion-svc also the Eureka client wiring and the dead-letter publisher against Testcontainers Kafka (the pinned compose image: every field on the topic, and a broker stopped under a live producer neither blocks nor throws); for ledger-svc also that it refuses connections on the local area network (LAN) address, and the gRPC Remote Procedure Call (gRPC) server in-process (`ConversionPostingRpcIT`: post, replay, every refusal code to its status and reason, find, void). For gateway-svc: real gateway contexts on Testcontainers Redis (the pinned compose image) against a stub upstream: the rate limit, two gateways sharing one bucket, Redis stopped, paused and absent, the path rewrite and the proof header |
 | `acceptanceTest` | `src/acceptanceTest` (Cucumber 8.0.4, `features/*.feature`) | business scenarios over real Hypertext Transfer Protocol (HTTP), some ending in a Structured Query Language (SQL) check that the books balance; `business-metrics.feature` checks that the counters move on the real path |
 
 config-svc and eureka-svc have one `test` task each. Counts per tier are in
@@ -21,9 +21,11 @@ config-svc and eureka-svc have one `test` task each. Counts per tier are in
 The Spring tiers start `postgres:18.6-alpine` through Testcontainers, so Docker must be running.
 They run under the `acceptance` profile and boot each service alone, with the config server, the
 registry and OpenTelemetry Protocol (OTLP) export switched off. conversion-svc's acceptance tier also runs the **real
-ledger-svc jar** as a separate process on its own database, puts an in-process WireMock
-(`wiremock-standalone` 3.13.2) in front of it to inject ledger faults, and serves the rate feed from
-the same mapping files compose mounts (`docker/wiremock/mappings/`).
+ledger-svc jar** as a separate process on its own database, puts a small gRPC forwarding proxy
+(`LedgerFaultProxy`, test code) in front of its gRPC port to inject ledger faults (an answer never
+sent, an answer lost or late), and serves the rate feed from an in-process WireMock
+(`wiremock-standalone` 3.13.2) loaded with the same mapping files compose mounts
+(`docker/wiremock/mappings/`).
 
 Run one tier with `./gradlew :services:ledger-svc:acceptanceTest` (or `test`, `integrationTest`;
 same for conversion-svc). Cucumber's reports land in `services/<svc>/build/reports/cucumber/`.
@@ -63,6 +65,8 @@ Design rules, not security findings, so they are not SAST. They run inside `test
 | Gate | Reads | Fails the build when |
 |---|---|---|
 | Dependency-injection budget (`DependencyBudgetTest`; source `architecture/src/test/java`, compiled into every service's `test` task) | every Spring component (`@Component` and its stereotypes, `@Configuration`, advice) found by scanning the service's compiled main classes under `io.ezeebit`, and every `@Bean` method on them | a bean or a `@Bean` method takes more than 3 injected dependencies (the message lists each with its count; no suppression), or the scan does not reach the service's `@SpringBootApplication` class |
+| Ports before adapters (`ServiceImportsNoOutboundTest`, conversion-svc `test`) | every main source file under `service/` | one imports `io.ezeebit.conversion.outbound.`: the use cases call `service/port/` interfaces, never an adapter |
+| One contract (`checkSingleProto`, root `check`) | every `.proto` in the repository outside `contracts/`, `build/`, `.gradle/`, `node_modules/` and `.superpowers/` | any `.proto` outside `contracts/`, or none inside it |
 
 What counts as one injected dependency:
 

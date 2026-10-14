@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversion to ledger over gRPC · Architecture</title>
+  <link rel="icon" href="data:,">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: dark;
+      --color-paper: #07080e; --color-ink: #e8ecff; --color-muted: #8b93b8; --color-accent: #39ff14;
+      --font-sans: 'IBM Plex Sans', system-ui, sans-serif; --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; }
+    .frame { width: min(1800px, 100%); }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-sans); font-size: clamp(1.5rem, 1.6vw + 1rem, 2.4rem); font-weight: 600;
+      letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 1.25rem; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    svg { width: 100%; min-width: 1360px; display: block; pointer-events: none; }
+    .detail-link { font-size: 0.875rem; color: var(--color-muted); margin-top: 1rem; }
+    .detail-link a { color: #22e6ff; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · ezeebit-wallet · detail · conversion to ledger</p>
+    <h1>Conversion to ledger over gRPC: retries, breakers, dead letters</h1>
+    <div class="diagram-container">
+    <svg viewBox="0 0 1360 800" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fleet-ledger-grpc-title fleet-ledger-grpc-desc">
+      <title id="fleet-ledger-grpc-title">Conversion to ledger over gRPC</title>
+      <desc id="fleet-ledger-grpc-desc">The accept path and the sweeper call one ledger client, which resolves ledger-svc's gRPC port 9081 through Eureka, retries and breaks per operation, and on giving up publishes a dead letter to the Kafka topic ezeebit.conversion.ledger.deadletter and counts it, so a Grafana alert rule pages Slack.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8b93b8"/></marker>
+        <marker id="arrow-grpc" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff5ce1"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22e6ff"/></marker>
+        <radialGradient id="wall" gradientUnits="userSpaceOnUse" cx="680" cy="380" r="820">
+          <stop offset="0" stop-color="#0f1225"/><stop offset="1" stop-color="#07080e"/>
+        </radialGradient>
+        <linearGradient id="surface" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#171b33"/><stop offset="1" stop-color="#0f1224"/>
+        </linearGradient>
+        <radialGradient id="spill-green" gradientUnits="userSpaceOnUse" cx="456" cy="358" r="220">
+          <stop offset="0" stop-color="#39ff14" stop-opacity="0.14"/><stop offset="1" stop-color="#39ff14" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="neon-tube" filterUnits="userSpaceOnUse" x="0" y="0" width="1360" height="800" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="halo"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="glow"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="bloom"/>
+          <feComponentTransfer in="bloom" result="bloomDim"><feFuncA type="linear" slope="0.7"/></feComponentTransfer>
+          <feMerge><feMergeNode in="bloomDim"/><feMergeNode in="glow"/><feMergeNode in="halo"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="neon-soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1360" height="800" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="glow"/>
+          <feComponentTransfer in="glow" result="glowDim"><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
+          <feMerge><feMergeNode in="glowDim"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="1360" height="800" fill="#07080e"/>
+      <rect x="0.5" y="0.5" width="1359" height="799" rx="12" fill="url(#wall)" stroke="rgba(232,236,255,0.08)" stroke-width="1"/>
+      <!-- Zones -->
+      <rect x="64" y="96" width="552" height="592" rx="8" fill="rgba(232,236,255,0.02)" stroke="rgba(232,236,255,0.10)" stroke-width="0.8"/>
+      <rect x="80" y="88" width="120" height="16" rx="2" fill="url(#wall)"/>
+      <text x="140" y="100" fill="#7a83a8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">CONVERSION-SVC</text>
+      <rect x="1008" y="96" width="288" height="592" rx="8" fill="rgba(232,236,255,0.02)" stroke="rgba(232,236,255,0.10)" stroke-width="0.8"/>
+      <rect x="1020" y="88" width="208" height="16" rx="2" fill="url(#wall)"/>
+      <text x="1124" y="100" fill="#7a83a8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SUPPORTING · DOCKER COMPOSE</text>
+      <!-- Arrows (before nodes) -->
+      <path d="M 304,214 H 440 Q 448,214 448,222 V 320" fill="none" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 304,502 H 440 Q 448,502 448,494 V 396" fill="none" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 520,320 V 174 Q 520,166 528,166 H 680" fill="none" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <line x1="784" y1="320" x2="784" y2="204" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <line x1="568" y1="358" x2="680" y2="358" stroke="#ff5ce1" stroke-width="1.4" marker-end="url(#arrow-grpc)" filter="url(#neon-soft)"/>
+      <path d="M 544,396 V 418 Q 544,426 552,426 H 1036" fill="none" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <path d="M 512,396 V 538 Q 512,546 520,546 H 1036" fill="none" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <line x1="1152" y1="584" x2="1152" y2="628" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <!-- Arrow labels -->
+      <rect x="352" y="190" width="40" height="16" rx="2" fill="url(#wall)"/>
+      <text x="372" y="202" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">POST</text>
+      <rect x="328" y="478" width="96" height="16" rx="2" fill="url(#wall)"/>
+      <text x="376" y="490" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">FIND · VOID</text>
+      <rect x="572" y="142" width="64" height="16" rx="2" fill="url(#wall)"/>
+      <text x="604" y="154" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">RESOLVE</text>
+      <rect x="792" y="254" width="72" height="16" rx="2" fill="url(#wall)"/>
+      <text x="828" y="266" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">GRPCPORT</text>
+      <rect x="584" y="326" width="80" height="16" rx="2" fill="url(#wall)"/>
+      <text x="624" y="338" fill="#ff5ce1" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">GRPC :9081</text>
+      <rect x="904" y="402" width="84" height="16" rx="2" fill="url(#wall)"/>
+      <text x="946" y="414" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">DEAD LETTER</text>
+      <rect x="912" y="522" width="64" height="16" rx="2" fill="url(#wall)"/>
+      <text x="944" y="534" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">COUNTER</text>
+      <rect x="1160" y="598" width="40" height="16" rx="2" fill="url(#wall)"/>
+      <text x="1180" y="610" fill="#22e6ff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.04em">PAGE</text>
+      <!-- Callouts -->
+      <text x="96" y="600" fill="#8b93b8" font-size="15" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">3 attempts per operation; breaker opens at 50% of 20.</text>
+      <text x="96" y="628" fill="#8b93b8" font-size="15" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">A dead letter is a record, not a retry:</text>
+      <text x="96" y="652" fill="#8b93b8" font-size="15" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">the sweeper settles the money.</text>
+      <text x="1152" y="484" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">ezeebit.conversion.ledger.deadletter</text>
+      <!-- Nodes: steps inside conversion-svc -->
+      <rect x="96" y="176" width="208" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="96" y="176" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
+      <rect x="104" y="184" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
+      <text x="124" y="196" fill="#e8ecff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">STEP</text>
+      <text x="200" y="222" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Accept path</text>
+      <text x="200" y="240" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">ConversionLedgerPoster</text>
+      <rect x="96" y="464" width="208" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="96" y="464" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
+      <rect x="104" y="472" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
+      <text x="124" y="484" fill="#e8ecff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">STEP</text>
+      <text x="200" y="510" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Sweeper</text>
+      <text x="200" y="528" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">PendingLedgerCheck · 10 s</text>
+      <rect x="344" y="320" width="224" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="344" y="320" width="224" height="76" rx="6" fill="url(#surface)" stroke="#39ff14" stroke-width="1.8"/>
+      <rect x="344" y="320" width="224" height="76" rx="6" fill="none" stroke="#39ff14" stroke-width="1.8" filter="url(#neon-tube)"/>
+      <rect x="344" y="320" width="224" height="76" rx="6" fill="none" stroke="#e6ffe0" stroke-width="0.6"/>
+      <rect x="352" y="328" width="64" height="16" rx="2" fill="transparent" stroke="rgba(57,255,20,0.60)" stroke-width="0.8"/>
+      <text x="384" y="340" fill="#39ff14" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">ADAPTER</text>
+      <text x="456" y="366" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Ledger client</text>
+      <text x="456" y="384" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">LedgerGrpcClient · LedgerGuard</text>
+      <!-- Nodes: Java services -->
+      <rect x="680" y="128" width="208" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="680" y="128" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
+      <rect x="688" y="136" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
+      <text x="708" y="148" fill="#e8ecff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">JAVA</text>
+      <text x="784" y="174" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Service registry</text>
+      <text x="784" y="192" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">eureka-svc :8761</text>
+      <rect x="680" y="320" width="208" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="680" y="320" width="208" height="76" rx="6" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
+      <rect x="688" y="328" width="40" height="16" rx="2" fill="transparent" stroke="rgba(232,236,255,0.40)" stroke-width="0.8"/>
+      <text x="708" y="340" fill="#e8ecff" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">JAVA</text>
+      <text x="784" y="366" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Ledger gRPC</text>
+      <text x="784" y="384" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">ledger-svc grpc/ :9081</text>
+      <!-- Supporting nodes: Docker containers -->
+      <rect x="1036" y="388" width="232" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="1036" y="388" width="232" height="76" rx="6" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
+      <rect x="1044" y="396" width="28" height="16" rx="2" fill="transparent" stroke="rgba(139,147,184,0.55)" stroke-width="0.8"/>
+      <text x="1058" y="408" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">MQ</text>
+      <text x="1152" y="434" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Dead-letter topic</text>
+      <text x="1152" y="452" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">kafka :9092 · 7 days</text>
+      <rect x="1036" y="508" width="232" height="76" rx="6" fill="url(#wall)"/>
+      <rect x="1036" y="508" width="232" height="76" rx="6" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
+      <rect x="1044" y="516" width="36" height="16" rx="2" fill="transparent" stroke="rgba(139,147,184,0.55)" stroke-width="0.8"/>
+      <text x="1062" y="528" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">OBS</text>
+      <text x="1152" y="554" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Alert rules</text>
+      <text x="1152" y="572" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">grafana in lgtm :3000</text>
+      <!-- External endpoint -->
+      <rect x="1084" y="628" width="136" height="44" rx="6" fill="url(#wall)"/>
+      <rect x="1084" y="628" width="136" height="44" rx="6" fill="url(#surface)" stroke="#22e6ff" stroke-opacity="0.7" stroke-width="1"/>
+      <text x="1152" y="647" fill="#e8ecff" font-size="14" font-weight="600" font-family="'IBM Plex Sans', system-ui, sans-serif" text-anchor="middle">Slack</text>
+      <text x="1152" y="664" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle">incoming webhook</text>
+      <!-- Legend -->
+      <line x1="64" y1="712" x2="1296" y2="712" stroke="rgba(232,236,255,0.12)" stroke-width="0.8"/>
+      <text x="64" y="736" fill="#8b93b8" font-size="11" font-family="'IBM Plex Mono', ui-monospace, monospace" letter-spacing="0.12em">LEGEND</text>
+      <rect x="64" y="754" width="16" height="12" rx="2" fill="url(#surface)" stroke="#39ff14" stroke-width="1"/>
+      <text x="88" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Focal: the ledger seam</text>
+      <rect x="240" y="754" width="16" height="12" rx="2" fill="url(#surface)" stroke="rgba(232,236,255,0.55)" stroke-width="1"/>
+      <text x="264" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Java service, or a step inside one</text>
+      <rect x="480" y="754" width="16" height="12" rx="2" fill="rgba(139,147,184,0.06)" stroke="#8b93b8" stroke-width="1"/>
+      <text x="504" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Docker container</text>
+      <rect x="632" y="754" width="16" height="12" rx="2" fill="url(#surface)" stroke="#22e6ff" stroke-opacity="0.7" stroke-width="1"/>
+      <text x="656" y="764" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">External service</text>
+      <line x1="64" y1="782" x2="92" y2="782" stroke="#ff5ce1" stroke-width="1.4" marker-end="url(#arrow-grpc)" filter="url(#neon-soft)"/>
+      <text x="100" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">gRPC call, HTTP/2, round robin</text>
+      <line x1="304" y1="782" x2="332" y2="782" stroke="#8b93b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="340" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">In-process call</text>
+      <line x1="456" y1="782" x2="484" y2="782" stroke="#22e6ff" stroke-width="1.4" marker-end="url(#arrow-link)" filter="url(#neon-soft)"/>
+      <text x="492" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">HTTP call</text>
+      <line x1="576" y1="782" x2="604" y2="782" stroke="#8b93b8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <text x="612" y="786" fill="#8b93b8" font-size="11" font-family="'IBM Plex Sans', system-ui, sans-serif">Async: registry lookup, dead-letter publish, metric push</text>
+      <rect x="216" y="136" width="480" height="460" fill="url(#spill-green)" style="mix-blend-mode: screen" pointer-events="none"/>
+    </svg>
+    </div>
+    <p class="detail-link">Overview: <a href="fleet-architecture.html">the whole wallet fleet, every service and container</a></p>
+  </div>
+</body>
+</html>

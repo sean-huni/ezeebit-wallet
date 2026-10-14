@@ -3,17 +3,25 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/conversion}
     username: ${DB_USER:conversion}
     password: ${DB_PASSWORD:conversion}
-  cloud:
-    loadbalancer:
-      cache:
-        # As on the gateway: a 35s instance cache would keep a dead ledger instance routable.
-        enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:${KAFKA_PORT:9092}}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 2000
+        request.timeout.ms: 1500
+        linger.ms: 0
+        # send() blocks for metadata up to this: the merchant's request must never wait on a dead broker.
+        max.block.ms: 250
 conversion:
   quote-ttl: 15s
   # Deadline sent to the ledger = quote expiry + grace; no posting commits after it.
   posting-grace: 30s
   # The sweeper resolves a PENDING conversion only after deadline + this, when no posting can still commit.
   max-transaction-time: 30s
+  # Record-and-alert only: nothing consumes it. The sweeper settles the conversion.
+  dead-letter-topic: ezeebit.conversion.ledger.deadletter
   sweep-interval: 10s
   rates:
     url: ${RATES_URL:http://localhost:${RATES_PORT:8089}}
@@ -23,10 +31,8 @@ conversion:
     max-jump-percent: 5
     jump-window: 5m
   ledger:
-    # A Eureka service name, resolved by the load-balanced client.
-    url: http://ledger-svc
-    connect-timeout: 1s
-    read-timeout: 3s
+    # A Eureka service name; DiscoveryNameResolverProvider reads each instance's grpcPort.
+    target: discovery:///ledger-svc
   # Must match the ledger's currency table; the ledger refuses any amount whose scale does not fit.
   currencies:
     zar: 2
@@ -48,3 +54,29 @@ conversion:
     kes-usdt: { min: 0.005, max: 0.0125, spread-bps: 50 }
     usdc-kes: { min: 80, max: 200, spread-bps: 50 }
     kes-usdc: { min: 0.005, max: 0.0125, spread-bps: 50 }
+# Retry only UNAVAILABLE and DEADLINE_EXCEEDED: LedgerGuard adds that predicate, which YAML cannot bind.
+# Worst case: Post 3 x 2s + 200ms + 400ms = 6.6s; Find and Void 3 x 2s + 500ms + 1s = 7.5s; the gateway waits 10s.
+resilience4j:
+  retry:
+    instances:
+      ledgerPost: { max-attempts: 3, wait-duration: 200ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      ledgerFind: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      ledgerVoid: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      # Rate feed: only a timeout or an IO failure is retried, never an error status. 2 x 2s + 200ms = 4.2s.
+      rates:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions: [org.springframework.web.client.ResourceAccessException]
+  circuitbreaker:
+    configs:
+      ledger:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+    instances:
+      ledgerPost: { base-config: ledger }
+      ledgerFind: { base-config: ledger }
+      ledgerVoid: { base-config: ledger }

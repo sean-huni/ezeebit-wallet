@@ -22,8 +22,10 @@ public class ConversionMetrics {
 	public static final String OUTCOMES = "ezeebit.conversion.outcomes";
 	public static final String LEFT_PENDING = "ezeebit.conversion.left.pending";
 	public static final String SWEEPS = "ezeebit.conversion.sweeps";
+	public static final String DEAD_LETTERS = "ezeebit.conversion.ledger.deadletter";
+	public static final String DEAD_LETTER_FAILURES = "ezeebit.conversion.ledger.deadletter.publish.failed";
 	private static final String NONE = "none";
-	// The rate client gives up at about 4 s (2 s connect, 2 s read), so the top bucket holds every call.
+	// Spring's JDK read timeout starts at send and so covers connect: 2 s an attempt, 4.2 s for two plus 200 ms.
 	private static final Duration[] RATE_CALL_BUCKETS = { Duration.ofMillis(25), Duration.ofMillis(50),
 			Duration.ofMillis(100), Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofSeconds(1),
 			Duration.ofSeconds(2), Duration.ofSeconds(4), Duration.ofSeconds(5) };
@@ -71,6 +73,14 @@ public class ConversionMetrics {
 
 	public void sweep(final LedgerAnswer answer) {
 		registry.counter(SWEEPS, "action", sweepAction(answer)).increment();
+	}
+
+	public void deadLettered(final String op, final String reason) {
+		registry.counter(DEAD_LETTERS, "op", op, "reason", reason).increment();
+	}
+
+	public void deadLetterLost(final String op) {
+		registry.counter(DEAD_LETTER_FAILURES, "op", op).increment();
 	}
 
 	public static String sweepAction(final LedgerAnswer answer) {

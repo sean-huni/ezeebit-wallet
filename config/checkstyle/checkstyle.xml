@@ -9,6 +9,10 @@
 	<property name="charset" value="UTF-8"/>
 	<property name="tabWidth" value="4"/>
 
+	<!-- protoc output (build/generated): it is regenerated on every build, so a style finding there has no fix. -->
+	<module name="BeforeExecutionExclusionFileFilter">
+		<property name="fileNamePattern" value="[\\/]build[\\/]generated[\\/]"/>
+	</module>
 	<module name="SuppressionSingleFilter">
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]src[\\/](test|acceptanceTest)[\\/]"/>
@@ -17,6 +21,22 @@
 	<module name="SuppressionSingleFilter">
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]gateway[\\/]api[\\/]filter[\\/]RateLimitFilter\.java$"/>
+	</module>
+	<!-- An exception escaping a gRPC name resolver panics the channel until restart; it must become an UNAVAILABLE status. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]discovery[\\/]DiscoveryNameResolver\.java$"/>
+	</module>
+
+	<!-- A dead letter alerts about a call that already failed: a sink that throws must never change that call's outcome. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]ledger[\\/]LedgerGuard\.java$"/>
+	</module>
+	<!-- The same promise at the sink itself: a closed producer throws IllegalStateException, not a KafkaException. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]deadletter[\\/]KafkaDeadLetterPublisher\.java$"/>
 	</module>
 
 	<module name="NewlineAtEndOfFile"/>

@@ -6,17 +6,17 @@ import java.util.UUID;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.domain.Settlement;
-import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
+import io.ezeebit.conversion.service.port.LedgerPostings;
 import org.springframework.stereotype.Component;
 
 @Component
 public class PendingLedgerCheck {
 
-	private final LedgerClient ledger;
+	private final LedgerPostings ledger;
 	private final ConversionSettler settler;
 
-	public PendingLedgerCheck(final LedgerClient ledger, final ConversionSettler settler) {
+	public PendingLedgerCheck(final LedgerPostings ledger, final ConversionSettler settler) {
 		this.ledger = ledger;
 		this.settler = settler;
 	}

@@ -6,18 +6,18 @@ import io.ezeebit.conversion.domain.Currency;
 import io.ezeebit.conversion.domain.MarketRate;
 import io.ezeebit.conversion.domain.PairPolicy;
 import io.ezeebit.conversion.domain.RateValidator;
-import io.ezeebit.conversion.outbound.rates.RateClient;
+import io.ezeebit.conversion.service.port.RateSource;
 import io.ezeebit.conversion.service.quote.RateHistory.Snapshot;
 import org.springframework.stereotype.Component;
 
 @Component
 public class RateCheck {
 
-	private final RateClient rates;
+	private final RateSource rates;
 	private final RateValidator validator;
 	private final RateHistory history;
 
-	public RateCheck(final RateClient rates, final RateValidator validator, final RateHistory history) {
+	public RateCheck(final RateSource rates, final RateValidator validator, final RateHistory history) {
 		this.rates = rates;
 		this.validator = validator;
 		this.history = history;

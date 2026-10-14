@@ -19,7 +19,7 @@ class PendingOverdueGaugeTest {
 
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final PendingOverdueGauge gauge = new PendingOverdueGauge(conversions, new DueCutoff(
-			new ConversionProperties(null, null, Duration.ofSeconds(30), null, null, null, null),
+			new ConversionProperties(null, null, Duration.ofSeconds(30), null, null, null, null, null),
 			Clock.fixed(Instant.parse("2026-10-13T10:00:00Z"), ZoneOffset.UTC)));
 
 	@AfterEach

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class CurrencyCatalogTest {
 
 	private final CurrencyCatalog catalog = new CurrencyCatalog(
-			new ConversionProperties(null, null, null, null, null, Map.of("kes", 2, "zar", 2), Map.of()));
+			new ConversionProperties(null, null, null, null, null, null, Map.of("kes", 2, "zar", 2), Map.of()));
 
 	@Test
 	void knowsAConfiguredCodeInUpperCase() {

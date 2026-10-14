@@ -1,3 +1,10 @@
+// The Spring Cloud BOM pins Resilience4j 2.3.0; the Boot 4 starter is 2.4.0 and needs its own line throughout.
+dependencyManagement {
+	imports {
+		mavenBom "io.github.resilience4j:resilience4j-bom:${resilience4jVersion}"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -6,8 +13,15 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+	implementation "io.github.resilience4j:resilience4j-spring-boot4:${resilience4jVersion}"
+	implementation 'com.google.protobuf:protobuf-java-util'
+	implementation 'org.springframework.boot:spring-boot-starter-kafka'
 	runtimeOnly 'org.postgresql:postgresql'
+	testImplementation 'io.grpc:grpc-netty-shaded'
+	testImplementation 'io.grpc:grpc-inprocess'
 	acceptanceTestImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
+	acceptanceTestImplementation 'org.testcontainers:testcontainers-kafka'
 }
 
 // Spring tests read the same files config-svc serves, so pairs, bands, timeouts and the gateway secret have one home.
@@ -15,6 +29,9 @@ def served = rootProject.file('services/config-svc/src/main/resources/served')
 tasks.withType(Test).configureEach {
 	systemProperty 'spring.config.import', "file:${served}/application.yml,file:${served}/conversion-svc.yml"
 	systemProperty 'served.shared', "${served}/application.yml"
+	systemProperty 'kafka.image', kafkaImage
+	systemProperty 'compose.file', rootProject.file('compose.yaml').absolutePath
+	inputs.file(rootProject.file('compose.yaml')).withPropertyName('composeFile').withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // The acceptance tier runs the real ledger-svc jar as a separate process: real HTTP, its own database.

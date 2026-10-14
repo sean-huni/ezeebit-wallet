@@ -15,8 +15,8 @@ final class Externals {
 
 	private final WireMockServer rates = new WireMockServer(options().dynamicPort().bindAddress("127.0.0.1")
 			.usingFilesUnderDirectory(System.getProperty("rates.stubs")).globalTemplating(true));
-	private final WireMockServer ledgerProxy = new WireMockServer(options().dynamicPort().bindAddress("127.0.0.1"));
 	private final LedgerProcess ledger = new LedgerProcess();
+	private LedgerFaultProxy ledgerProxy;
 	private JdbcClient ledgerDb;
 
 	private Externals() {
@@ -38,8 +38,9 @@ final class Externals {
 
 	private void start() throws Exception {
 		rates.start();
-		ledgerProxy.start();
 		ledger.start();
+		ledgerProxy = new LedgerFaultProxy("127.0.0.1", ledger.grpcPort());
+		ledgerProxy.start();
 		DataSource dataSource = new DriverManagerDataSource(ledger.database().getJdbcUrl(),
 				ledger.database().getUsername(), ledger.database().getPassword());
 		ledgerDb = JdbcClient.create(dataSource);
@@ -53,8 +54,12 @@ final class Externals {
 		return rates;
 	}
 
-	WireMockServer ledgerProxy() {
+	LedgerFaultProxy ledgerProxy() {
 		return ledgerProxy;
+	}
+
+	int ledgerGrpcPort() {
+		return ledger.grpcPort();
 	}
 
 	String ledgerUrl() {

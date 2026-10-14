@@ -61,7 +61,7 @@
     {
       "type": "alertlist",
       "title": "Every rule, every state",
-      "description": "All nine rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
+      "description": "All 12 rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
       "options": {
         "viewMode": "list",
         "showInstances": false,
@@ -783,6 +783,225 @@
         "h": 7
       },
       "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "ConversionLedgerDeadLettered",
+      "description": "{{ $labels.op }} to the ledger was dead-lettered ({{ $labels.reason }}). Holds 0s before firing. Runbook: Read the topic: docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ezeebit.conversion.ledger.deadletter --from-beginning. The sweeper settles the conversion once the ledger answers; check ledger-svc with ./fleet.sh status. Empty: the expression returns no series, which this rule treats as OK.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (op, reason) (clamp_min(ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} - ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} unless ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} offset 5m))",
+          "legendFormat": "{{op}} {{reason}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {
+              "mode": "line"
+            },
+            "axisSoftMax": 1
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 8,
+        "h": 7
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "DeadLetterPublishFailing",
+      "description": "conversion-svc could not publish a {{ $labels.op }} dead letter to Kafka: it is only in the log. Holds 0s before firing. Runbook: docker compose ps kafka; then .fleet/conversion-svc.log, search 'dead letter not published' for the conversion ids and the cause. Empty: the expression returns no series, which this rule treats as OK.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (op) (clamp_min(ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} - ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} unless ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} offset 5m))",
+          "legendFormat": "{{op}} not published",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {
+              "mode": "line"
+            },
+            "axisSoftMax": 1
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 34,
+        "w": 8,
+        "h": 7
+      },
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "KafkaAbsent",
+      "description": "conversion-svc's Kafka producer has had no broker connection for 60s: dead letters cannot be published. Holds 60s before firing. Runbook: docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then. Empty: the expression returns no series, which this rule treats as OK.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (job) (last_over_time(kafka_producer_connection_count{job=\"conversion-svc\"}[30s])) == bool 0",
+          "legendFormat": "{{job}} producer",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {
+              "mode": "line"
+            },
+            "axisSoftMax": 1
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 34,
+        "w": 8,
+        "h": 7
+      },
+      "id": 15
     }
   ]
 }

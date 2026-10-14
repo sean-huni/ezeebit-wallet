@@ -14,6 +14,7 @@ import java.net.SocketException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
@@ -30,9 +31,12 @@ class LoopbackOnlyIT {
 	@LocalServerPort
 	private int port;
 
+	@Value("${local.grpc.server.port}")
+	private int grpcPort;
+
 	@Test
 	void theLedgerAnswersOnLoopback() {
-		assertThatCode(() -> connect(InetAddress.getLoopbackAddress())).doesNotThrowAnyException();
+		assertThatCode(() -> connect(InetAddress.getLoopbackAddress(), port)).doesNotThrowAnyException();
 	}
 
 	@Test
@@ -40,12 +44,25 @@ class LoopbackOnlyIT {
 		Optional<InetAddress> lan = lanAddress();
 		assumeTrue(lan.isPresent(), "this host has no LAN address to probe");
 
-		assertThatThrownBy(() -> connect(lan.get())).isInstanceOf(IOException.class);
+		assertThatThrownBy(() -> connect(lan.get(), port)).isInstanceOf(IOException.class);
 	}
 
-	private void connect(final InetAddress address) throws IOException {
+	@Test
+	void theGrpcServerAnswersOnLoopback() {
+		assertThatCode(() -> connect(InetAddress.getLoopbackAddress(), grpcPort)).doesNotThrowAnyException();
+	}
+
+	@Test
+	void theGrpcServerRefusesConnectionsOnTheLanAddress() throws SocketException {
+		Optional<InetAddress> lan = lanAddress();
+		assumeTrue(lan.isPresent(), "this host has no LAN address to probe");
+
+		assertThatThrownBy(() -> connect(lan.get(), grpcPort)).isInstanceOf(IOException.class);
+	}
+
+	private static void connect(final InetAddress address, final int target) throws IOException {
 		try (Socket socket = new Socket()) {
-			socket.connect(new InetSocketAddress(address, port), CONNECT_TIMEOUT_MILLIS);
+			socket.connect(new InetSocketAddress(address, target), CONNECT_TIMEOUT_MILLIS);
 		}
 	}
 

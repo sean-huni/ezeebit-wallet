@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package ezeebit.ledger.v1;
+
+option java_multiple_files = true;
+option java_package = "io.ezeebit.contracts.ledger.v1";
+
+// Called by conversion-svc only. Post is idempotent on conversion_id: a repeat replays the stored result.
+service ConversionPostings {
+  rpc Post(PostingRequest) returns (PostingResult);
+}
+
+// The sweeper's two questions about a conversion whose outcome is unknown.
+service ConversionSettlement {
+  rpc Find(PostingLookup) returns (PostingResult);
+  rpc Void(PostingLookup) returns (PostingResult);
+}
+
+message PostingRequest {
+  string conversion_id = 1;
+  string merchant_id = 2;
+  string sell_currency = 3;
+  string sell_amount = 4;     // decimal text at the currency's scale, e.g. "1000.00"
+  string buy_currency = 5;
+  string buy_amount = 6;
+  string deadline = 7;        // ISO-8601 instant, checked against the ledger's clock
+}
+
+message PostingLookup {
+  string conversion_id = 1;
+  string merchant_id = 2;
+}
+
+enum PostingStatus {
+  POSTING_STATUS_UNSPECIFIED = 0;
+  POSTED = 1;
+  VOID = 2;
+  REFUSED = 3;
+}
+
+message PostingResult {
+  string journal_id = 1;
+  string conversion_id = 2;
+  string merchant_id = 3;
+  PostingStatus status = 4;
+  string reason = 5;          // set when REFUSED: INSUFFICIENT_FUNDS or BALANCE_LIMIT_EXCEEDED
+  string sell_currency = 6;
+  string sell_amount = 7;
+  string buy_currency = 8;
+  string buy_amount = 9;
+  string created = 10;
+}

@@ -838,16 +838,381 @@
     },
     {
       "type": "row",
-      "title": "Edge rate limiter (Redis)",
-      "collapsed": false,
+      "title": "Ledger gRPC (conversion-svc to ledger-svc): calls, errors, breakers, dead letters",
+      "collapsed": true,
       "gridPos": {
         "x": 0,
         "y": 33,
         "w": 24,
         "h": 1
       },
-      "panels": [],
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Calls by method and status",
+          "description": "Each attempt conversion-svc made to ledger-svc over gRPC, so a retried call shows once per attempt. Empty: conversion-svc made no gRPC call to the ledger in the window.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (rpc_method, grpc_status_code) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval]))",
+              "legendFormat": "{{rpc_method}} {{grpc_status_code}}",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 34,
+            "w": 8,
+            "h": 8
+          },
+          "id": 15
+        },
+        {
+          "type": "timeseries",
+          "title": "Error ratio by method",
+          "description": "Share of attempts per method that ended in any status but OK (UNAVAILABLE and DEADLINE_EXCEEDED are retried). 0 is the healthy state; empty: no gRPC call in the window.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"}[$interval])) or sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval])) * 0) / sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval]))",
+              "legendFormat": "{{rpc_method}}",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              },
+              "min": 0,
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 34,
+            "w": 8,
+            "h": 8
+          },
+          "id": 16
+        },
+        {
+          "type": "timeseries",
+          "title": "Latency p95 and mean by method",
+          "description": "p95 from the grpc.client histogram buckets (shared observability config), with the mean (sum over count) beside it. Empty: no gRPC call in the window; a mean with no p95 means the JVM runs without the grpc.client buckets.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (rpc_method, le) (rate(grpc_client_milliseconds_bucket{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval])))",
+              "legendFormat": "{{rpc_method}} p95",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (rpc_method) (rate(grpc_client_milliseconds_sum{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval])) / sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval]))",
+              "legendFormat": "{{rpc_method}} mean",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 34,
+            "w": 8,
+            "h": 8
+          },
+          "id": 17
+        },
+        {
+          "type": "stat",
+          "title": "Circuit breakers",
+          "description": "Each ledger breaker's state, the worst across conversion-svc JVMs: CLOSED passes calls, OPEN refuses them for 10s, HALF_OPEN lets 3 through to test. Empty: no conversion-svc exported in 30s.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by (name) (last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"closed\"}[30s]) * 0 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"half_open\"}[30s]) * 1 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"open\"}[30s]) * 2 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"forced_open\"}[30s]) * 3 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"disabled\"}[30s]) * 4 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"metrics_only\"}[30s]) * 5)",
+              "legendFormat": "{{name}}",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "CLOSED",
+                      "color": "green"
+                    },
+                    "1": {
+                      "text": "HALF_OPEN",
+                      "color": "orange"
+                    },
+                    "2": {
+                      "text": "OPEN",
+                      "color": "red"
+                    },
+                    "3": {
+                      "text": "FORCED_OPEN",
+                      "color": "red"
+                    },
+                    "4": {
+                      "text": "DISABLED",
+                      "color": "blue"
+                    },
+                    "5": {
+                      "text": "METRICS_ONLY",
+                      "color": "blue"
+                    }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "value_and_name",
+            "justifyMode": "center",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 42,
+            "w": 8,
+            "h": 6
+          },
+          "id": 18
+        },
+        {
+          "type": "timeseries",
+          "title": "Dead letters",
+          "description": "Ledger calls conversion-svc gave up on, per op and reason, and dead letters Kafka did not take (not published), each counted over 5m including a series' first event. Empty is the healthy state: no dead letter in the window.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (op, reason) (clamp_min(ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} - ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} unless ezeebit_conversion_ledger_deadletter_total{job=\"conversion-svc\"} offset 5m))",
+              "legendFormat": "{{op}} {{reason}}",
+              "range": true
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (op) (clamp_min(ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} - ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} unless ezeebit_conversion_ledger_deadletter_publish_failed_total{job=\"conversion-svc\"} offset 5m))",
+              "legendFormat": "{{op}} not published",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "thresholdsStyle": {
+                  "mode": "dashed"
+                }
+              },
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 42,
+            "w": 16,
+            "h": 6
+          },
+          "id": 19
+        }
+      ],
       "id": 14
+    },
+    {
+      "type": "row",
+      "title": "Edge rate limiter (Redis)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "id": 20
     },
     {
       "type": "timeseries",
@@ -902,11 +1267,11 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 35,
         "w": 10,
         "h": 8
       },
-      "id": 15
+      "id": 21
     },
     {
       "type": "timeseries",
@@ -958,11 +1323,11 @@
       },
       "gridPos": {
         "x": 10,
-        "y": 34,
+        "y": 35,
         "w": 9,
         "h": 8
       },
-      "id": 16
+      "id": 22
     },
     {
       "type": "stat",
@@ -1034,11 +1399,11 @@
       },
       "gridPos": {
         "x": 19,
-        "y": 34,
+        "y": 35,
         "w": 5,
         "h": 8
       },
-      "id": 17
+      "id": 23
     },
     {
       "type": "row",
@@ -1046,12 +1411,12 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 43,
         "w": 24,
         "h": 1
       },
       "panels": [],
-      "id": 18
+      "id": 24
     },
     {
       "type": "timeseries",
@@ -1132,11 +1497,11 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 43,
+        "y": 44,
         "w": 8,
         "h": 8
       },
-      "id": 19
+      "id": 25
     },
     {
       "type": "timeseries",
@@ -1215,11 +1580,11 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 43,
+        "y": 44,
         "w": 8,
         "h": 8
       },
-      "id": 20
+      "id": 26
     },
     {
       "type": "timeseries",
@@ -1290,11 +1655,11 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 43,
+        "y": 44,
         "w": 8,
         "h": 8
       },
-      "id": 21
+      "id": 27
     },
     {
       "type": "row",
@@ -1302,12 +1667,12 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 51,
+        "y": 52,
         "w": 24,
         "h": 1
       },
       "panels": [],
-      "id": 22
+      "id": 28
     },
     {
       "type": "timeseries",
@@ -1378,11 +1743,11 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 52,
+        "y": 53,
         "w": 8,
         "h": 8
       },
-      "id": 23
+      "id": 29
     },
     {
       "type": "timeseries",
@@ -1443,11 +1808,11 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 52,
+        "y": 53,
         "w": 8,
         "h": 8
       },
-      "id": 24
+      "id": 30
     },
     {
       "type": "timeseries",
@@ -1508,11 +1873,11 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 52,
+        "y": 53,
         "w": 8,
         "h": 8
       },
-      "id": 25
+      "id": 31
     }
   ]
 }

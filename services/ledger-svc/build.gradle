@@ -6,7 +6,13 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
 	runtimeOnly 'org.postgresql:postgresql'
+	testImplementation 'org.springframework.boot:spring-boot-grpc-test'
+	acceptanceTestImplementation 'org.springframework.boot:spring-boot-grpc-test'
+	acceptanceTestImplementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+	// AutoConfigureTestGrpcTransport needs InProcessServerBuilder, which grpc-java ships apart from grpc-core.
+	acceptanceTestImplementation 'io.grpc:grpc-inprocess'
 }
 
 // Spring tests read the shared file config-svc serves, so the gateway secret has one home.

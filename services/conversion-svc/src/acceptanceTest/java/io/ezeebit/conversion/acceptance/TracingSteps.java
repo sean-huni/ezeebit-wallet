@@ -1,9 +1,7 @@
 package io.ezeebit.conversion.acceptance;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -47,7 +45,7 @@ public class TracingSteps {
 
 	@Then("the ledger was called inside trace {string}")
 	public void ledgerInTrace(final String traceId) {
-		assertThat(traceIds(Externals.get().ledgerProxy().findAll(anyRequestedFor(urlPathMatching("/internal/v1/conversion-postings.*")))))
+		assertThat(Externals.get().ledgerProxy().traceparents("Post").stream().map(header -> header.split("-")[1]))
 				.contains(traceId);
 	}
 

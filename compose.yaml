@@ -60,8 +60,13 @@ services:
       - 'KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT'
       - 'KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1'
       - 'KAFKA_AUTO_CREATE_TOPICS_ENABLE=false'
+      # Unset, log.dirs falls back to /tmp/kafka-logs in the container layer and every bounce erases the dead letters.
+      # This image path is appuser-owned, so the named volume inherits a writable owner on first mount.
+      - 'KAFKA_LOG_DIRS=/var/lib/kafka/data'
     ports:
       - '127.0.0.1:${KAFKA_PORT:-9092}:9092'
+    volumes:
+      - 'kafkadata:/var/lib/kafka/data'
     healthcheck:
       # Healthy only once the dead-letter topic exists: creating it is idempotent, and a broker that cannot is not ready.
       test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --create --if-not-exists --topic ezeebit.conversion.ledger.deadletter --partitions 1 --replication-factor 1 --config retention.ms=604800000 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --describe --topic ezeebit.conversion.ledger.deadletter']
@@ -101,3 +106,4 @@ services:
 volumes:
   pgdata:
   lgtmdata:
+  kafkadata:

@@ -428,7 +428,7 @@ purge() {
   down || return 1
   local -a vols
   vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})
-  print "removing volumes: ${vols:-none} (every ledger and conversion row, Prometheus and Tempo history)"
+  print "removing volumes: ${vols:-none} (every ledger and conversion row, the dead-letter topic, Prometheus and Tempo history)"
   docker compose down --volumes --remove-orphans || return 1
   rm -r -f -- $RUN
   vols=(${(f)"$(docker volume ls -q --filter label=com.docker.compose.project=$PROJECT)"})

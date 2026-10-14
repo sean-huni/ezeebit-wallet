@@ -41,3 +41,24 @@ conversion:
     kes-usdt: { min: 0.005, max: 0.0125, spread-bps: 50 }
     usdc-kes: { min: 80, max: 200, spread-bps: 50 }
     kes-usdc: { min: 0.005, max: 0.0125, spread-bps: 50 }
+# Retry only UNAVAILABLE and DEADLINE_EXCEEDED: LedgerGuard adds that predicate, which YAML cannot bind.
+# Worst case: Post 3 x 2s + 200ms + 400ms = 6.6s; Find and Void 3 x 2s + 500ms + 1s = 7.5s; the gateway waits 10s.
+resilience4j:
+  retry:
+    instances:
+      ledgerPost: { max-attempts: 3, wait-duration: 200ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      ledgerFind: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      ledgerVoid: { max-attempts: 3, wait-duration: 500ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+  circuitbreaker:
+    configs:
+      ledger:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+    instances:
+      ledgerPost: { base-config: ledger }
+      ledgerFind: { base-config: ledger }
+      ledgerVoid: { base-config: ledger }

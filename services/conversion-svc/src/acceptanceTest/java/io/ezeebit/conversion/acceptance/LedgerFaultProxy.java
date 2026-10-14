@@ -135,6 +135,10 @@ final class LedgerFaultProxy {
 				.map(Call::traceparent).toList();
 	}
 
+	int distinctPosts() {
+		return posted.size();
+	}
+
 	Optional<PostingRequest> posting(final String conversionId) {
 		return Optional.ofNullable(posted.get(conversionId));
 	}

@@ -3,6 +3,7 @@ package io.ezeebit.conversion.outbound.ledger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,8 @@ class LedgerGrpcClientTest {
 		server = InProcessServerBuilder.forName(name).directExecutor().addService(ledger.postings())
 				.addService(ledger.settlement()).build().start();
 		channel = InProcessChannelBuilder.forName(name).directExecutor().build();
-		client = new LedgerGrpcClient(channel, new LedgerReplyMapper());
+		client = new LedgerGrpcClient(channel, new LedgerReplyMapper(), LedgerGuardTest.guard(Duration.ofMillis(1), letter -> {
+		}));
 	}
 
 	@AfterEach
@@ -91,14 +93,27 @@ class LedgerGrpcClientTest {
 	}
 
 	@Test
-	void anUnavailableLedgerLeavesTheOutcomeUnknown() {
+	void anUnavailableLedgerIsTriedThreeTimesAndLeavesTheOutcomeUnknown() {
 		ledger.failure = Status.UNAVAILABLE.withDescription("ledger down").asRuntimeException();
 
 		assertThat(client.post(new LedgerPosting(CONVERSION, MERCHANT, quote(), DEADLINE)))
 				.isEqualTo(LedgerAnswer.UNKNOWN);
 		assertThat(client.lookup(CONVERSION, MERCHANT)).isEqualTo(LedgerAnswer.UNKNOWN);
 		assertThat(client.voidPosting(CONVERSION, MERCHANT)).isEqualTo(LedgerAnswer.UNKNOWN);
-		assertThat(ledger.received).extracting(Received::operation).containsExactly("post", "find", "void");
+		assertThat(ledger.received).extracting(Received::operation).containsExactly("post", "post", "post", "find", "find",
+				"find", "void", "void", "void");
+	}
+
+	// The ledger hashes the whole message, deadline included, to tell a replay from a reused id.
+	@Test
+	void aRetriedPostResendsTheIdenticalMessage() {
+		ledger.answer = PostingResult.newBuilder().setStatus(PostingStatus.POSTED).build();
+		ledger.transientFailures = 2;
+
+		assertThat(client.post(new LedgerPosting(CONVERSION, MERCHANT, quote(), DEADLINE))).isEqualTo(LedgerAnswer.POSTED);
+
+		assertThat(ledger.received).hasSize(3).extracting(received -> received.message().toByteString())
+				.containsOnly(ledger.received.getFirst().message().toByteString());
 	}
 
 	// A refused lookup or void is about this caller's message, never the conversion: the posting may exist.
@@ -136,6 +151,7 @@ class LedgerGrpcClientTest {
 		private final List<Received> received = new ArrayList<>();
 		private PostingResult answer = PostingResult.getDefaultInstance();
 		private StatusRuntimeException failure;
+		private int transientFailures;
 
 		ConversionPostingsGrpc.ConversionPostingsImplBase postings() {
 			return new ConversionPostingsGrpc.ConversionPostingsImplBase() {
@@ -166,6 +182,11 @@ class LedgerGrpcClientTest {
 
 		private void answer(final String operation, final Message request, final StreamObserver<PostingResult> reply) {
 			received.add(new Received(operation, request));
+			if (transientFailures > 0) {
+				transientFailures--;
+				reply.onError(Status.UNAVAILABLE.asRuntimeException());
+				return;
+			}
 			if (failure != null) {
 				reply.onError(failure);
 				return;

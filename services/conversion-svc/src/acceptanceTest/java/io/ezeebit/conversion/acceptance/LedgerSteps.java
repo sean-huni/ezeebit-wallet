@@ -193,9 +193,10 @@ public class LedgerSteps {
 				.param("merchant", state.merchant(merchant)).query(Integer.class).single()).isEqualTo(count);
 	}
 
-	@Then("the ledger was sent {int} posting(s)")
-	public void postingsSent(final int count) {
-		assertThat(proxy().calls("Post")).isEqualTo(count);
+	// Counts conversions, not Post calls: a retried posting resends the same conversion up to three times.
+	@Then("the ledger was asked to post {int} conversion(s)")
+	public void conversionsPosted(final int count) {
+		assertThat(proxy().distinctPosts()).isEqualTo(count);
 	}
 
 	@Then("the ledger was asked to void each of them exactly once")

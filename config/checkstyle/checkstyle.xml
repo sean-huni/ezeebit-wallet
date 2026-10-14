@@ -28,6 +28,12 @@
 		<property name="files" value="[\\/]outbound[\\/]discovery[\\/]DiscoveryNameResolver\.java$"/>
 	</module>
 
+	<!-- A dead letter alerts about a call that already failed: a sink that throws must never change that call's outcome. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]ledger[\\/]LedgerGuard\.java$"/>
+	</module>
+
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">
 		<property name="max" value="140"/>

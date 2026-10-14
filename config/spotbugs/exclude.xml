@@ -45,8 +45,16 @@
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient"/>
-				<Method name="call" params="io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient$Attempt"
+				<Method name="call" params="io.ezeebit.conversion.outbound.ledger.Operation,java.util.UUID,java.util.UUID,com.google.protobuf.Message,io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient$Attempt"
 						returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerGuard"/>
+				<Method name="record"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.deadletter.LoggingDeadLetters"/>
+				<Method name="record"/>
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>

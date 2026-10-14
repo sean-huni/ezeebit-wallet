@@ -3,6 +3,7 @@ package io.ezeebit.conversion.outbound.ledger;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.google.protobuf.Message;
 import io.ezeebit.contracts.ledger.v1.ConversionPostingsGrpc;
 import io.ezeebit.contracts.ledger.v1.ConversionSettlementGrpc;
 import io.ezeebit.contracts.ledger.v1.PostingLookup;
@@ -28,10 +29,13 @@ public class LedgerGrpcClient implements LedgerPostings {
 
 	private final ManagedChannel channel;
 	private final LedgerReplyMapper replies;
+	private final LedgerGuard guard;
 
-	public LedgerGrpcClient(@Qualifier("ledgerChannel") final ManagedChannel channel, final LedgerReplyMapper replies) {
+	public LedgerGrpcClient(@Qualifier("ledgerChannel") final ManagedChannel channel, final LedgerReplyMapper replies,
+			final LedgerGuard guard) {
 		this.channel = channel;
 		this.replies = replies;
+		this.guard = guard;
 	}
 
 	// Exactly the quoted amounts, at each currency's scale: the merchant gets the quoted rate or nothing.
@@ -42,18 +46,22 @@ public class LedgerGrpcClient implements LedgerPostings {
 				.setSellCurrency(posting.quote().sell().currency().code()).setSellAmount(posting.quote().sell().text())
 				.setBuyCurrency(posting.quote().buy().currency().code()).setBuyAmount(posting.quote().buy().text())
 				.setDeadline(posting.deadline().toString()).build();
-		return call(() -> ConversionPostingsGrpc.newBlockingStub(channel)
-				.withDeadlineAfter(ATTEMPT_MILLIS, TimeUnit.MILLISECONDS).post(message));
+		// Built once: every retry resends these exact bytes, which the ledger's replay hash requires.
+		return call(Operation.POST, posting.conversionId(), posting.merchantId(), message,
+				() -> ConversionPostingsGrpc.newBlockingStub(channel)
+						.withDeadlineAfter(ATTEMPT_MILLIS, TimeUnit.MILLISECONDS).post(message));
 	}
 
 	@Override
 	public LedgerAnswer lookup(final UUID conversionId, final UUID merchantId) {
-		return aboutTheConversion(call(() -> settlement().find(lookupMessage(conversionId, merchantId))));
+		PostingLookup message = lookupMessage(conversionId, merchantId);
+		return aboutTheConversion(call(Operation.FIND, conversionId, merchantId, message, () -> settlement().find(message)));
 	}
 
 	@Override
 	public LedgerAnswer voidPosting(final UUID conversionId, final UUID merchantId) {
-		return aboutTheConversion(call(() -> settlement().void_(lookupMessage(conversionId, merchantId))));
+		PostingLookup message = lookupMessage(conversionId, merchantId);
+		return aboutTheConversion(call(Operation.VOID, conversionId, merchantId, message, () -> settlement().void_(message)));
 	}
 
 	// A refused lookup or void is about this caller's message, never the conversion: the outcome stays open.
@@ -70,9 +78,10 @@ public class LedgerGrpcClient implements LedgerPostings {
 				.build();
 	}
 
-	private LedgerAnswer call(final Attempt attempt) {
+	private LedgerAnswer call(final Operation op, final UUID conversionId, final UUID merchantId, final Message message,
+			final Attempt attempt) {
 		try {
-			return replies.fromResult(attempt.run());
+			return replies.fromResult(guard.call(op, conversionId, merchantId, message, attempt));
 		}
 		catch (StatusRuntimeException ex) {
 			LedgerAnswer answer = replies.fromStatus(ex);

@@ -47,7 +47,7 @@ Feature: A ledger that does not answer leaves the conversion PENDING, never gues
     And quote "q1" has expired
     When "Acme" accepts quote "q1" with key "k1"
     Then the conversion is PENDING
-    And the ledger was sent 1 posting
+    And the ledger was asked to post 1 conversion
     And the ledger holds exactly 0 conversions for "Acme"
 
   Scenario: A refused conversion stays refused when money arrives during a same-key retry

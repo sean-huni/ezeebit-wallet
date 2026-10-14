@@ -25,7 +25,7 @@ public class ConversionMetrics {
 	public static final String DEAD_LETTERS = "ezeebit.conversion.ledger.deadletter";
 	public static final String DEAD_LETTER_FAILURES = "ezeebit.conversion.ledger.deadletter.publish.failed";
 	private static final String NONE = "none";
-	// The rate client gives up at about 4 s (2 s connect, 2 s read), so the top bucket holds every call.
+	// Spring's JDK read timeout starts at send and so covers connect: 2 s an attempt, 4.2 s for two plus 200 ms.
 	private static final Duration[] RATE_CALL_BUCKETS = { Duration.ofMillis(25), Duration.ofMillis(50),
 			Duration.ofMillis(100), Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofSeconds(1),
 			Duration.ofSeconds(2), Duration.ofSeconds(4), Duration.ofSeconds(5) };

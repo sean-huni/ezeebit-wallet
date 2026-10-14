@@ -26,8 +26,8 @@ public class RateFeedSteps {
 	private static final Duration POLL = Duration.ofMillis(50);
 	private static final Duration QUIET = Duration.ofMillis(500);
 
-	// Counted by receipt time: WireMock journals a request only once its response is sent, so an abandoned
-	// delayed request from an earlier scenario can enter the journal after this scenario's reset.
+	// Counted by receipt time: WireMock journals a request when it arrives, before any delayed response, and that
+	// time is fixed then, so a slow request from an earlier scenario never counts here however late it is answered.
 	private Instant countFrom;
 
 	@Before
@@ -74,8 +74,8 @@ public class RateFeedSteps {
 				.willReturn(RateFeed.rate("0.054254", "{{now}}").withFixedDelay(seconds * 1000)));
 	}
 
-	// A delayed answer the client abandoned is journaled seconds after the refusal: wait for the expected count,
-	// then for a quiet spell in which no extra arrives. Counts requests received since the fault was armed.
+	// Requests are journaled on receipt: wait for the expected count, then for a quiet spell in which no extra
+	// arrives. Counts requests received since the fault was armed.
 	@Then("the rate service was asked {int} time(s)")
 	public void asked(final int times) throws InterruptedException {
 		long deadline = System.nanoTime() + JOURNAL_WAIT.toNanos();

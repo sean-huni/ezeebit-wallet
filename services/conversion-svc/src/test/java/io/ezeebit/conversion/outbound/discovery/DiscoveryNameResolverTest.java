@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.outbound.discovery;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -38,7 +39,8 @@ class DiscoveryNameResolverTest {
 		assertThat(a.get()).as("instance one").isPositive();
 		assertThat(b.get()).as("instance two").isPositive();
 
-		one.shutdownNow().awaitTermination();
+		// Graceful stop models a rolling restart (SIGTERM); abrupt kill: LedgerGuardTest, Task 8.
+		one.shutdown().awaitTermination(5, SECONDS);
 		int before = b.get();
 		for (int i = 0; i < 5; i++) {
 			stub.post(PostingRequest.getDefaultInstance());

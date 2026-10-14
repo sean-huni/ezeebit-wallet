@@ -213,16 +213,21 @@ container_row() {
 }
 
 observability_rows() {
-  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name body msg grafana=0
+  local g=${PORT[lgtm:3000]} o=${PORT[lgtm:4318]} name body msg try grafana=0
   probe "http://localhost:$g/api/health"
   if [[ $CODE == 200 ]]; then grafana=1; row grafana "inside lgtm" $g - UP "/api/health 200"
   else row grafana "inside lgtm" $g - DOWN "${CODE:+/api/health answered }${CODE:-$WHY}"; fi
   for name in $BACKENDS; do
     if (( ! grafana )); then row $name "inside lgtm" - - SKIPPED "Grafana not answering, so its datasource check cannot run"; continue; fi
-    body=$(curl -s --max-time 5 "http://localhost:$g/api/datasources/uid/$name/health")
+    # Grafana answers a datasource health check with a transient error now and then; only 3 in a row is DOWN.
+    for try in 1 2 3; do
+      body=$(curl -s --max-time 5 "http://localhost:$g/api/datasources/uid/$name/health")
+      [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]] && break
+      (( try < 3 )) && sleep 1
+    done
     if [[ $(jq -r '.status // empty' <<< $body 2>/dev/null) == OK ]]; then row $name "inside lgtm" - - UP "datasource health OK"
-    elif [[ -z $body ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s"
-    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}"; fi
+    elif [[ -z $body ]]; then row $name "inside lgtm" - - DOWN "datasource health: no reply within 5s, 3 tries 1s apart"
+    else msg=$(jq -r '.message // empty' <<< $body 2>/dev/null); row $name "inside lgtm" - - DOWN "datasource health: ${msg:-a reply that is not JSON}, 3 tries 1s apart"; fi
   done
   # An empty export is the cheapest request only a live collector answers with 200.
   probe -X POST -H 'Content-Type: application/json' -d '{}' "http://localhost:$o/v1/metrics"

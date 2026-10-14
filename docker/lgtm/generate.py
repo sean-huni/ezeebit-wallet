@@ -44,6 +44,14 @@ ALL_QUOTES = "ezeebit_conversion_quotes_total"
 REFUSED = f"sum by (pair) {increase_new(RATE_REFUSALS, '1m')}"
 QUOTED = f"sum by (pair) {increase_new(ALL_QUOTES, '1m')}"
 INVARIANT = 'outcome="refused", code=~"CURRENCY_MISMATCH|UNBALANCED_POSTING"'
+DEAD_LETTERS = 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"}'
+DEAD_LETTERS_LOST = 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"}'
+PRODUCER_CONNECTIONS = 'kafka_producer_connection_count{job="conversion-svc"}'
+KAFKA_WHY = ["Spring creates the producer at the first dead letter, so before one there is no series: absent_over_time()",
+             "would page every healthy fleet that never dead-lettered, and a first send that cannot reach Kafka is",
+             "DeadLetterPublishFailing's. Measured: 0 within 10s of the broker stopping; idle for 17m it held 1 connection",
+             "(the 5m metadata refresh), so an idle producer does not page. last_over_time: a pushed gauge has no",
+             "staleness marker."]
 
 RULES = [
     {
@@ -153,6 +161,39 @@ RULES = [
         "runbook": "Logs for ledger-svc, search 'ledger invariant violated': the trace_id opens the request that broke it. Stop "
                    "postings until fixed.",
     },
+    {
+        "uid": "ezeebit-conversion-ledger-dead-lettered", "title": "ConversionLedgerDeadLettered", "severity": "warning",
+        "for": "0s", "from": 360,
+        "why": ["conversion-svc gave up on a ledger call after its retries or an open breaker and recorded a dead letter.",
+                "Counted before the send, so this pages whether or not Kafka took it. The counter is born with the first",
+                "dead letter, so each count includes a series born inside the window, which increase() cannot see."],
+        "expr": f"sum by (op, reason) {increase_new(DEAD_LETTERS, '5m')}",
+        "threshold": 0, "noData": "No dead letter since conversion-svc started returns no series: nothing to report.",
+        "summary": "{{ $labels.op }} to the ledger was dead-lettered ({{ $labels.reason }})",
+        "runbook": "Read the topic: docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ezeebit.conversion.ledger.deadletter --from-beginning. The sweeper settles the conversion once the "
+                   "ledger answers; check ledger-svc with ./fleet.sh status.",
+    },
+    {
+        "uid": "ezeebit-dead-letter-publish-failing", "title": "DeadLetterPublishFailing", "severity": "critical",
+        "for": "0s", "from": 360,
+        "why": ["A dead letter that Kafka did not take: the record of a ledger call conversion-svc gave up on exists only",
+                "in its log. Born with the first failure, so counted with the series-born arm."],
+        "expr": f"sum by (op) {increase_new(DEAD_LETTERS_LOST, '5m')}",
+        "threshold": 0, "noData": "No failed publish since conversion-svc started returns no series: nothing to report.",
+        "summary": "conversion-svc could not publish a {{ $labels.op }} dead letter to Kafka: it is only in the log",
+        "runbook": "docker compose ps kafka; then .fleet/conversion-svc.log, search 'dead letter not published' for the "
+                   "conversion ids and the cause.",
+    },
+    {
+        "uid": "ezeebit-kafka-absent", "title": "KafkaAbsent", "severity": "critical", "for": "60s", "from": 60,
+        "why": KAFKA_WHY,
+        "expr": f"max by (job) (last_over_time({PRODUCER_CONNECTIONS}[30s])) == bool 0",
+        "threshold": 0,
+        "noData": "No producer yet (no dead letter since conversion-svc started) returns no series: OK, see above.",
+        "forWhy": "The producer reconnects within seconds of a broker restart (measured); 60s is a broker that stays away.",
+        "summary": "conversion-svc's Kafka producer has had no broker connection for 60s: dead letters cannot be published",
+        "runbook": "docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka.",
+    },
 ]
 
 
@@ -211,10 +252,13 @@ class Board:
     def row(self, title, collapsed_panels=None):
         """A collapsed row holds its panels and queries nothing until a reader opens it."""
         self._newline()
-        inner = []
+        inner, x, y, row_h = [], 0, self.y + 1, 0
         for panel, w, h in collapsed_panels or []:
-            panel["gridPos"] = {"x": 0, "y": self.y + 1, "w": w, "h": h}
+            if x + w > 24:
+                x, y, row_h = 0, y + row_h, 0
+            panel["gridPos"] = {"x": x, "y": y, "w": w, "h": h}
             inner.append(panel)
+            x, row_h = x + w, max(row_h, h)
         self.panels.append({"type": "row", "title": title, "collapsed": bool(inner),
                             "gridPos": {"x": 0, "y": self.y, "w": 24, "h": 1}, "panels": inner})
         self.y += 1
@@ -408,6 +452,7 @@ def fleet():
                      "includes the upstream service's own time.",
                      [prom(p95("http_client_requests_milliseconds", "job, client_name"), "{{job}} -> {{client_name}}",
                            exemplar=True)], "ms", SERVICE_LINKS), 12, 8)
+    b.row("Ledger gRPC (conversion-svc to ledger-svc): calls, errors, breakers, dead letters", ledger_grpc_panels())
     b.row("Edge rate limiter (Redis)")
     b.add(timeseries("Limiter decisions by outcome", "Each merchant request's admission: allowed, limited (429), "
                      "contention, unavailable (Redis did not answer: 503, fail closed) or refused_path. No merchant tag.",
@@ -455,6 +500,50 @@ def fleet():
                            "{{job}} {{level}}")], "short", SERVICE_LINKS), 8, 8)
     return dashboard("ezeebit-fleet", "Fleet Overview", "Every service's health, RED metrics, dependencies, limiter, pool "
                      "and JVM.", b.numbered(), [service_var(), interval_var()])
+
+
+GRPC_CALLS = 'grpc_client_milliseconds_count{job="conversion-svc", net_peer_name="ledger-svc"}'
+BREAKER = 'resilience4j_circuitbreaker_state{job="conversion-svc", name=~"ledger.*"}'
+BREAKER_CODES = {"closed": 0, "half_open": 1, "open": 2, "forced_open": 3, "disabled": 4, "metrics_only": 5}
+
+
+def ledger_grpc_panels():
+    """conversion-svc's client side of the gRPC seam: every attempt, so one exhausted Post is three UNAVAILABLE calls."""
+    by_method = "sum by (rpc_method) (rate({0}{1}))"
+    calls, failed = GRPC_CALLS, GRPC_CALLS.replace("}", ', grpc_status_code!="OK"}')
+    state = " or ".join(f'last_over_time({BREAKER.replace("}", f', state="{st}"}}')}[30s]) * {code}'
+                        for st, code in BREAKER_CODES.items())
+    colours = {"closed": "green", "half_open": "orange", "open": "red", "forced_open": "red", "disabled": "blue",
+               "metrics_only": "blue"}
+    return [
+        (timeseries("Calls by method and status", "Each attempt conversion-svc made to ledger-svc over gRPC, so a retried "
+                    "call shows once per attempt. Empty: conversion-svc made no gRPC call to the ledger in the window.",
+                    [prom(f"sum by (rpc_method, grpc_status_code) (rate({calls}{WINDOW}))",
+                          "{{rpc_method}} {{grpc_status_code}}")], "reqps", stack=True), 8, 8),
+        (timeseries("Error ratio by method", "Share of attempts per method that ended in any status but OK (UNAVAILABLE "
+                    "and DEADLINE_EXCEEDED are retried). 0 is the healthy state; empty: no gRPC call in the window.",
+                    [prom(f"({by_method.format(failed, WINDOW)} or {by_method.format(calls, WINDOW)} * 0) / "
+                          f"{by_method.format(calls, WINDOW)}", "{{rpc_method}}")], "percentunit", min_max=(0, 1)), 8, 8),
+        (timeseries("Latency p95 and mean by method", "p95 needs the grpc.client histogram buckets; while conversion-svc "
+                    "publishes only +Inf the p95 line is empty and the mean (sum over count) is what there is. Empty "
+                    "everywhere: no gRPC call in the window.",
+                    [prom(f"histogram_quantile(0.95, sum by (rpc_method, le) (rate("
+                          f"{GRPC_CALLS.replace('_count', '_bucket')}{WINDOW})))", "{{rpc_method}} p95"),
+                     prom(f"{by_method.format(GRPC_CALLS.replace('_count', '_sum'), WINDOW)} / "
+                          f"{by_method.format(calls, WINDOW)}", "{{rpc_method}} mean")], "ms"), 8, 8),
+        (stat("Circuit breakers", "Each ledger breaker's state, the worst across conversion-svc JVMs: CLOSED passes calls, "
+              "OPEN refuses them for 10s, HALF_OPEN lets 3 through to test. Empty: no conversion-svc exported in 30s.",
+              [prom(f"max by (name) ({state})", "{{name}}", instant=True)],
+              mappings=[{"type": "value", "options": {str(code): {"text": st.upper(), "color": colours[st]}
+                                                      for st, code in BREAKER_CODES.items()}}],
+              steps=[{"color": "green", "value": None}], text_mode="value_and_name"), 8, 6),
+        (timeseries("Dead letters", "Ledger calls conversion-svc gave up on, per op and reason, and dead letters Kafka did "
+                    "not take (not published), each counted over 5m including a series' first event. Empty is the "
+                    "healthy state: no dead letter in the window.",
+                    [prom(f"sum by (op, reason) {increase_new(DEAD_LETTERS, '5m')}", "{{op}} {{reason}}"),
+                     prom(f"sum by (op) {increase_new(DEAD_LETTERS_LOST, '5m')}", "{{op}} not published")], "short",
+                    thresholds=0.5, min_max=(0, None)), 16, 6),
+    ]
 
 
 COUNTED = (" Counted per rate window, including a series' first event and the events after a restart, which rate() "
@@ -619,7 +708,8 @@ def logs():
 LEGENDS = {"ServiceDown": "{{job}}", "HighErrorRate": "{{job}}", "RateFeedRefusing": "{{pair}}",
            "ConversionsStuckPending": "overdue PENDING", "RateLimiterUnavailable": "refused for Redis",
            "RateLimiterStoreDown": "store down", "LatencySLOBurn": "{{job}} burn", "DbPoolSaturated": "{{job}} {{instance}}",
-           "LedgerInvariantBroken": "{{job}} {{code}}"}
+           "LedgerInvariantBroken": "{{job}} {{code}}", "ConversionLedgerDeadLettered": "{{op}} {{reason}}",
+           "DeadLetterPublishFailing": "{{op}} not published", "KafkaAbsent": "{{job}} producer"}
 
 
 def rule_panel_id(rule):
@@ -629,7 +719,7 @@ def rule_panel_id(rule):
 
 def alerts():
     b = Board()
-    b.add({"type": "alertlist", "title": "Every rule, every state", "description": "All nine rules including Normal, so "
+    b.add({"type": "alertlist", "title": "Every rule, every state", "description": f"All {len(RULES)} rules including Normal, so "
            "a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
            "options": {"viewMode": "list", "showInstances": False, "maxItems": 50, "sortOrder": 1,
                        "stateFilter": {"firing": True, "pending": True, "noData": True, "normal": True, "error": True},

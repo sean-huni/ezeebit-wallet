@@ -93,3 +93,27 @@ groups:
         for: 0s
         labels:
           severity: critical
+      - alert: ConversionLedgerDeadLettered
+        expr: |-
+          (
+            sum by (op, reason) (clamp_min(ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} - ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} unless ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"} offset 5m))
+          ) > 0
+        for: 0s
+        labels:
+          severity: warning
+      - alert: DeadLetterPublishFailing
+        expr: |-
+          (
+            sum by (op) (clamp_min(ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} - ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} offset 5m, 0) or (ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} unless ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"} offset 5m))
+          ) > 0
+        for: 0s
+        labels:
+          severity: critical
+      - alert: KafkaAbsent
+        expr: |-
+          (
+            max by (job) (last_over_time(kafka_producer_connection_count{job="conversion-svc"}[30s])) == bool 0
+          ) > 0
+        for: 60s
+        labels:
+          severity: critical

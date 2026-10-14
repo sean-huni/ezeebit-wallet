@@ -101,3 +101,71 @@ tests:
         alertname: RateFeedRefusing
         exp_alerts:
           - exp_labels: {alertname: RateFeedRefusing, pair: USDT/ZAR, severity: warning}
+
+  # ConversionLedgerDeadLettered: the counter is born with the first dead letter, so increase() alone would see
+  # nothing. It fires at once, one alert per op and reason; a series older than the 5m window that stays flat
+  # raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="VOID", reason="RETRIES_EXHAUSTED"}'
+        values: '3x60'
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="POST", reason="RETRIES_EXHAUSTED"}'
+        values: '_x36 1x24'
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="FIND", reason="CIRCUIT_OPEN"}'
+        values: '_x42 1x18'
+    alert_rule_test:
+      - eval_time: 5m50s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts: []
+      - eval_time: 6m30s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts:
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: POST, reason: RETRIES_EXHAUSTED, severity: warning}
+      - eval_time: 7m30s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts:
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: POST, reason: RETRIES_EXHAUSTED, severity: warning}
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: FIND, reason: CIRCUIT_OPEN, severity: warning}
+
+  # DeadLetterPublishFailing: a dead letter Kafka did not take pages at once, per op; a flat series older than the
+  # window raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc", instance="localhost:8082:1", op="FIND"}'
+        values: '2x60'
+      - series: 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc", instance="localhost:8082:1", op="POST"}'
+        values: '_x36 1x24'
+    alert_rule_test:
+      - eval_time: 5m50s
+        alertname: DeadLetterPublishFailing
+        exp_alerts: []
+      - eval_time: 6m30s
+        alertname: DeadLetterPublishFailing
+        exp_alerts:
+          - exp_labels: {alertname: DeadLetterPublishFailing, op: POST, severity: critical}
+
+  # KafkaAbsent: the producer's connections drop to 0 for over the 60s hold and it pages; a 30s blip does not; a
+  # conversion-svc that never created a producer (no series) raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'kafka_producer_connection_count{job="conversion-svc", instance="localhost:8082:1", client_id="conversion-svc-producer-1"}'
+        values: '2x6 0x3 2x6 0x12 2x6'
+    alert_rule_test:
+      - eval_time: 1m50s
+        alertname: KafkaAbsent
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: KafkaAbsent
+        exp_alerts:
+          - exp_labels: {alertname: KafkaAbsent, job: conversion-svc, severity: critical}
+      - eval_time: 5m30s
+        alertname: KafkaAbsent
+        exp_alerts: []
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="conversion-svc"}'
+        values: '30x30'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: KafkaAbsent
+        exp_alerts: []

@@ -44,8 +44,9 @@
 						returns="org.springframework.http.ProblemDetail"/>
 			</And>
 			<And>
-				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerClient"/>
-				<Method name="call" params="java.util.function.Supplier" returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
+				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient"/>
+				<Method name="call" params="io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient$Attempt"
+						returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>

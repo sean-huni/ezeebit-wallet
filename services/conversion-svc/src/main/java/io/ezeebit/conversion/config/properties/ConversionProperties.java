@@ -20,7 +20,7 @@ public record ConversionProperties(Duration quoteTtl, Duration postingGrace, Dur
 			BigDecimal maxJumpPercent, Duration jumpWindow) {
 	}
 
-	public record Ledger(String url, Duration connectTimeout, Duration readTimeout) {
+	public record Ledger(String target) {
 	}
 
 	public record Pair(BigDecimal min, BigDecimal max, int spreadBps) {

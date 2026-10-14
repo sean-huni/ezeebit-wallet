@@ -6,8 +6,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-client'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'io.grpc:grpc-netty-shaded'
+	testImplementation 'io.grpc:grpc-inprocess'
 	acceptanceTestImplementation "org.wiremock:wiremock-standalone:${wiremockVersion}"
 }
 

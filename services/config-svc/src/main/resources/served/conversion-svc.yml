@@ -3,11 +3,6 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/conversion}
     username: ${DB_USER:conversion}
     password: ${DB_PASSWORD:conversion}
-  cloud:
-    loadbalancer:
-      cache:
-        # As on the gateway: a 35s instance cache would keep a dead ledger instance routable.
-        enabled: false
 conversion:
   quote-ttl: 15s
   # Deadline sent to the ledger = quote expiry + grace; no posting commits after it.
@@ -23,10 +18,8 @@ conversion:
     max-jump-percent: 5
     jump-window: 5m
   ledger:
-    # A Eureka service name, resolved by the load-balanced client.
-    url: http://ledger-svc
-    connect-timeout: 1s
-    read-timeout: 3s
+    # A Eureka service name; DiscoveryNameResolverProvider reads each instance's grpcPort.
+    target: discovery:///ledger-svc
   # Must match the ledger's currency table; the ledger refuses any amount whose scale does not fit.
   currencies:
     zar: 2

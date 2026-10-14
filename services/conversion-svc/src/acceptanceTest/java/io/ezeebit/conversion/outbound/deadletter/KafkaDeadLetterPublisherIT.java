@@ -31,8 +31,11 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.test.context.ActiveProfiles;
@@ -48,6 +51,7 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest(properties = "conversion.sweep-interval=1h")
 @ActiveProfiles("acceptance")
 @TestMethodOrder(OrderAnnotation.class)
+@ExtendWith(OutputCaptureExtension.class)
 class KafkaDeadLetterPublisherIT {
 
 	private static final String TOPIC = "ezeebit.conversion.ledger.deadletter";
@@ -104,32 +108,39 @@ class KafkaDeadLetterPublisherIT {
 
 	@Test
 	@Order(3)
-	void aBrokerThatDiesAfterUseNeitherBlocksNorThrowsAndTheLossIsCounted() throws InterruptedException {
+	void aBrokerThatDiesAfterUseNeitherBlocksNorThrowsAndTheLossIsCounted(final CapturedOutput output)
+			throws InterruptedException {
 		KAFKA.stop();
 
-		assertLostQuickly();
+		assertLostQuickly(output);
 	}
 
 	@Test
 	@Order(4)
-	void aProducerThatHasNeverReachedTheBrokerNeitherBlocksNorThrowsAndTheLossIsCounted() throws InterruptedException {
+	void aProducerThatHasNeverReachedTheBrokerNeitherBlocksNorThrowsAndTheLossIsCounted(final CapturedOutput output)
+			throws InterruptedException {
 		KAFKA.stop();
 		producers.reset();
 
-		assertLostQuickly();
+		assertLostQuickly(output);
 	}
 
-	private void assertLostQuickly() throws InterruptedException {
+	private void assertLostQuickly(final CapturedOutput output) throws InterruptedException {
 		DoubleSupplier lost = counter(ConversionMetrics.DEAD_LETTER_FAILURES, "op", "POST");
 		double before = lost.getAsDouble();
+		DeadLetter letter = letter();
 
 		long start = System.nanoTime();
-		deadLetters.record(letter());
+		deadLetters.record(letter);
 		Duration took = Duration.ofNanos(System.nanoTime() - start);
 
 		assertThat(took).isLessThan(CALLER_BUDGET);
 		assertThat(eventually(() -> lost.getAsDouble() - before >= 1.0, Duration.ofSeconds(5))).isTrue();
 		assertThat(lost.getAsDouble() - before).isEqualTo(1.0);
+		// Only the publisher's own WARN lines name the letter: no framework ERROR line carrying the record value.
+		List<String> lines = output.getAll().lines().filter(line -> line.contains(letter.conversionId().toString()))
+				.toList();
+		assertThat(lines).isNotEmpty().allSatisfy(line -> assertThat(line).contains("WARN").doesNotContain("payload"));
 	}
 
 	private DoubleSupplier counter(final String name, final String... tags) {

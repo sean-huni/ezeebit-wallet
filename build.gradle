@@ -164,7 +164,6 @@ configure(subprojects.findAll { it.name in grpcServices }) {
 		implementation 'io.grpc:grpc-protobuf'
 		implementation 'io.grpc:grpc-stub'
 		implementation 'com.google.api.grpc:proto-google-common-protos'
-		compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 	}
 }
 
@@ -172,7 +171,10 @@ def checkSingleProto = tasks.register('checkSingleProto') {
 	group = 'verification'
 	description = 'Fails when a .proto file exists anywhere but contracts/.'
 	doLast {
-		def strays = fileTree('services') { include '**/*.proto'; exclude '**/build/**' }.files
+		def strays = fileTree('.') {
+			include '**/*.proto'
+			exclude 'contracts/**', '**/build/**', '.gradle/**', '**/node_modules/**', '.superpowers/**'
+		}.files
 		if (!strays.isEmpty()) {
 			throw new GradleException("checkSingleProto: .proto outside contracts/: ${strays*.path}")
 		}

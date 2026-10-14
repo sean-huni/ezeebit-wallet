@@ -105,7 +105,7 @@ convert_once() {
   [[ $CODE == 201 && -n $q ]] || { ROUTES="a conversion did not complete: $(failed quote)"; return 1; }
   call -H "Idempotency-Key: fleet-check-$m" "$gw/conversions" -d "{\"quoteId\":\"$q\"}"
   st=$(jq -r '.data.status // empty' <<< $BODY 2>/dev/null)
-  [[ $st == COMPLETED ]] && return 0
+  [[ $CODE == 201 && $st == COMPLETED ]] && return 0
   if [[ $CODE == 201 ]]; then ROUTES="a conversion did not complete: status ${st:-missing}"
   else ROUTES="a conversion did not complete: $(failed convert)"; fi
   return 1

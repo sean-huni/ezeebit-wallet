@@ -26,8 +26,8 @@ Walkthrough video: link to be added.
 | [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
-| [docs/fleet/verification/](docs/fleet/verification/) | The `fleet.sh` sweep test (every outcome of `up`, `down` and `status`) and its last run log; the Playwright suite for both fleet diagrams |
-| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html), [docs/fleet/fleet-ledger-grpc.html](docs/fleet/fleet-ledger-grpc.html) | Fleet diagrams: the overview (every service and container, and the calls between them), and the detail of the conversion-to-ledger gRPC and dead-letter paths |
+| [docs/fleet/verification/](docs/fleet/verification/) | The `fleet.sh` sweep test (every outcome of `up`, `down` and `status`) and its last run log |
+| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html) | The fleet diagram, the one source of truth: every service and container as built, the gRPC call from conversion to ledger, Kafka dead letters, telemetry to LGTM and alerts to Slack |
 | [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
 
 **This README**

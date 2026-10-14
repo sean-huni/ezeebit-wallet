@@ -9,6 +9,7 @@ import io.ezeebit.conversion.domain.RateRejection;
 import io.ezeebit.conversion.domain.RateValidator;
 import io.ezeebit.conversion.exception.ConversionException;
 import io.ezeebit.conversion.exception.ErrorCode;
+import io.ezeebit.conversion.service.port.RateSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,7 +21,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 // Fails closed: a timeout, a refused connection or an error status is 503, never a cached or default rate.
 @Component
-public class RateClient {
+public class RateClient implements RateSource {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RateClient.class);
 
@@ -35,6 +36,7 @@ public class RateClient {
 		this.metrics = metrics;
 	}
 
+	@Override
 	public MarketRate fetch(final String base, final String quote) {
 		RateDto dto;
 		long started = System.nanoTime();

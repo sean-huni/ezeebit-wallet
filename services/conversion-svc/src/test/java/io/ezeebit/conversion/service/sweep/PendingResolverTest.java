@@ -21,8 +21,8 @@ import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
-import io.ezeebit.conversion.outbound.ledger.LedgerClient;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
+import io.ezeebit.conversion.service.port.LedgerPostings;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class PendingResolverTest {
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 	private final ConversionMetrics metrics = new ConversionMetrics(registry, ObservationRegistry.NOOP);
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
-	private final LedgerClient ledger = mock(LedgerClient.class);
+	private final LedgerPostings ledger = mock(LedgerPostings.class);
 	private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 	private final ConversionEntity due = new ConversionEntity(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 			"k1", "PENDING", null, NOW.minusSeconds(120), NOW.minusSeconds(180), null, null);

@@ -1,0 +1,8 @@
+{
+  "name": "ezeebit-fleet-diagram-verification",
+  "private": true,
+  "description": "Playwright harness for docs/fleet/fleet-architecture.html. Run: npm install once, then node <suite>.js",
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

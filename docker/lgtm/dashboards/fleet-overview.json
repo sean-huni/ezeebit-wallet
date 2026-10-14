@@ -966,7 +966,7 @@
         {
           "type": "timeseries",
           "title": "Latency p95 and mean by method",
-          "description": "p95 needs the grpc.client histogram buckets; while conversion-svc publishes only +Inf the p95 line is empty and the mean (sum over count) is what there is. Empty everywhere: no gRPC call in the window.",
+          "description": "p95 from the grpc.client histogram buckets (shared observability config), with the mean (sum over count) beside it. Empty: no gRPC call in the window; a mean with no p95 means the JVM runs without the grpc.client buckets.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

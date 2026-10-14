@@ -29,6 +29,7 @@ management:
       percentiles-histogram:
         http.server.requests: true
         http.client.requests: true
+        grpc.client: true
         ezeebit.deposit: true
         ezeebit.ledger.posting: true
         ezeebit.quote: true
@@ -36,6 +37,7 @@ management:
         ezeebit.ratelimit.decision: true
       minimum-expected-value:
         http: 1ms
+        grpc: 1ms
         ezeebit: 1ms
       maximum-expected-value:
         http: 10s

@@ -933,7 +933,7 @@
     {
       "type": "timeseries",
       "title": "KafkaAbsent",
-      "description": "conversion-svc's Kafka producer has had no broker connection for 60s: dead letters cannot be published. Holds 60s before firing. Runbook: docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "conversion-svc's Kafka producer has had no broker connection for 60s: dead letters cannot be published. Holds 60s before firing. Runbook: docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

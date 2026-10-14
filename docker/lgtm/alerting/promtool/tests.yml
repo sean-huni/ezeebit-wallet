@@ -144,14 +144,14 @@ tests:
         exp_alerts:
           - exp_labels: {alertname: DeadLetterPublishFailing, op: POST, severity: critical}
 
-  # KafkaAbsent: the producer's connections drop to 0 for over the 60s hold and it pages; a 30s blip does not; a
-  # conversion-svc that never created a producer (no series) raises nothing.
+  # KafkaAbsent: the producer's connections drop to 0 for over the 60s hold and it pages; a 40s blip (70s to 100s)
+  # does not, checked at 1m40s inside the blip while pending; a conversion-svc with no producer series raises nothing.
   - interval: 10s
     input_series:
       - series: 'kafka_producer_connection_count{job="conversion-svc", instance="localhost:8082:1", client_id="conversion-svc-producer-1"}'
         values: '2x6 0x3 2x6 0x12 2x6'
     alert_rule_test:
-      - eval_time: 1m50s
+      - eval_time: 1m40s
         alertname: KafkaAbsent
         exp_alerts: []
       - eval_time: 4m

@@ -192,7 +192,9 @@ RULES = [
         "noData": "No producer yet (no dead letter since conversion-svc started) returns no series: OK, see above.",
         "forWhy": "The producer reconnects within seconds of a broker restart (measured); 60s is a broker that stays away.",
         "summary": "conversion-svc's Kafka producer has had no broker connection for 60s: dead letters cannot be published",
-        "runbook": "docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka.",
+        "runbook": "docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. "
+                   "Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has "
+                   "not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then.",
     },
 ]
 
@@ -524,9 +526,9 @@ def ledger_grpc_panels():
                     "and DEADLINE_EXCEEDED are retried). 0 is the healthy state; empty: no gRPC call in the window.",
                     [prom(f"({by_method.format(failed, WINDOW)} or {by_method.format(calls, WINDOW)} * 0) / "
                           f"{by_method.format(calls, WINDOW)}", "{{rpc_method}}")], "percentunit", min_max=(0, 1)), 8, 8),
-        (timeseries("Latency p95 and mean by method", "p95 needs the grpc.client histogram buckets; while conversion-svc "
-                    "publishes only +Inf the p95 line is empty and the mean (sum over count) is what there is. Empty "
-                    "everywhere: no gRPC call in the window.",
+        (timeseries("Latency p95 and mean by method", "p95 from the grpc.client histogram buckets (shared "
+                    "observability config), with the mean (sum over count) beside it. Empty: no gRPC call in the window; "
+                    "a mean with no p95 means the JVM runs without the grpc.client buckets.",
                     [prom(f"histogram_quantile(0.95, sum by (rpc_method, le) (rate("
                           f"{GRPC_CALLS.replace('_count', '_bucket')}{WINDOW})))", "{{rpc_method}} p95"),
                      prom(f"{by_method.format(GRPC_CALLS.replace('_count', '_sum'), WINDOW)} / "

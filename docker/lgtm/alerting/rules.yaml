@@ -426,6 +426,6 @@ groups:
           severity: critical
         annotations:
           summary: 'conversion-svc''s Kafka producer has had no broker connection for 60s: dead letters cannot be published'
-          runbook: 'docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka.'
+          runbook: 'docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then.'
           __dashboardUid__: ezeebit-alerts
           __panelId__: '15'

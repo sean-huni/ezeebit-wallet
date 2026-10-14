@@ -35,7 +35,7 @@ differs from what the script writes, so a hand edit to the JavaScript Object Not
 
 | Dashboard | Shows | Variables |
 |---|---|---|
-| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, garbage collection, warnings and errors | service, rate window |
+| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; the Ledger gRPC row (below); limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, garbage collection, warnings and errors | service, rate window |
 | Money | deposits by currency and outcome; quotes by pair, refusals by reason and rule; rate-feed calls; conversion requests by pair and outcome; settled outcomes; ledger postings; overdue PENDING; sweeper actions; p95 of each business step | currency, pair, outcome, rate window |
 | Traces | a trace by ID (in a collapsed row: a trace panel with no ID is an error), merchant requests, traces with an error or a 5xx, slow merchant requests, business spans with their attributes, the service map, span rates | service, trace ID, min duration, rate window |
 | Logs | lines per service and level, the lines, warnings and errors | service, level, search, trace ID |
@@ -43,6 +43,21 @@ differs from what the script writes, so a hand edit to the JavaScript Object Not
 
 Money is its own dashboard because currency, pair and outcome filter only the business panels; on Fleet
 Overview they would be three controls that do nothing to twenty panels.
+
+**The Ledger gRPC row** (Fleet Overview, collapsed: "Ledger gRPC (conversion-svc to ledger-svc): calls,
+errors, breakers, dead letters") shows conversion-svc's client side of the gRPC seam. Every panel counts
+attempts, so one exhausted `Post` is three `UNAVAILABLE` calls:
+
+| Panel | Shows | Source |
+|---|---|---|
+| Calls by method and status | attempts per second by `rpc_method` and `grpc_status_code` | `grpc_client_milliseconds_count{net_peer_name="ledger-svc"}` |
+| Error ratio by method | share of attempts per method not `OK` | same |
+| Latency p95 and mean by method | p95 from the `grpc.client` histogram buckets, mean beside it | `grpc_client_milliseconds_{bucket,sum,count}` |
+| Circuit breakers | each ledger breaker's state (CLOSED, OPEN, HALF_OPEN), the worst across conversion-svc JVMs | `resilience4j_circuitbreaker_state{name=~"ledger.*"}` |
+| Dead letters | dead letters per `op` and `reason` over 5 min, and those Kafka did not take ("not published") | the two dead-letter counters below |
+
+Empty is the healthy state for the dead-letter panel. The Alerts board has one rule-input panel for
+each of the three new rules.
 
 How the boards connect:
 
@@ -64,9 +79,11 @@ How the boards connect:
 
 One merchant request is one trace: the gateway's request span, its `rate limit` span, its call to the
 service, the service's request span and business span, and the calls to the rate feed and to
-ledger-svc with the ledger's own spans. conversion-svc's two `RestClient`s carry the
-`ObservationRegistry`; before that, the rate feed and the ledger each began a new trace
-(`tracing.feature` proves the `traceparent` reaches both). Sampling is 100%.
+ledger-svc with the ledger's own spans. conversion-svc's rate `RestClient` carries the
+`ObservationRegistry`, and Spring gRPC's observation interceptors on both ends of the gRPC Remote
+Procedure Call (gRPC) channel carry the trace from conversion-svc into ledger-svc; without them the
+rate feed and the ledger each began a new trace (`tracing.feature` proves the trace reaches both).
+Sampling is 100%.
 
 | Span | Service | Attributes (bounded; never a merchant, an id or an amount) |
 |---|---|---|
@@ -96,11 +113,13 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 | `ezeebit_ledger_deposits_total` | counter | `currency` (`unknown` when refused for it), `outcome` posted, replayed, refused; `code` | ledger `DepositService`, once per answer |
 | `ezeebit_ledger_conversion_postings_total` | counter | `outcome` posted, replayed, voided, refused; `code` | ledger `ConversionPostingResponder`, once per answer; a replayed refusal counts again |
 | `ezeebit_conversion_quotes_total` | counter | `pair`, `outcome` issued, refused; `reason`; `detail` (the rate rule for `RATE_REJECTED`) | `QuoteService`. Not counted: a quote that passes every check and then fails to save, which surfaces as a 500 |
-| `ezeebit_conversion_rate_calls_milliseconds_{bucket,count,sum}` | timer, 25 ms to 5 s | `outcome` answered, unavailable, unreadable | `RateClient`, around the HTTP call |
+| `ezeebit_conversion_rate_calls_milliseconds_{bucket,count,sum}` | timer, 25 ms to 5 s | `outcome` answered, unavailable, unreadable | `RateClient`, around one fetch including its retry, so one outcome per fetch |
 | `ezeebit_conversion_outcomes_total` | counter | `status` COMPLETED, REJECTED; `reason` | once per conversion across replicas: only the call whose compare-and-set moved the row counts it, after that update committed |
 | `ezeebit_conversion_left_pending_total` | counter | none | when a conversion's first ledger answer left it PENDING |
 | `ezeebit_conversion_sweeps_total` | counter | `action` completed, voided, refused, unresolved | `PendingResolver`, once per claimed row, after the sweep's transaction commits |
 | `ezeebit_conversion_pending_overdue` | gauge | none | `PendingOverdueGauge`: `count(*)` of PENDING rows past deadline plus max transaction time |
+| `ezeebit_conversion_ledger_deadletter_total` | counter | `op` POST, FIND, VOID; `reason` RETRIES_EXHAUSTED, CIRCUIT_OPEN | `KafkaDeadLetterPublisher`, once per dead letter, counted before the send, so it counts whether or not Kafka takes it. Born with the first dead letter |
+| `ezeebit_conversion_ledger_deadletter_publish_failed_total` | counter | `op` | `KafkaDeadLetterPublisher`, when Kafka did not take a dead letter (the record is then only in the log) |
 | `ezeebit_gateway_ratelimit_total` | counter | `outcome` allowed, limited, contention, unavailable, refused_path | gateway `RateLimitFilter`, once per merchant request or refused path; every outcome registered at zero on start |
 | `ezeebit_gateway_ratelimit_store_up` | gauge | none | gateway `StorePingScheduler`: 1 while Redis answers PING within 250 ms, else 0, every 10 s. One view per replica: read with `min()` |
 
@@ -113,7 +132,11 @@ latency service level objective (SLO)) and `http_client_requests_milliseconds_*`
 name (`ezeebit_deposit`, `ezeebit_ledger_posting`, `ezeebit_quote`, `ezeebit_conversion_accept`,
 `ezeebit_ratelimit_decision`, `ezeebit_sweep`, all `_milliseconds_*`) with the span's bounded tags. ledger-svc
 and conversion-svc export Hikari's `hikaricp_connections_{active,idle,pending,max,timeout_total}` and
-acquire time per JVM.
+acquire time per JVM. conversion-svc also exports the gRPC client timer
+`grpc_client_milliseconds_*` (per `rpc_method` and `grpc_status_code`, with histogram buckets),
+Resilience4j's `resilience4j_circuitbreaker_state`, and the Kafka producer's metrics
+(`kafka_producer_connection_count` feeds KafkaAbsent). All three were read live on 2026-10-14, by the
+panels in the outage screenshots.
 
 **Levels are read from the database, never from heap state.** A counter is a flow: each replica
 counts its own requests and dashboards `sum()` them. A per-replica copy of "how many conversions are
@@ -138,16 +161,28 @@ every rule carries a `runbook` annotation.
 | RateLimiterStoreDown (critical) | `(1 - min(last_over_time(ezeebit_gateway_ratelimit_store_up[30s]))) or absent_over_time(ezeebit_gateway_ratelimit_store_up[30s])`: a gateway cannot PING Redis, or no gateway has reported for 30 s | after 1 min; needs no traffic |
 | LatencySLOBurn | SLO: 99% of business requests within 500 ms. The slow share (against the exact `le="500.0"` bucket) burns the 1% budget more than 14.4 times too fast over both 5 min and 1 h, while the service sees more than 3 requests a minute | after 2 min; one alert per service |
 | DbPoolSaturated | a thread waited for a Hikari connection in each of the last 30 s windows (`max_over_time(hikaricp_connections_pending[30s]) > 0`) | after 1 min; one alert per JVM |
-| LedgerInvariantBroken (critical) | the ledger refused its own posting as `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` (both map to 500: a code defect, never bad input) in the last 5 min, counted with the same born-in-window arm as RateFeedRefusing | at once; one alert per code |
+| LedgerInvariantBroken (critical) | the ledger refused its own posting as `CURRENCY_MISMATCH` or `UNBALANCED_POSTING` (both map to 500 on HTTP and `INTERNAL` on gRPC: a code defect, never bad input) in the last 5 min, counted with the same born-in-window arm as RateFeedRefusing | at once; one alert per code |
+| ConversionLedgerDeadLettered (warning) | any dead letter in the last 5 min, per `op` and `reason`, counted with the born-in-window arm (the counter is born with the first dead letter, which `increase()` cannot see) | at once (`for: 0s`); one alert per op and reason |
+| DeadLetterPublishFailing (critical) | any increase of `ezeebit_conversion_ledger_deadletter_publish_failed_total` in the last 5 min, same arm: a dead letter exists only in conversion-svc's log | at once; one alert per op |
+| KafkaAbsent (critical) | `max by (job) (last_over_time(kafka_producer_connection_count{job="conversion-svc"}[30s])) == bool 0`: conversion-svc's producer has no broker connection | after 60 s |
 
-No data is OK for all nine, by design: no refusal series means no refusals, and a service that exports
+**KafkaAbsent's blind spot.** Spring creates the Kafka producer at the first dead letter, so until
+conversion-svc has dead-lettered once since it started there is no producer series and the rule has
+nothing to read. An `absent_over_time()` arm would page every healthy fleet, so there is none. A broker
+that is down before the first dead letter pages nothing; the `kafka` row of `./fleet.sh status` is the
+check then, and the first dead letter that cannot be sent pages DeadLetterPublishFailing.
+
+No data is OK for all twelve, by design: no refusal series means no refusals, and a service that exports
 nothing is ServiceDown's to page, so one silent service never pages twice. An evaluation error is
 Error, never OK.
 
 **The rules are unit-tested.** `docker/lgtm/test-rules.sh` runs `promtool test rules` from the pinned
 lgtm image over `alerting/promtool/rules.yml`, the generated Prometheus-format mirror of the Grafana rules
 (same expressions, thresholds and holds; Grafana's `noDataState` is not mirrored). The cases are in
-`alerting/promtool/tests.yml`. Red-proof: rewriting LedgerInvariantBroken as `sum(increase(X[5m]))` fails
+`alerting/promtool/tests.yml` and cover 8 of the 12 rules: ServiceDown, RateFeedRefusing,
+LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken, ConversionLedgerDeadLettered,
+DeadLetterPublishFailing and KafkaAbsent (its 60 s hold is evaluated inside a broker blip and after
+it). Red-proof: rewriting LedgerInvariantBroken as `sum(increase(X[5m]))` fails
 both of its cases, because `increase()` cannot see a counter born inside the window
 (`docs/observability/verification/2026-10-13-promtool-red.log`).
 
@@ -229,7 +264,36 @@ Normal throughout, because nothing was refused:
 | restored (Redis started, gateway restarted) | t+74s | about t+100s |
 | Normal | t+95s | 29 s after the restart |
 
-What these rehearsals do not prove: alerts reach one Slack channel, not an on-call rota. The three rules
+**Ledger outage over gRPC, Slack live (2026-10-14).** ledger-svc killed with `kill -9`, then five
+fresh merchants each quoted and converted 50.00 ZAR; restored with `./fleet.sh up`. The full run,
+every query and the chaos audit are in
+[2026-10-14-ledger-grpc-outage.md](observability/verification/2026-10-14-ledger-grpc-outage.md):
+
+| Event | Time |
+|---|---|
+| ledger-svc killed | t+0s |
+| 5 conversions answered 202 PENDING, 0.62 s to 0.97 s each; 5 `POST` dead letters written | t+1s to t+4s |
+| ConversionLedgerDeadLettered `{op=POST, reason=RETRIES_EXHAUSTED}` Alerting (`for: 0s`) | t+16s |
+| Slack page delivered (`grafana_alerting_notifications_total{integration="slack"}` 0 to 1) | t+27s |
+| ServiceDown `{job=ledger-svc}` Pending | t+35s |
+| Sweeper's first `FIND` dead letter | t+78s |
+| ServiceDown Alerting | t+95s |
+| `FIND` breaker open (`reason=CIRCUIT_OPEN` Alerting) | t+167s |
+| `./fleet.sh up` started (bounced once) | t+257s |
+| Sweeper voided all 5 on both sides | t+350s |
+| `up` exit 0, 16 of 16 checks; PENDING count 0 | t+361s, t+369s |
+
+The audit after it was clean: 0 PENDING, 41 conversion journals over 41 distinct conversion ids, each
+of the 28 COMPLETED conversions with exactly one POSTED journal, and the books balanced. The dead-letter
+topic held 60 records matching the counter. That run found that `fleet.sh down` deleted the topic
+(the broker had no volume); the `kafkadata` volume has fixed it since, and records now survive `down`
+and a bounce until `purge`. The rehearsal also showed that the bounce wipes Grafana's alert state: the
+outage page never got its all-clear, and the rules re-fired once after recovery from the persisted
+metrics (a second page, cleared at t+589s).
+
+What these rehearsals do not prove: alerts reach one Slack channel, not an on-call rota. DeadLetterPublishFailing
+and KafkaAbsent are proven by promtool and by `KafkaDeadLetterPublisherIT` (a broker stopped under a
+live producer), not by a rehearsed outage. The three rules
 added on 2026-10-13 (LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken) are proven by promtool, not
 by a rehearsed outage.
 

@@ -22,6 +22,11 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]gateway[\\/]api[\\/]filter[\\/]RateLimitFilter\.java$"/>
 	</module>
+	<!-- An exception escaping a gRPC name resolver panics the channel until restart; it must become an UNAVAILABLE status. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]outbound[\\/]discovery[\\/]DiscoveryNameResolver\.java$"/>
+	</module>
 
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">

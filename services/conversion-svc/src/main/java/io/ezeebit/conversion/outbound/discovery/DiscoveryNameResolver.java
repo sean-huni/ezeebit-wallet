@@ -17,6 +17,8 @@ final class DiscoveryNameResolver extends NameResolver {
 
 	private static final String GRPC_PORT = "grpcPort";
 
+	private static final int MAX_PORT = 65_535;
+
 	private final DiscoveryClient discovery;
 	private final String service;
 	private final Args args;
@@ -53,20 +55,37 @@ final class DiscoveryNameResolver extends NameResolver {
 		if (listener == null) {
 			return;
 		}
-		List<EquivalentAddressGroup> addresses = discovery.getInstances(service).stream()
-				.flatMap(i -> address(i).stream()).toList();
-		StatusOr<List<EquivalentAddressGroup>> result = addresses.isEmpty()
-				? StatusOr.fromStatus(
-						Status.UNAVAILABLE.withDescription("no %s instance with a grpcPort".formatted(service)))
-				: StatusOr.fromValue(addresses);
+		StatusOr<List<EquivalentAddressGroup>> result;
+		try {
+			List<EquivalentAddressGroup> addresses = discovery.getInstances(service).stream()
+					.flatMap(i -> address(i).stream()).toList();
+			result = addresses.isEmpty()
+					? StatusOr.fromStatus(
+							Status.UNAVAILABLE.withDescription("no %s instance with a grpcPort".formatted(service)))
+					: StatusOr.fromValue(addresses);
+		}
+		// An exception escaping the synchronization context panics the channel for good; an error status is retried.
+		catch (RuntimeException e) {
+			result = StatusOr.fromStatus(Status.UNAVAILABLE
+					.withDescription("registry lookup for %s failed".formatted(service)).withCause(e));
+		}
 		// onResult2 is the synchronization-context form; start and refresh both run there.
 		listener.onResult2(ResolutionResult.newBuilder().setAddressesOrError(result).build());
 	}
 
 	private static Optional<EquivalentAddressGroup> address(final ServiceInstance instance) {
 		Map<String, String> metadata = instance.getMetadata();
-		return Optional.ofNullable(metadata).map(m -> m.get(GRPC_PORT)).map(port -> new EquivalentAddressGroup(
-				new InetSocketAddress(instance.getHost(), Integer.parseInt(port))));
+		return Optional.ofNullable(metadata).map(m -> m.get(GRPC_PORT)).flatMap(DiscoveryNameResolver::port)
+				.map(port -> new EquivalentAddressGroup(new InetSocketAddress(instance.getHost(), port)));
+	}
+
+	private static Optional<Integer> port(final String grpcPort) {
+		try {
+			return Optional.of(Integer.parseInt(grpcPort)).filter(p -> p > 0 && p <= MAX_PORT);
+		}
+		catch (NumberFormatException e) {
+			return Optional.empty();
+		}
 	}
 
 }

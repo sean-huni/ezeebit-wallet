@@ -509,12 +509,16 @@ BREAKER = 'resilience4j_circuitbreaker_state{job="conversion-svc", name=~"ledger
 BREAKER_CODES = {"closed": 0, "half_open": 1, "open": 2, "forced_open": 3, "disabled": 4, "metrics_only": 5}
 
 
+def breaker_in(state):
+    return BREAKER.replace("}", f', state="{state}"}}')
+
+
 def ledger_grpc_panels():
     """conversion-svc's client side of the gRPC seam: every attempt, so one exhausted Post is three UNAVAILABLE calls."""
     by_method = "sum by (rpc_method) (rate({0}{1}))"
     calls, failed = GRPC_CALLS, GRPC_CALLS.replace("}", ', grpc_status_code!="OK"}')
-    state = " or ".join(f'last_over_time({BREAKER.replace("}", f', state="{st}"}}')}[30s]) * {code}'
-                        for st, code in BREAKER_CODES.items())
+    # Gradle may run macOS /usr/bin/python3 (3.9): an f-string must not reuse its own quotes (PEP 701 is 3.12+).
+    state = " or ".join(f"last_over_time({breaker_in(st)}[30s]) * {code}" for st, code in BREAKER_CODES.items())
     colours = {"closed": "green", "half_open": "orange", "open": "red", "forced_open": "red", "disabled": "blue",
                "metrics_only": "blue"}
     return [

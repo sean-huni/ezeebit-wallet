@@ -12,7 +12,7 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 | `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
 
 ```sh
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.1.0, one per service, Paketo only
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.2.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
@@ -86,7 +86,7 @@ Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) fil
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.1.0 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.2.0 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

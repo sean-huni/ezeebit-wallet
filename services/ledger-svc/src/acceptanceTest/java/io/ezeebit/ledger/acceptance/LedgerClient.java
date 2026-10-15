@@ -25,24 +25,26 @@ public class LedgerClient {
 		if (idempotencyKey != null) {
 			request = request.header("Idempotency-Key", idempotencyKey);
 		}
-		return reply(request.body(body).retrieve().toEntity(String.class));
+		return reply("POST", "/internal/v1/deposits", request.body(body).retrieve().toEntity(String.class));
 	}
 
 	public Reply post(final String path, final String body) {
-		return reply(client().post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
+		return reply("POST", path, client().post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
 				.toEntity(String.class));
 	}
 
 	// The path is sent exactly as given: callers percent-encode, so %2B stays a plus and never becomes a space.
 	public Reply get(final String path) {
 		URI uri = URI.create("http://127.0.0.1:%s%s".formatted(port(), path));
-		return reply(client().get().uri(uri).retrieve().toEntity(String.class));
+		return reply("GET", path, client().get().uri(uri).retrieve().toEntity(String.class));
 	}
 
 	private synchronized RestClient client() {
 		if (client == null) {
+			// Every call arrives as if through the gateway; GatewayProofIT covers the calls that do not.
 			client = RestClient.builder()
 					.baseUrl("http://127.0.0.1:%s".formatted(port()))
+					.defaultHeader("X-Ezeebit-Gateway", environment.getRequiredProperty("ezeebit.gateway.shared-secret"))
 					.defaultStatusHandler(HttpStatusCode::isError, (request, response) -> { })
 					.build();
 		}
@@ -53,8 +55,10 @@ public class LedgerClient {
 		return environment.getRequiredProperty("local.server.port");
 	}
 
-	private static Reply reply(final ResponseEntity<String> entity) {
-		return new Reply(entity.getStatusCode().value(), entity.getBody() == null ? "" : entity.getBody());
+	private static Reply reply(final String method, final String path, final ResponseEntity<String> entity) {
+		Reply reply = new Reply(entity.getStatusCode().value(), entity.getBody() == null ? "" : entity.getBody());
+		SpecCoverage.record(method, path, reply);
+		return reply;
 	}
 
 }

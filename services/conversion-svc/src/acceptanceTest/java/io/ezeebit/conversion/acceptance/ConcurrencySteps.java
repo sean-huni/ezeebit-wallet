@@ -24,7 +24,7 @@ public class ConcurrencySteps {
 			final String second) {
 		UUID id = state.merchant(merchant);
 		for (int i = 0; i < count; i++) {
-			Reply quote = http.conversion("POST", "/api/v1/merchants/%s/quotes".formatted(id), null, """
+			Reply quote = http.conversion("POST", "/v1/merchants/%s/quotes".formatted(id), null, """
 					{"sell":"%s","buy":"%s","sellAmount":"%s"}""".formatted(sell, i % 2 == 0 ? first : second, amount));
 			assertThat(quote.status()).as(quote.body()).isEqualTo(201);
 			state.quoted("batch-%02d".formatted(i), quote);
@@ -76,7 +76,7 @@ public class ConcurrencySteps {
 	}
 
 	private Reply accept(final UUID merchantId, final String quoteId, final String key) {
-		return http.conversion("POST", "/api/v1/merchants/%s/conversions".formatted(merchantId), key,
+		return http.conversion("POST", "/v1/merchants/%s/conversions".formatted(merchantId), key,
 				"{\"quoteId\":\"%s\"}".formatted(quoteId));
 	}
 

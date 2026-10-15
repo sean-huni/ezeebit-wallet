@@ -20,3 +20,6 @@ out/
 
 ### Fleet run state (pids, logs) ###
 .fleet/
+
+# Subagent-driven-development scratch (ledger, briefs, reports)
+.superpowers/

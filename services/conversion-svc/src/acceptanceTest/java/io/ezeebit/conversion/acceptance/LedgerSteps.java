@@ -1,32 +1,44 @@
 package io.ezeebit.conversion.acceptance;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import com.google.protobuf.Any;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.ErrorInfo;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import io.ezeebit.contracts.ledger.v1.ConversionPostingsGrpc;
+import io.ezeebit.contracts.ledger.v1.PostingRequest;
+import io.ezeebit.conversion.acceptance.LedgerFaultProxy.Fault;
 import io.ezeebit.conversion.scheduler.PendingConversionSweeper;
+import io.grpc.Grpc;
+import io.grpc.InsecureChannelCredentials;
+import io.grpc.ManagedChannel;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 // Faults are injected between conversion-svc and the ledger; the ledger itself is never altered.
 public class LedgerSteps {
 
-	private static final String POSTINGS = "/internal/v1/conversion-postings";
-	private static final int FAULT = 1;
-	// Longer than the 2 s ledger read timeout these tests run conversion-svc with.
-	private static final int TOO_SLOW_MILLIS = 3_500;
+	// Longer than conversion-svc's 2 s deadline on each ledger call.
+	private static final Duration TOO_SLOW = Duration.ofSeconds(3);
+	// The ledger's own reason-to-status table (ledger-svc api/advice/ErrorStatus) for the refusals a Post can meet.
+	private static final Map<String, Integer> HTTP_STATUS = Map.of("CONVERSION_VOIDED", 409, "POSTING_DEADLINE_PASSED",
+			409, "CONVERSION_ALREADY_POSTED", 409, "IDEMPOTENCY_KEY_REUSED", 422, "INSUFFICIENT_FUNDS", 422,
+			"BALANCE_LIMIT_EXCEEDED", 422);
+	// The step text keeps the ledger's HTTP-era numbers; over gRPC the reason decides the status.
+	private static final Map<String, Status.Code> GRPC_CODE = Map.of("AMOUNT_TOO_LARGE", Status.Code.INVALID_ARGUMENT,
+			"IDEMPOTENCY_KEY_REUSED", Status.Code.FAILED_PRECONDITION);
 	// The first request has reached the ledger and been answered there; its reply is still delayed.
 	private static final long RACE_HEAD_START_MILLIS = 250;
 
@@ -45,31 +57,25 @@ public class LedgerSteps {
 
 	@Given("the ledger does not answer in time")
 	public void neverReaches() {
-		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT)
-				.willReturn(aResponse().withStatus(504).withFixedDelay(TOO_SLOW_MILLIS)));
+		proxy().post(Fault.unanswered(TOO_SLOW));
 	}
 
-	// The proxy forwards first and delays its reply after: the posting commits, the answer arrives too late.
 	@Given("the ledger posts conversions but its answers are lost")
 	public void answerLost() {
-		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT)
-				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(TOO_SLOW_MILLIS)));
+		proxy().post(Fault.answeredLate(TOO_SLOW));
 	}
 
+	// Each posting reaches the ledger at once; only its answer waits, so the race below sees the ledger's first verdict.
 	@Given("the ledger's first answer takes {int} ms and its second {int} ms")
 	public void answersInTurn(final int first, final int second) {
-		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).inScenario("turns").whenScenarioStateIs(STARTED)
-				.willSetStateTo("second")
-				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(first)));
-		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).inScenario("turns").whenScenarioStateIs("second")
-				.willReturn(aResponse().proxiedFrom(Externals.get().ledgerUrl()).withFixedDelay(second)));
+		proxy().posts(Fault.answeredLate(Duration.ofMillis(first)), Fault.answeredLate(Duration.ofMillis(second)));
 	}
 
 	@Given("the ledger refuses every posting with {int} {word}")
 	public void refusesEvery(final int status, final String code) {
-		proxy().stubFor(post(urlEqualTo(POSTINGS)).atPriority(FAULT).willReturn(aResponse().withStatus(status)
-				.withHeader("Content-Type", "application/problem+json")
-				.withBody("{\"status\":%d,\"code\":\"%s\"}".formatted(status, code))));
+		Status.Code grpc = GRPC_CODE.get(code);
+		assertThat(grpc).as("no gRPC status mapped for %s", code).isNotNull();
+		proxy().post(Fault.refuse(grpc, code));
 	}
 
 	@When("{string} accepts quote {string} with key {string}, and while that answer is on its way"
@@ -77,7 +83,7 @@ public class LedgerSteps {
 	public void raceWithDeposit(final String merchant, final String quote, final String key, final String amount,
 			final String currency, final String sameMerchant) {
 		UUID merchantId = state.merchant(merchant);
-		String path = "/api/v1/merchants/%s/conversions".formatted(merchantId);
+		String path = "/v1/merchants/%s/conversions".formatted(merchantId);
 		String body = "{\"quoteId\":\"%s\"}".formatted(state.quoteId(quote));
 		String deposit = """
 				{"merchantId":"%s","currency":"%s","amount":"%s","reference":"late"}""".formatted(merchantId, currency, amount);
@@ -108,7 +114,7 @@ public class LedgerSteps {
 	@Then("the conversion and the ledger agree")
 	public void conversionAndLedgerAgree() {
 		String conversionId = state.conversion();
-		Reply conversion = http.conversion("GET", "/api/v1/merchants/%s/conversions/%s"
+		Reply conversion = http.conversion("GET", "/v1/merchants/%s/conversions/%s"
 				.formatted(state.merchantOf(conversionId), conversionId), null, null);
 		List<String> ledger = Externals.get().ledgerDb().sql("""
 				SELECT status FROM journal WHERE type = 'CONVERSION' AND idempotency_key = :id""")
@@ -119,8 +125,7 @@ public class LedgerSteps {
 
 	@Given("the ledger answers normally again")
 	public void healthy() {
-		proxy().getStubMappings().stream().filter(stub -> Integer.valueOf(FAULT).equals(stub.getPriority()))
-				.toList().forEach(proxy()::removeStub);
+		proxy().clearFaults();
 	}
 
 	@Given("{string} has {int} PENDING conversions of {string} {word} for {word}")
@@ -128,9 +133,9 @@ public class LedgerSteps {
 			final String buy) {
 		UUID id = state.merchant(merchant);
 		for (int i = 0; i < count; i++) {
-			Reply quote = http.conversion("POST", "/api/v1/merchants/%s/quotes".formatted(id), null, """
+			Reply quote = http.conversion("POST", "/v1/merchants/%s/quotes".formatted(id), null, """
 					{"sell":"%s","buy":"%s","sellAmount":"%s"}""".formatted(sell, buy, amount));
-			Reply accepted = http.conversion("POST", "/api/v1/merchants/%s/conversions".formatted(id), "pending-" + i,
+			Reply accepted = http.conversion("POST", "/v1/merchants/%s/conversions".formatted(id), "pending-" + i,
 					"{\"quoteId\":\"%s\"}".formatted(quote.<String>read("$.data.quoteId")));
 			assertThat(accepted.status()).as(accepted.body()).isEqualTo(202);
 			state.converted(accepted.read("$.data.conversionId"), id);
@@ -162,10 +167,23 @@ public class LedgerSteps {
 
 	@When("the lost posting finally reaches the ledger")
 	public void latePosting() {
-		String conversionId = state.conversion();
-		String body = proxy().findAll(postRequestedFor(urlEqualTo(POSTINGS))).stream()
-				.map(LoggedRequest::getBodyAsString).filter(sent -> sent.contains(conversionId)).findFirst().orElseThrow();
-		state.record(http.ledger("POST", POSTINGS, null, body));
+		PostingRequest sent = proxy().posting(state.conversion()).orElseThrow();
+		ManagedChannel ledger = Grpc.newChannelBuilderForAddress("127.0.0.1", Externals.get().ledgerGrpcPort(),
+				InsecureChannelCredentials.create()).build();
+		try {
+			ConversionPostingsGrpc.newBlockingStub(ledger).post(sent);
+			state.record(new Reply(201, "{}", 0));
+		}
+		catch (StatusRuntimeException refused) {
+			String reason = StatusProto.fromThrowable(refused).getDetailsList().stream()
+					.filter(detail -> detail.is(ErrorInfo.class)).map(LedgerSteps::reason).findFirst().orElseThrow();
+			Integer status = HTTP_STATUS.get(reason);
+			assertThat(status).as("no HTTP status mapped for %s", reason).isNotNull();
+			state.record(new Reply(status, "{\"status\":%d,\"code\":\"%s\"}".formatted(status, reason), 0));
+		}
+		finally {
+			ledger.shutdownNow();
+		}
 	}
 
 	@Then("the ledger holds exactly {int} conversion(s) for {string}")
@@ -175,15 +193,16 @@ public class LedgerSteps {
 				.param("merchant", state.merchant(merchant)).query(Integer.class).single()).isEqualTo(count);
 	}
 
-	@Then("the ledger was sent {int} posting(s)")
-	public void postingsSent(final int count) {
-		assertThat(proxy().findAll(postRequestedFor(urlEqualTo(POSTINGS)))).hasSize(count);
+	// Counts Post calls since the ledger answered normally again: retries of the first accept all came before it.
+	@Then("the ledger was not asked to post again")
+	public void notPostedAgain() {
+		assertThat(proxy().postsSinceClear()).as("Post calls after the ledger answered normally again").isZero();
 	}
 
 	@Then("the ledger was asked to void each of them exactly once")
 	public void voidedOnce() {
-		assertThat(state.conversions()).isNotEmpty().allSatisfy(id -> assertThat(proxy()
-				.findAll(postRequestedFor(urlEqualTo("%s/%s/void".formatted(POSTINGS, id))))).as(id).hasSize(1));
+		assertThat(state.conversions()).isNotEmpty()
+				.allSatisfy(id -> assertThat(proxy().calls("Void", id)).as(id).isEqualTo(1));
 	}
 
 	@Then("the ledger's books balance")
@@ -216,7 +235,16 @@ public class LedgerSteps {
 		}
 	}
 
-	private static WireMockServer proxy() {
+	private static String reason(final Any detail) {
+		try {
+			return detail.unpack(ErrorInfo.class).getReason();
+		}
+		catch (InvalidProtocolBufferException ex) {
+			throw new IllegalStateException(ex);
+		}
+	}
+
+	private static LedgerFaultProxy proxy() {
 		return Externals.get().ledgerProxy();
 	}
 

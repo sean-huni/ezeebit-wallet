@@ -24,6 +24,11 @@ public class CucumberSpringConfig {
 			return new LedgerClient(environment);
 		}
 
+		@Bean(destroyMethod = "close")
+		LedgerRpc ledgerRpc(final Environment environment) {
+			return new LedgerRpc(environment);
+		}
+
 		@Bean
 		@ScenarioScope
 		ScenarioState scenarioState() {

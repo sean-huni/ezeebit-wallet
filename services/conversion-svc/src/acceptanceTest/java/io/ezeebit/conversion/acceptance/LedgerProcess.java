@@ -14,7 +14,7 @@ import java.util.List;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-// The real ledger-svc jar in its own JVM with its own database: conversion-svc reaches it only over HTTP.
+// The real ledger-svc jar in its own JVM with its own database: conversion-svc reaches it over gRPC, the steps over HTTP.
 final class LedgerProcess {
 
 	private static final Duration BOOT_LIMIT = Duration.ofSeconds(90);
@@ -23,18 +23,23 @@ final class LedgerProcess {
 			.withDatabaseName("ledger");
 	private Process process;
 	private int port;
+	private int grpcPort;
 
 	void start() throws IOException, InterruptedException {
 		database.start();
 		port = freePort();
+		grpcPort = freePort();
 		String jar = System.getProperty("ledger.jar");
 		String java = ProcessHandle.current().info().command().orElse("java");
 		ProcessBuilder builder = new ProcessBuilder(List.of(java, "-jar", jar,
-				"--server.port=" + port, "--server.address=127.0.0.1",
-				"--spring.datasource.url=" + database.getJdbcUrl(),
-				"--spring.datasource.username=" + database.getUsername(),
-				"--spring.datasource.password=" + database.getPassword(),
+				"--server.port=%d".formatted(port), "--server.address=127.0.0.1",
+				"--spring.grpc.server.port=%d".formatted(grpcPort), "--spring.grpc.server.address=127.0.0.1",
+				"--spring.datasource.url=%s".formatted(database.getJdbcUrl()),
+				"--spring.datasource.username=%s".formatted(database.getUsername()),
+				"--spring.datasource.password=%s".formatted(database.getPassword()),
 				"--spring.cloud.config.enabled=false", "--eureka.client.enabled=false",
+				// The gateway proof secret, from the file config-svc serves to every service.
+				"--spring.config.import=file:%s".formatted(System.getProperty("served.shared")),
 				"--management.otlp.metrics.export.enabled=false", "--management.tracing.export.otlp.enabled=false",
 				"--management.logging.export.otlp.enabled=false"))
 				.redirectErrorStream(true)
@@ -47,6 +52,10 @@ final class LedgerProcess {
 
 	String url() {
 		return "http://127.0.0.1:%d".formatted(port);
+	}
+
+	int grpcPort() {
+		return grpcPort;
 	}
 
 	PostgreSQLContainer database() {
@@ -69,7 +78,7 @@ final class LedgerProcess {
 						.formatted(process.exitValue()));
 			}
 			try {
-				HttpResponse<Void> health = client.send(HttpRequest.newBuilder(URI.create(url() + "/actuator/health"))
+				HttpResponse<Void> health = client.send(HttpRequest.newBuilder(URI.create("%s/actuator/health".formatted(url())))
 						.build(), HttpResponse.BodyHandlers.discarding());
 				if (health.statusCode() == 200) {
 					return;

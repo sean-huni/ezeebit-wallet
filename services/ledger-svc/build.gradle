@@ -1,9 +1,22 @@
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:${springdocVersion}"
 	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-liquibase'
 	implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 	implementation 'org.springframework.cloud:spring-cloud-starter-config'
+	implementation 'org.springframework.boot:spring-boot-starter-grpc-server'
 	runtimeOnly 'org.postgresql:postgresql'
+	testImplementation 'org.springframework.boot:spring-boot-grpc-test'
+	acceptanceTestImplementation 'org.springframework.boot:spring-boot-grpc-test'
+	acceptanceTestImplementation 'org.springframework.boot:spring-boot-starter-grpc-client'
+	// AutoConfigureTestGrpcTransport needs InProcessServerBuilder, which grpc-java ships apart from grpc-core.
+	acceptanceTestImplementation 'io.grpc:grpc-inprocess'
+}
+
+// Spring tests read the shared file config-svc serves, so the gateway secret has one home.
+def served = rootProject.file('services/config-svc/src/main/resources/served')
+tasks.withType(Test).configureEach {
+	systemProperty 'spring.config.import', "file:${served}/application.yml"
 }

@@ -1,0 +1,11 @@
+# First counts after a JVM restart, deposits panel on Money, 2026-10-13 (UTC). Each run: ./fleet.sh-equivalent restart of
+# the services, then one traffic.mjs run (4 posted, 4 replayed, 1 refused deposits), then the panel expression over Prometheus.
+# Run 1: instance id host:port, counted() with its growth, born and reset arms; range peaks over the last 4 minutes.
+range over the last 4 min, step 10s, peak of the summed panel: (value, series)
+  old rate()*60  : (0, 7)
+  three-arm      : (0, 7)
+# Every deposit series kept the value 1 across the restart (old process 1, new process 1), so neither growth, birth nor a
+# reset was visible: the panel was blank after real deposits. Run 2: instance id host:port:pid, same traffic.
+2026-10-13T13:53:25Z instance id now carries the pid; first traffic after the restart (4 posted, 4 replayed, 1 refused):
+  old rate()*60 peak : (0, 7)
+  counted() peak     : (9.0, 7)

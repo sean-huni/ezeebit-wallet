@@ -2,3 +2,8 @@
 # (@ServiceConnection); config server, registry and OTLP are switched off by the root build's
 # test-task convention, which every service's tests share.
 # The services bind loopback by default (server.address in their own application.yml), so tests inherit it.
+spring:
+  grpc:
+    server:
+      # A free port per context, as RANDOM_PORT gives HTTP: contexts in one run, or a local fleet, never share 9081.
+      port: 0

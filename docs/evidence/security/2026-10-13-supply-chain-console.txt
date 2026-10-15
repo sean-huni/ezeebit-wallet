@@ -1,0 +1,90 @@
+==============================================================================
+EZEEBIT SUPPLY CHAIN   trivy 0.74.0, gitleaks v8.30.1, pinned in security/scanners.lock
+==============================================================================
+
+STAGES REQUIRED BY THIS RUN  [secrets,sbom,images,config]
+  secrets  3/3 scanner(s) completed   4/4 report file(s) usable   OK
+  sbom     5/5 scanner(s) completed   5/5 report file(s) usable   OK
+  images   5/5 scanner(s) completed   11/11 report file(s) usable   OK
+  config   1/1 scanner(s) completed   2/2 report file(s) usable   OK
+
+SECRETS  [any finding fails; values are redacted and never printed]
+  gitleaks history : 0 finding(s)  [83 of 83 commits with changes, all refs, merges by first parent; 83 in all]
+  gitleaks tree    : 0 finding(s)  [432 files: tracked plus untracked, .gitignore honoured]
+  trivy secret     : 0 finding(s)  [the same 432 files, second instrument]
+
+IMAGES  [5 images, 15 layers carried by all 5; trivy DB updated 2026-10-13T01:09:18.36500669Z]
+  service          SERVICE  SHARED  distinct   gating
+  config-svc             0      47        47   0
+  conversion-svc         1      47        48   0
+  eureka-svc             0      47        47   0
+  gateway-svc            1      47        48   0
+  ledger-svc             1      47        48   0
+
+  SERVICE SCOPE, app layers and unattributed layers, ours to fix (1 distinct)
+    MEDIUM   CVE-2020-13956       org.apache.httpcomponents:httpclient 4.5.3 fix=4.5.13, 5.0.3  [3/5 images]
+
+  SHARED SCOPE, builder and run-image layers, fixed by moving those pins (47 distinct)
+    HIGH     CVE-2026-78667       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78667       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78669       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    HIGH     CVE-2026-78669       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78669       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-84782       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    HIGH     CVE-2026-84782       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    HIGH     CVE-2026-97031       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-97031       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-18374       libc6 2.39-0ubuntu8.9                    fix=NONE           [5/5 images]
+    MEDIUM   CVE-2026-56866       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-56866       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78663       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78663       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78663       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-85091       zlib1g 1:1.3.dfsg-3.1ubuntu2.2           fix=NONE           [5/5 images]
+    MEDIUM   CVE-2026-89092       libc6 2.39-0ubuntu8.9                    fix=NONE           [5/5 images]
+    MEDIUM   CVE-2026-94439       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94439       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94448       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94448       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97032       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97032       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-97032       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    LOW      CVE-2026-35189       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-35189       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-54872       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-54872       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-56857       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    LOW      CVE-2026-56857       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    LOW      CVE-2026-75805       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-75805       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-75806       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-75806       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-77696       openssl 3.0.13-0ubuntu3.15               fix=3.0.13-0ubuntu3.16 [5/5 images]
+    LOW      CVE-2026-77696       libssl3t64 3.0.13-0ubuntu3.15            fix=3.0.13-0ubuntu3.16 [5/5 images]
+    UNKNOWN  CVE-2026-78659       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    UNKNOWN  CVE-2026-78659       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-78659       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-78660       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-78660       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    UNKNOWN  CVE-2026-78660       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-94440       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-94440       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-97030       stdlib v1.26.7                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-97030       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  GO-2026-5932         golang.org/x/crypto v0.56.0              fix=NONE           [5/5 images]
+
+SBOM  [CycloneDX written by trivy from each image, build/supply-chain/sbom/]
+  config-svc        177 components  CycloneDX 1.7
+  conversion-svc    233 components  CycloneDX 1.7
+  eureka-svc        232 components  CycloneDX 1.7
+  gateway-svc       235 components  CycloneDX 1.7
+  ledger-svc        233 components  CycloneDX 1.7
+
+MISCONFIGURATION  [reported, NOT gating; its own universe, never add it to image totals]
+  17 file(s) staged (compose.yaml, docker/, Dockerfile*); trivy recognised 0 as a config format
+  failing checks: CRITICAL=0  HIGH=0  MEDIUM=0  LOW=0  UNKNOWN=0
+
+SUPPRESSIONS  security/trivy-ignore.yaml holds 0 vulnerability entries
+
+==============================================================================
+SUPPLY CHAIN GATE: PASSED  (no finding is HIGH or CRITICAL AND fixable AND in a SERVICE layer)

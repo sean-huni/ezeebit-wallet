@@ -28,6 +28,52 @@ services:
     volumes:
       - './docker/wiremock/mappings:/home/wiremock/mappings:ro'
 
+  redis:
+    # The gateway's rate-limit store, shared by every gateway replica. Pin and digest: gradle.properties redisImage,
+    # which Testcontainers runs too; RedisPinTest fails the build when the two differ.
+    image: 'redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0'
+    command: ['sh', '-c', 'exec redis-server --requirepass "$$REDIS_PASSWORD" --save "" --appendonly no']
+    environment:
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD:-redis-local}'
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      # The reply itself: redis-cli prints an auth error on stdout and still exits 0.
+      test: ['CMD-SHELL', '[ "$$(redis-cli --no-auth-warning -a "$$REDIS_PASSWORD" ping)" = PONG ]']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  kafka:
+    # Dead-letter records from conversion-svc. One KRaft broker, loopback only. Pin: gradle.properties kafkaImage (KafkaPinTest).
+    image: 'apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837'
+    environment:
+      - 'KAFKA_NODE_ID=1'
+      - 'KAFKA_PROCESS_ROLES=broker,controller'
+      - 'KAFKA_LISTENERS=PLAINTEXT://:9092,INTERNAL://:29092,CONTROLLER://:9093'
+      # Host clients are sent to the published port; in-container clients (the healthcheck) need a listener that
+      # advertises an address reachable inside the container, or a non-default KAFKA_PORT never turns healthy.
+      - 'KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${KAFKA_PORT:-9092},INTERNAL://localhost:29092'
+      - 'KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL'
+      - 'KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER'
+      - 'KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093'
+      - 'KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT'
+      - 'KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1'
+      - 'KAFKA_AUTO_CREATE_TOPICS_ENABLE=false'
+      # Unset, log.dirs falls back to /tmp/kafka-logs in the container layer and every bounce erases the dead letters.
+      # This image path is appuser-owned, so the named volume inherits a writable owner on first mount.
+      - 'KAFKA_LOG_DIRS=/var/lib/kafka/data'
+    ports:
+      - '127.0.0.1:${KAFKA_PORT:-9092}:9092'
+    volumes:
+      - 'kafkadata:/var/lib/kafka/data'
+    healthcheck:
+      # Healthy only once the dead-letter topic exists: creating it is idempotent, and a broker that cannot is not ready.
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --create --if-not-exists --topic ezeebit.conversion.ledger.deadletter --partitions 1 --replication-factor 1 --config retention.ms=604800000 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --describe --topic ezeebit.conversion.ledger.deadletter']
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
   lgtm:
     # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
     # Grafana runs with anonymous Admin access.
@@ -44,6 +90,7 @@ services:
       - './docker/lgtm:/ezeebit:ro'
       - './docker/lgtm/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml:ro'
       - './docker/lgtm/alerting/rules.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml:ro'
+      - './docker/lgtm/datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml:ro'
       - 'lgtmdata:/data'
     tmpfs:
       # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted
@@ -59,3 +106,4 @@ services:
 volumes:
   pgdata:
   lgtmdata:
+  kafkadata:

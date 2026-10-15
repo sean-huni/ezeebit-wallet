@@ -2,6 +2,11 @@
 <!-- One justification per entry; each names the classes it covers, so a new site of the pattern is still reported. -->
 <FindBugsFilter xmlns="https://github.com/spotbugs/filter/3.0.0">
 
+	<!-- protoc and grpc-java output from contracts/: regenerated on every build, so a finding there has no fix here. -->
+	<Match>
+		<Package name="~io\.ezeebit\.contracts\..*"/>
+	</Match>
+
 	<!-- An inventory detector (one per request mapping), not a weakness: it names no flaw and prescribes no fix. -->
 	<Match>
 		<Bug pattern="SPRING_ENDPOINT"/>
@@ -16,11 +21,15 @@
 			<Field type="io.ezeebit.ledger.data.repo.AccountRepo"/>
 			<Field type="io.ezeebit.ledger.data.repo.EntryRepo"/>
 			<Field type="io.ezeebit.ledger.data.repo.JournalRepo"/>
+			<Field type="io.ezeebit.ledger.service.conversion.ConversionLegWriter"/>
+			<Field type="io.ezeebit.ledger.service.posting.EntryWriter"/>
 			<Field type="io.ezeebit.conversion.data.repo.ConversionRepo"/>
 			<Field type="io.ezeebit.conversion.data.repo.QuoteRepo"/>
-			<Field type="io.ezeebit.conversion.service.ConversionSettler"/>
+			<Field type="io.ezeebit.conversion.service.conversion.ConversionSettler"/>
 			<Field type="io.micrometer.core.instrument.MeterRegistry"/>
+			<Field type="io.micrometer.observation.ObservationRegistry"/>
 			<Field type="org.springframework.web.client.RestClient"/>
+			<Field type="org.springframework.kafka.core.KafkaTemplate"/>
 			<Field type="org.springframework.transaction.support.TransactionTemplate"/>
 		</Or>
 	</Match>
@@ -36,8 +45,20 @@
 						returns="org.springframework.http.ProblemDetail"/>
 			</And>
 			<And>
-				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerClient"/>
-				<Method name="call" params="java.util.function.Supplier" returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
+				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient"/>
+				<Method name="call" params="io.ezeebit.conversion.outbound.ledger.Operation,java.util.UUID,java.util.UUID,com.google.protobuf.Message,io.ezeebit.conversion.outbound.ledger.LedgerGrpcClient$Attempt"
+						returns="io.ezeebit.conversion.domain.LedgerAnswer"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.ledger.LedgerGuard"/>
+				<Method name="record"/>
+			</And>
+			<And>
+				<Class name="io.ezeebit.conversion.outbound.deadletter.KafkaDeadLetterPublisher"/>
+				<Or>
+					<Method name="record"/>
+					<Method name="lost"/>
+				</Or>
 			</And>
 			<And>
 				<Class name="io.ezeebit.conversion.outbound.rates.RateClient"/>
@@ -46,11 +67,35 @@
 		</Or>
 	</Match>
 
+	<!-- Business outcome lines: every argument is an enum constant, a route operation literal, or a currency or pair the
+	     catalog admitted as ASCII [A-Z]{3,5}, so no caller text can carry a line break into them. -->
+	<Match>
+		<Bug pattern="CRLF_INJECTION_LOGS"/>
+		<Or>
+			<And><Class name="io.ezeebit.ledger.service.deposit.DepositService"/><Method name="post"/></And>
+			<And><Class name="io.ezeebit.ledger.service.conversion.answer.ConversionPostingResponder"/><Method name="answer"/></And>
+			<And><Class name="io.ezeebit.conversion.service.quote.QuoteService"/><Method name="issue"/></And>
+			<And><Class name="io.ezeebit.conversion.service.conversion.ConversionService"/><Method name="acceptAndTag"/></And>
+			<And><Class name="io.ezeebit.gateway.api.filter.RateLimitFilter"/><Method name="limit"/></And>
+		</Or>
+	</Match>
+
 	<!-- policy() only sees codes require() admitted as ASCII [A-Z]{3,5}; CurrencyCatalogTest proves the guard. -->
 	<Match>
 		<Bug pattern="IMPROPER_UNICODE"/>
 		<Class name="io.ezeebit.conversion.service.CurrencyCatalog"/>
 		<Method name="policy"/>
+	</Match>
+
+	<!-- The proof header is read only to compare it, in constant time, against the served secret; the value is never
+	     used as data. It is defence in depth by design (ARCHITECTURE.md section 3), which is what SERVLET_HEADER flags. -->
+	<Match>
+		<Bug pattern="SERVLET_HEADER"/>
+		<Or>
+			<Class name="io.ezeebit.ledger.api.filter.GatewayProofFilter"/>
+			<Class name="io.ezeebit.conversion.api.filter.GatewayProofFilter"/>
+		</Or>
+		<Method name="doFilterInternal"/>
 	</Match>
 
 </FindBugsFilter>

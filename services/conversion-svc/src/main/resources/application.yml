@@ -12,3 +12,8 @@ spring:
   messages:
     basename: i18n/messages
     fallback-to-system-locale: false
+springdoc:
+  # Sorted keys keep the committed snapshots in docs/openapi stable; responses come from api/doc, not the advice classes.
+  writer-with-order-by-keys: true
+  override-with-generic-response: false
+  default-produces-media-type: application/json

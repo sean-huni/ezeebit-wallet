@@ -1,0 +1,30 @@
+# 2026-10-13T13:12:54Z red-proof: LedgerInvariantBroken mutated to sum(increase(X[5m])), dropping the born-in-window arm
+      - alert: LedgerInvariantBroken
+        expr: |-
+          (
+            sum by (job, code) (
+              increase(ezeebit_ledger_deposits_total{outcome="refused", code=~"CURRENCY_MISMATCH|UNBALANCED_POSTING"}[5m])
+              or increase(ezeebit_ledger_conversion_postings_total{outcome="refused", code=~"CURRENCY_MISMATCH|UNBALANCED_POSTING"}[5m])
+            )
+  FAILED:
+    alertname: LedgerInvariantBroken, time: 2m30s, 
+        exp:[
+            0:
+              Labels:{alertname="LedgerInvariantBroken", code="UNBALANCED_POSTING", job="ledger-svc", severity="critical"}
+              Annotations:{}
+            ], 
+        got:[]
+    alertname: LedgerInvariantBroken, time: 3m30s, 
+        exp:[
+            0:
+              Labels:{alertname="LedgerInvariantBroken", code="CURRENCY_MISMATCH", job="ledger-svc", severity="critical"}
+              Annotations:{},
+            1:
+              Labels:{alertname="LedgerInvariantBroken", code="UNBALANCED_POSTING", job="ledger-svc", severity="critical"}
+              Annotations:{}
+            ], 
+        got:[]
+
+
+
+exit=1

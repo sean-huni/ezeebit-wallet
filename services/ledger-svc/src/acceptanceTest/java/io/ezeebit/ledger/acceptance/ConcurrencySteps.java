@@ -72,7 +72,7 @@ public class ConcurrencySteps {
 	@Then("{string} holds only the accepted deposit")
 	public void holdsOnlyTheAccepted(final String merchant) {
 		Reply accepted = state.replies().stream().filter(reply -> reply.status() == 201).findFirst().orElseThrow();
-		Reply balances = ledger.get("/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
+		Reply balances = ledger.get("/v1/merchants/%s/balances".formatted(state.merchant(merchant)));
 		assertThat(balances.<List<Map<String, String>>>read("$.data")).containsExactly(Map.of(
 				"currency", accepted.read("$.data.currency"), "balance", accepted.read("$.data.amount")));
 	}

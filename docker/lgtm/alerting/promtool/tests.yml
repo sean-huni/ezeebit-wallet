@@ -1,0 +1,171 @@
+# promtool unit tests over rules.yml, the generated mirror of the Grafana rules (same expressions).
+# Run: docker/lgtm/test-rules.sh. Each case states when the rule fires and with which labels.
+rule_files:
+  - rules.yml
+evaluation_interval: 10s
+
+tests:
+  # ServiceDown: one silent service is one alert naming it; the four exporting services raise nothing.
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="eureka-svc"}'
+        values: '30x30'
+      - series: 'jvm_threads_live{job="ledger-svc"}'
+        values: '30x30'
+      - series: 'jvm_threads_live{job="conversion-svc"}'
+        values: '30x30'
+      - series: 'jvm_threads_live{job="gateway-svc"}'
+        values: '30x30'
+      - series: 'jvm_threads_live{job="config-svc"}'
+        values: '30x6 _x24'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {alertname: ServiceDown, job: config-svc, severity: critical}
+
+  # LedgerInvariantBroken: the counter is born with the first break, so increase() would see nothing. It fires at
+  # once, per code; an ordinary refusal (INSUFFICIENT_FUNDS) on the same counter raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_ledger_conversion_postings_total{job="ledger-svc", outcome="refused", code="INSUFFICIENT_FUNDS"}'
+        values: '0+1x30'
+      - series: 'ezeebit_ledger_conversion_postings_total{job="ledger-svc", outcome="refused", code="UNBALANCED_POSTING"}'
+        values: '_x12 1x18'
+      - series: 'ezeebit_ledger_deposits_total{job="ledger-svc", currency="ZAR", outcome="refused", code="CURRENCY_MISMATCH"}'
+        values: '_x18 1x12'
+    alert_rule_test:
+      - eval_time: 1m50s
+        alertname: LedgerInvariantBroken
+        exp_alerts: []
+      - eval_time: 2m30s
+        alertname: LedgerInvariantBroken
+        exp_alerts:
+          - exp_labels: {alertname: LedgerInvariantBroken, job: ledger-svc, code: UNBALANCED_POSTING, severity: critical}
+      - eval_time: 3m30s
+        alertname: LedgerInvariantBroken
+        exp_alerts:
+          - exp_labels: {alertname: LedgerInvariantBroken, job: ledger-svc, code: UNBALANCED_POSTING, severity: critical}
+          - exp_labels: {alertname: LedgerInvariantBroken, job: ledger-svc, code: CURRENCY_MISMATCH, severity: critical}
+
+  # DbPoolSaturated: a waiter for under the hold does not page; one that stays for over a minute does, per JVM.
+  - interval: 10s
+    input_series:
+      - series: 'hikaricp_connections_pending{job="ledger-svc", instance="localhost:8081", pool="HikariPool-1"}'
+        values: '0x6 2x18 0x12'
+      - series: 'hikaricp_connections_pending{job="conversion-svc", instance="localhost:8082", pool="HikariPool-1"}'
+        values: '0x6 1x3 0x27'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: DbPoolSaturated
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: DbPoolSaturated
+        exp_alerts:
+          - exp_labels: {alertname: DbPoolSaturated, job: ledger-svc, instance: "localhost:8081", severity: warning}
+      - eval_time: 6m
+        alertname: DbPoolSaturated
+        exp_alerts: []
+
+  # LatencySLOBurn: conversion-svc answers half its requests over 500 ms for over an hour (burn 50x); ledger-svc
+  # answers 99.9% under it. Only conversion-svc pages, and only after both windows burn.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_requests_milliseconds_count{job="conversion-svc", uri="/quotes"}'
+        values: '0+60x80'
+      - series: 'http_server_requests_milliseconds_bucket{job="conversion-svc", uri="/quotes", le="500.0"}'
+        values: '0+30x80'
+      - series: 'http_server_requests_milliseconds_count{job="ledger-svc", uri="/deposits"}'
+        values: '0+1000x80'
+      - series: 'http_server_requests_milliseconds_bucket{job="ledger-svc", uri="/deposits", le="500.0"}'
+        values: '0+999x80'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: LatencySLOBurn
+        exp_alerts:
+          - exp_labels: {alertname: LatencySLOBurn, job: conversion-svc, severity: warning}
+
+  # RateFeedRefusing, ratio arm: about one refusal a minute, every quote the pair got, on a series born in the window.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_conversion_quotes_total{pair="USDT/ZAR", outcome="refused", reason="RATE_REJECTED", detail="RATE_STALE"}'
+        values: '_x6 1+0.16666667x30'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: RateFeedRefusing
+        exp_alerts: []
+      - eval_time: 3m20s
+        alertname: RateFeedRefusing
+        exp_alerts:
+          - exp_labels: {alertname: RateFeedRefusing, pair: USDT/ZAR, severity: warning}
+
+  # ConversionLedgerDeadLettered: the counter is born with the first dead letter, so increase() alone would see
+  # nothing. It fires at once, one alert per op and reason; a series older than the 5m window that stays flat
+  # raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="VOID", reason="RETRIES_EXHAUSTED"}'
+        values: '3x60'
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="POST", reason="RETRIES_EXHAUSTED"}'
+        values: '_x36 1x24'
+      - series: 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc", instance="localhost:8082:1", op="FIND", reason="CIRCUIT_OPEN"}'
+        values: '_x42 1x18'
+    alert_rule_test:
+      - eval_time: 5m50s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts: []
+      - eval_time: 6m30s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts:
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: POST, reason: RETRIES_EXHAUSTED, severity: warning}
+      - eval_time: 7m30s
+        alertname: ConversionLedgerDeadLettered
+        exp_alerts:
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: POST, reason: RETRIES_EXHAUSTED, severity: warning}
+          - exp_labels: {alertname: ConversionLedgerDeadLettered, op: FIND, reason: CIRCUIT_OPEN, severity: warning}
+
+  # DeadLetterPublishFailing: a dead letter Kafka did not take pages at once, per op; a flat series older than the
+  # window raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc", instance="localhost:8082:1", op="FIND"}'
+        values: '2x60'
+      - series: 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc", instance="localhost:8082:1", op="POST"}'
+        values: '_x36 1x24'
+    alert_rule_test:
+      - eval_time: 5m50s
+        alertname: DeadLetterPublishFailing
+        exp_alerts: []
+      - eval_time: 6m30s
+        alertname: DeadLetterPublishFailing
+        exp_alerts:
+          - exp_labels: {alertname: DeadLetterPublishFailing, op: POST, severity: critical}
+
+  # KafkaAbsent: the producer's connections drop to 0 for over the 60s hold and it pages; a 40s blip (70s to 100s)
+  # does not, checked at 1m40s inside the blip while pending; a conversion-svc with no producer series raises nothing.
+  - interval: 10s
+    input_series:
+      - series: 'kafka_producer_connection_count{job="conversion-svc", instance="localhost:8082:1", client_id="conversion-svc-producer-1"}'
+        values: '2x6 0x3 2x6 0x12 2x6'
+    alert_rule_test:
+      - eval_time: 1m40s
+        alertname: KafkaAbsent
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: KafkaAbsent
+        exp_alerts:
+          - exp_labels: {alertname: KafkaAbsent, job: conversion-svc, severity: critical}
+      - eval_time: 5m30s
+        alertname: KafkaAbsent
+        exp_alerts: []
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="conversion-svc"}'
+        values: '30x30'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: KafkaAbsent
+        exp_alerts: []

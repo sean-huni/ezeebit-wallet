@@ -9,10 +9,10 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 | Task | Runs in | Reads | Needs |
 |---|---|---|---|
 | `checkSecrets` | every `./gradlew build` (root `check`) | the git history and the working tree | Docker; no images |
-| `checkSupplyChain` | only when asked | secrets again, then the five images, their SBOMs and the compose and docker files | `bootBuildImageAll`, which it depends on |
+| `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
 
 ```sh
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.1.0, one per service, Paketo only
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.2.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
@@ -28,7 +28,7 @@ architecture.
 |---|---|---|
 | secrets | gitleaks `git --log-opts="--all --diff-merges=first-parent"` | every commit reachable from any ref, merges included as their diff against the first parent; the console prints the commits gitleaks scanned beside the commits git counts, and a mismatch fails |
 | secrets | gitleaks `dir`, then trivy `fs --scanners secret` | tracked files plus untracked files that `.gitignore` does not exclude, copied out first, so `.env` never reaches a scanner |
-| images | trivy `image --input` on a `docker save` tarball | the OS packages, JRE, buildpack helpers and jars in each image; the scanner gets no Docker socket |
+| images | trivy `image --input` on a `docker save` tarball | the operating-system packages, Java Runtime Environment (JRE), buildpack helpers and jars in each image; the scanner gets no Docker socket |
 | sbom | trivy `--format cyclonedx` from the same tarball | one CycloneDX document per image in `build/supply-chain/sbom/` |
 | config | trivy `config` | `compose.yaml`, `docker/` and any tracked `Dockerfile*`; reported, never gating |
 
@@ -58,7 +58,7 @@ that differs per image and so made it look like this repository's code.
 **The verdict is a three-clause test.** `checkSupplyChain` fails only on a finding that is HIGH or
 CRITICAL **and** has a published fix **and** sits in a SERVICE layer. Everything else is reported.
 `security/trivy-ignore.yaml` has no vulnerability entries. It is read in block form only (`- id:`,
-`statement:`, `expired_at:`); flow style, an empty `statement`, a non-ISO date or an expired date
+`statement:`, `expired_at:`); flow style, an empty `statement`, a date not in International Organization for Standardization (ISO) 8601 form, or an expired date
 fails the gate.
 
 **Evidence goes stale on every new commit.** Re-run `checkSupplyChain` after any change rather than
@@ -66,8 +66,10 @@ quoting an older console.
 
 ## State
 
-PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run at commit `eae19eb` with the trivy DB of 2026-10-13. The
-first run failed on nine CVEs in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
+PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run on 2026-10-13 at commit `d538b32` after
+`bootBuildImageAll` rebuilt all 5 images, with the trivy database updated 2026-10-13T01:09:18Z. Its console and
+per-scanner exit codes are committed as [2026-10-13-supply-chain-console.txt](evidence/security/2026-10-13-supply-chain-console.txt)
+and [2026-10-13-supply-chain-status.txt](evidence/security/2026-10-13-supply-chain-status.txt). The first run failed on nine Common Vulnerabilities and Exposures (CVE) entries in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
 of Boot's own properties in the root `build.gradle` (`tomcat.version`, `jackson-bom.version`,
 `jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties`: Tomcat 11.0.26,
 Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders with it, so it is
@@ -80,11 +82,11 @@ recognises none of the files it reads and reports zero checks rather than a clea
 
 ## Re-rendering the verdict without rescanning
 
-Reports land in `build/supply-chain/` (one JSON per scanner plus `status.txt`, one exit code per
+Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) file per scanner plus `status.txt`, one exit code per
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.1.0 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.2.0 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

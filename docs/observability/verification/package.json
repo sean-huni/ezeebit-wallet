@@ -1,0 +1,9 @@
+{
+  "name": "ezeebit-observability-verification",
+  "private": true,
+  "type": "module",
+  "description": "Drives traffic, then drives and photographs the Grafana dashboards. Run: npm install once, then node <dated suite>.mjs",
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

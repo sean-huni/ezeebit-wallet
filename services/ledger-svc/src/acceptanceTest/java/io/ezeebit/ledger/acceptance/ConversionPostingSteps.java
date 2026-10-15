@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,17 +15,19 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import io.ezeebit.contracts.ledger.v1.PostingLookup;
+import io.ezeebit.contracts.ledger.v1.PostingRequest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+// Conversion postings travel over gRPC; LedgerRpc renders each answer as the Reply the scenarios already read.
 public class ConversionPostingSteps {
 
-	private static final String POSTINGS = "/internal/v1/conversion-postings";
-
-	private final LedgerClient ledger;
+	private final LedgerRpc ledger;
 	private final ScenarioState state;
 	private final JdbcClient jdbc;
+	private final Map<String, PostingRequest> sent = new HashMap<>();
 
-	public ConversionPostingSteps(final LedgerClient ledger, final ScenarioState state, final JdbcClient jdbc) {
+	public ConversionPostingSteps(final LedgerRpc ledger, final ScenarioState state, final JdbcClient jdbc) {
 		this.ledger = ledger;
 		this.state = state;
 		this.jdbc = jdbc;
@@ -34,10 +37,10 @@ public class ConversionPostingSteps {
 	public void sells(final String conversion, final String merchant, final String sellAmount, final String sellCurrency,
 			final String buyAmount, final String buyCurrency, final int minutes, final String direction) {
 		Duration offset = Duration.ofMinutes("ago".equals(direction) ? -minutes : minutes);
-		String body = body(state.conversion(conversion), state.merchant(merchant), sellCurrency, sellAmount, buyCurrency,
-				buyAmount, Instant.now().plus(offset));
-		state.sent(conversion, body);
-		state.record(ledger.post(POSTINGS, body));
+		PostingRequest request = request(state.conversion(conversion), state.merchant(merchant), sellCurrency, sellAmount,
+				buyCurrency, buyAmount, Instant.now().plus(offset));
+		sent.put(conversion, request);
+		state.record(ledger.post(request));
 	}
 
 	@Given("conversion {string} for {string} has sold {string} {word} for {string} {word}")
@@ -49,23 +52,17 @@ public class ConversionPostingSteps {
 
 	@When("conversion {string} is sent again")
 	public void sentAgain(final String conversion) {
-		state.record(ledger.post(POSTINGS, state.bodySentWith(conversion)));
+		state.record(ledger.post(sent.get(conversion)));
 	}
 
 	@When("the sweeper voids conversion {string} for {string}")
 	public void voids(final String conversion, final String merchant) {
-		state.record(ledger.post("%s/%s/void".formatted(POSTINGS, state.conversion(conversion)),
-				"{\"merchantId\":\"%s\"}".formatted(state.merchant(merchant))));
+		state.record(ledger.voidPosting(lookupOf(conversion, state.merchant(merchant).toString())));
 	}
 
 	@When("conversion {string} is looked up without a merchant id")
 	public void lookedUpWithoutMerchant(final String conversion) {
-		state.record(ledger.get("%s/%s".formatted(POSTINGS, state.conversion(conversion))));
-	}
-
-	@When("the path {string} is requested")
-	public void requested(final String path) {
-		state.record(ledger.get(path));
+		state.record(ledger.find(lookupOf(conversion, "")));
 	}
 
 	@When("{int} conversions for {string} each sell {string} {word} at the same time, buying in turn:")
@@ -74,10 +71,10 @@ public class ConversionPostingSteps {
 		UUID merchantId = state.merchant(merchant);
 		Instant deadline = Instant.now().plus(Duration.ofMinutes(1));
 		List<Map<String, String>> targets = buys.asMaps();
-		List<String> bodies = IntStream.range(0, count).mapToObj(i -> targets.get(i % targets.size()))
-				.map(buy -> body(UUID.randomUUID(), merchantId, sellCurrency, sellAmount, buy.get("currency"),
+		List<PostingRequest> requests = IntStream.range(0, count).mapToObj(i -> targets.get(i % targets.size()))
+				.map(buy -> request(UUID.randomUUID(), merchantId, sellCurrency, sellAmount, buy.get("currency"),
 						buy.get("amount"), deadline)).toList();
-		state.recordAll(ConcurrencySteps.atOnce(count, i -> ledger.post(POSTINGS, bodies.get(i))));
+		state.recordAll(ConcurrencySteps.atOnce(count, i -> ledger.post(requests.get(i))));
 	}
 
 	@Then("the posting is accepted with status {word}")
@@ -160,15 +157,19 @@ public class ConversionPostingSteps {
 	}
 
 	private Reply lookup(final String conversion, final String merchant) {
-		return ledger.get("%s/%s?merchantId=%s".formatted(POSTINGS, state.conversion(conversion), state.merchant(merchant)));
+		return ledger.find(lookupOf(conversion, state.merchant(merchant).toString()));
 	}
 
-	private static String body(final UUID conversionId, final UUID merchantId, final String sellCurrency,
+	private PostingLookup lookupOf(final String conversion, final String merchantId) {
+		return PostingLookup.newBuilder().setConversionId(state.conversion(conversion).toString()).setMerchantId(merchantId)
+				.build();
+	}
+
+	private static PostingRequest request(final UUID conversionId, final UUID merchantId, final String sellCurrency,
 			final String sellAmount, final String buyCurrency, final String buyAmount, final Instant deadline) {
-		return """
-				{"conversionId":"%s","merchantId":"%s","sellCurrency":"%s","sellAmount":"%s",\
-				"buyCurrency":"%s","buyAmount":"%s","deadline":"%s"}"""
-				.formatted(conversionId, merchantId, sellCurrency, sellAmount, buyCurrency, buyAmount, deadline);
+		return PostingRequest.newBuilder().setConversionId(conversionId.toString()).setMerchantId(merchantId.toString())
+				.setSellCurrency(sellCurrency).setSellAmount(sellAmount).setBuyCurrency(buyCurrency).setBuyAmount(buyAmount)
+				.setDeadline(deadline.toString()).build();
 	}
 
 }

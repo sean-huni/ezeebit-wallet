@@ -56,7 +56,7 @@ public class MerchantSteps {
 	}
 
 	private List<Map<String, String>> balances(final String merchant) {
-		Reply reply = http.ledger("GET", "/api/v1/merchants/%s/balances".formatted(state.merchant(merchant)), null, null);
+		Reply reply = http.ledger("GET", "/v1/merchants/%s/balances".formatted(state.merchant(merchant)), null, null);
 		assertThat(reply.status()).as(reply.body()).isEqualTo(200);
 		return reply.read("$.data");
 	}

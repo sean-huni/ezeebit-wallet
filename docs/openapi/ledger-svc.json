@@ -1,0 +1,464 @@
+{
+  "components" : {
+    "schemas" : {
+      "ApiResponseListBalanceResp" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BalanceResp"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseStatementResp" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StatementResp"
+          }
+        },
+        "type" : "object"
+      },
+      "BalanceResp" : {
+        "properties" : {
+          "balance" : {
+            "example" : "53.982730",
+            "type" : "string"
+          },
+          "currency" : {
+            "example" : "USDT",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ErrorCode" : {
+        "description" : "Stable machine-readable error code.",
+        "enum" : [ "AMOUNT_NOT_POSITIVE", "AMOUNT_SCALE_EXCEEDED", "AMOUNT_TOO_LARGE", "BALANCE_LIMIT_EXCEEDED", "CONVERSION_ALREADY_POSTED", "CONVERSION_VOIDED", "CURRENCY_MISMATCH", "GATEWAY_REQUIRED", "IDEMPOTENCY_KEY_MISSING", "IDEMPOTENCY_KEY_REUSED", "INSUFFICIENT_FUNDS", "INTERNAL_ERROR", "MALFORMED_REQUEST", "METHOD_NOT_ALLOWED", "NOT_FOUND", "POSTING_DEADLINE_PASSED", "POSTING_NOT_FOUND", "SAME_CURRENCY", "UNBALANCED_POSTING", "UNKNOWN_CURRENCY", "UNSUPPORTED_API_VERSION", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ],
+        "type" : "string"
+      },
+      "Problem" : {
+        "description" : "RFC 9457 problem detail. `code` is stable; `detail` is localised by Accept-Language.",
+        "properties" : {
+          "code" : {
+            "$ref" : "#/components/schemas/ErrorCode"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "errors" : {
+            "description" : "One entry per invalid field, on VALIDATION_FAILED.",
+            "items" : {
+              "$ref" : "#/components/schemas/Violation"
+            },
+            "type" : "array"
+          },
+          "field" : {
+            "description" : "The request field a business rule refused, when one did.",
+            "type" : "string"
+          },
+          "instance" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "format" : "uri",
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "status", "title" ],
+        "type" : "object"
+      },
+      "StatementLineResp" : {
+        "properties" : {
+          "amount" : {
+            "description" : "Signed: a debit is negative.",
+            "example" : "-1000.00",
+            "type" : "string"
+          },
+          "balanceAfter" : {
+            "example" : "500.00",
+            "type" : "string"
+          },
+          "created" : {
+            "example" : "2026-10-13T10:00:05Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "example" : "ZAR",
+            "type" : "string"
+          },
+          "journalId" : {
+            "example" : "9b1d4e2a-7c3f-4a5b-8e6d-1f2a3b4c5d6e",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reference" : {
+            "example" : "c4e8f1a2-6b3d-4e5f-9a7b-2d1c0e9f8a7b",
+            "type" : "string"
+          },
+          "seq" : {
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "description" : "DEPOSIT or CONVERSION.",
+            "example" : "CONVERSION",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementResp" : {
+        "properties" : {
+          "entries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StatementLineResp"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "description" : "Null on the last page; otherwise pass it back as `after`.",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Violation" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "field" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Balances and the statement of a merchant. Call it through the gateway: the server below is the gateway, and each path here is served there under /api.\nEvery error is an RFC 9457 problem detail (application/problem+json) with a stable `code`.\nBesides the answers listed per operation, the gateway itself can answer any operation with 400 INVALID_MERCHANT_ID, 400 MALFORMED_PATH, 429 RATE_LIMITED (with Retry-After), 503 RATE_LIMITER_UNAVAILABLE (with Retry-After), 503 UPSTREAM_UNAVAILABLE and 504 UPSTREAM_OUTCOME_UNKNOWN.",
+    "title" : "ledger-svc public API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/v1/merchants/{merchantId}/balances" : {
+      "get" : {
+        "description" : "One row per currency the merchant has ever held, zero balances included. Amounts are decimal strings.",
+        "operationId" : "getBalances",
+        "parameters" : [ {
+          "description" : "Merchant id, a UUID.",
+          "example" : "3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27",
+          "in" : "path",
+          "name" : "merchantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListBalanceResp"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "VALIDATION_FAILED" : {
+                    "value" : {
+                      "code" : "VALIDATION_FAILED",
+                      "detail" : "The request is invalid.",
+                      "status" : 400,
+                      "title" : "Bad Request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "VALIDATION_FAILED" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Bad Request: VALIDATION_FAILED"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "GATEWAY_REQUIRED" : {
+                    "value" : {
+                      "code" : "GATEWAY_REQUIRED",
+                      "detail" : "This endpoint is reachable only through the gateway.",
+                      "status" : 403,
+                      "title" : "Forbidden"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "GATEWAY_REQUIRED" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Forbidden: GATEWAY_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "INTERNAL_ERROR" : {
+                    "value" : {
+                      "code" : "INTERNAL_ERROR",
+                      "detail" : "Internal error.",
+                      "status" : 500,
+                      "title" : "Internal Server Error"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "INTERNAL_ERROR" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Internal Server Error: INTERNAL_ERROR"
+          }
+        },
+        "summary" : "Balance per currency",
+        "tags" : [ "Balances" ]
+      }
+    },
+    "/v1/merchants/{merchantId}/entries" : {
+      "get" : {
+        "description" : "Oldest first, in keyset pages: pass nextCursor back as `after` until it is null.",
+        "operationId" : "listEntries",
+        "parameters" : [ {
+          "description" : "Merchant id, a UUID.",
+          "example" : "3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27",
+          "in" : "path",
+          "name" : "merchantId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Only this currency.",
+          "example" : "ZAR",
+          "in" : "query",
+          "name" : "currency",
+          "required" : false,
+          "schema" : {
+            "type" : [ "string", "null" ]
+          }
+        }, {
+          "description" : "Inclusive.",
+          "example" : "2026-10-01T00:00:00Z",
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          }
+        }, {
+          "description" : "Exclusive.",
+          "example" : "2026-11-01T00:00:00Z",
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          }
+        }, {
+          "description" : "Page size, 1 to 500; default 100.",
+          "example" : 100,
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "format" : "int32",
+            "maximum" : 500,
+            "minimum" : 1,
+            "type" : [ "integer", "null" ]
+          }
+        }, {
+          "description" : "The previous page's nextCursor.",
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : [ "integer", "null" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementResp"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "UNKNOWN_CURRENCY" : {
+                    "value" : {
+                      "code" : "UNKNOWN_CURRENCY",
+                      "detail" : "Currency {0} is not supported.",
+                      "status" : 400,
+                      "title" : "Bad Request"
+                    }
+                  },
+                  "VALIDATION_FAILED" : {
+                    "value" : {
+                      "code" : "VALIDATION_FAILED",
+                      "detail" : "The request is invalid.",
+                      "status" : 400,
+                      "title" : "Bad Request"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "VALIDATION_FAILED", "UNKNOWN_CURRENCY" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Bad Request: VALIDATION_FAILED, UNKNOWN_CURRENCY"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "GATEWAY_REQUIRED" : {
+                    "value" : {
+                      "code" : "GATEWAY_REQUIRED",
+                      "detail" : "This endpoint is reachable only through the gateway.",
+                      "status" : 403,
+                      "title" : "Forbidden"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "GATEWAY_REQUIRED" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Forbidden: GATEWAY_REQUIRED"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "examples" : {
+                  "INTERNAL_ERROR" : {
+                    "value" : {
+                      "code" : "INTERNAL_ERROR",
+                      "detail" : "Internal error.",
+                      "status" : 500,
+                      "title" : "Internal Server Error"
+                    }
+                  }
+                },
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Problem"
+                  }, {
+                    "properties" : {
+                      "code" : {
+                        "enum" : [ "INTERNAL_ERROR" ],
+                        "type" : "string"
+                      }
+                    },
+                    "type" : "object"
+                  } ]
+                }
+              }
+            },
+            "description" : "Internal Server Error: INTERNAL_ERROR"
+          }
+        },
+        "summary" : "Statement: ledger entries with the balance after each",
+        "tags" : [ "Statement" ]
+      }
+    }
+  },
+  "servers" : [ {
+    "description" : "the gateway",
+    "url" : "http://localhost:8080/api"
+  } ]
+}

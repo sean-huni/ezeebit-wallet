@@ -1,0 +1,430 @@
+Fleet up/status/down twice, then a final up, with .env settings. Branch feat-ledger-grpc at 3b92e9d.
+=== 2026-10-14T11:51:26Z ./fleet.sh up (cycle 1)
+postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Created 
+ Network ezeebit-wallet-grpc_default Created 
+ Container ezeebit-wallet-grpc-wiremock-1 Creating 
+ Container ezeebit-wallet-grpc-redis-1 Creating 
+ Container ezeebit-wallet-grpc-kafka-1 Creating 
+ Container ezeebit-wallet-grpc-postgres-1 Creating 
+ Container ezeebit-wallet-grpc-wiremock-1 Created 
+ Container ezeebit-wallet-grpc-redis-1 Created 
+ Container ezeebit-wallet-grpc-postgres-1 Created 
+ Container ezeebit-wallet-grpc-kafka-1 Created 
+ Container ezeebit-wallet-grpc-wiremock-1 Starting 
+ Container ezeebit-wallet-grpc-redis-1 Starting 
+ Container ezeebit-wallet-grpc-kafka-1 Starting 
+ Container ezeebit-wallet-grpc-postgres-1 Starting 
+ Container ezeebit-wallet-grpc-wiremock-1 Started 
+ Container ezeebit-wallet-grpc-redis-1 Started 
+ Container ezeebit-wallet-grpc-kafka-1 Started 
+ Container ezeebit-wallet-grpc-postgres-1 Started 
+ Container ezeebit-wallet-grpc-postgres-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Waiting 
+ Container ezeebit-wallet-grpc-redis-1 Waiting 
+ Container ezeebit-wallet-grpc-kafka-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Healthy 
+ Container ezeebit-wallet-grpc-redis-1 Healthy 
+ Container ezeebit-wallet-grpc-postgres-1 Healthy 
+ Container ezeebit-wallet-grpc-kafka-1 Healthy 
+build
+  config-svc UP on :8888
+  eureka-svc UP on :8761
+  ledger-svc UP on :8081
+  conversion-svc UP on :8082
+  gateway-svc UP on :8080
+  gateway routes to ledger-svc and conversion-svc, and a conversion completes
+lgtm
+ Container ezeebit-wallet-grpc-lgtm-1 Creating 
+ Container ezeebit-wallet-grpc-lgtm-1 Created 
+ Container ezeebit-wallet-grpc-lgtm-1 Starting 
+ Container ezeebit-wallet-grpc-lgtm-1 Started 
+ Container ezeebit-wallet-grpc-lgtm-1 Waiting 
+ Container ezeebit-wallet-grpc-lgtm-1 Healthy 
+waiting for grafana plugins to settle
+grafana plugins settled after 7s
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  94632  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  94742  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  94818  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  94819  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  94820  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000
+=== exit=0 ./fleet.sh up (cycle 1) at 2026-10-14T11:52:16Z
+=== 2026-10-14T11:52:16Z ./fleet.sh status (cycle 1)
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  94632  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  94742  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  94818  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  94819  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  94820  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+=== exit=0 ./fleet.sh status (cycle 1) at 2026-10-14T11:52:17Z
+=== 2026-10-14T11:52:17Z ./fleet.sh down (cycle 1)
+ Container ezeebit-wallet-grpc-lgtm-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopped 
+stopped gateway-svc (94820)
+stopped conversion-svc (94819)
+stopped ledger-svc (94818)
+stopped eureka-svc (94742)
+stopped config-svc (94632)
+ Container ezeebit-wallet-grpc-redis-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopping 
+ Container ezeebit-wallet-grpc-kafka-1 Stopping 
+ Container ezeebit-wallet-grpc-postgres-1 Stopping 
+ Container ezeebit-wallet-grpc-wiremock-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopped 
+ Container ezeebit-wallet-grpc-lgtm-1 Removing 
+ Container ezeebit-wallet-grpc-lgtm-1 Removed 
+ Container ezeebit-wallet-grpc-postgres-1 Stopped 
+ Container ezeebit-wallet-grpc-postgres-1 Removing 
+ Container ezeebit-wallet-grpc-postgres-1 Removed 
+ Container ezeebit-wallet-grpc-redis-1 Stopped 
+ Container ezeebit-wallet-grpc-redis-1 Removing 
+ Container ezeebit-wallet-grpc-redis-1 Removed 
+ Container ezeebit-wallet-grpc-wiremock-1 Stopped 
+ Container ezeebit-wallet-grpc-wiremock-1 Removing 
+ Container ezeebit-wallet-grpc-wiremock-1 Removed 
+ Container ezeebit-wallet-grpc-kafka-1 Stopped 
+ Container ezeebit-wallet-grpc-kafka-1 Removing 
+ Container ezeebit-wallet-grpc-kafka-1 Removed 
+ Network ezeebit-wallet-grpc_default Removing 
+ Network ezeebit-wallet-grpc_default Removed 
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  -      DOWN         nothing listening (connection refused)
+    eureka-svc         Java microservice  8761  -      DOWN         nothing listening (connection refused)
+  Business
+    ledger-svc         Java microservice  8081  -      DOWN         nothing listening (connection refused)
+    conversion-svc     Java microservice  8082  -      DOWN         nothing listening (connection refused)
+  Edge
+    gateway-svc        Java microservice  8080  -      DOWN         nothing listening (connection refused)
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      NOT RUNNING  no container
+    redis              Docker container   6390  -      NOT RUNNING  no container
+  External stand-ins
+    wiremock           Docker container   8089  -      NOT RUNNING  no container
+  Messaging
+    kafka              Docker container   9092  -      NOT RUNNING  no container
+  Observability
+    lgtm               Docker container   3000  -      NOT RUNNING  no container
+    grafana            inside lgtm        3000  -      DOWN         nothing listening (connection refused)
+    prometheus         inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    loki               inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    tempo              inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    pyroscope          inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    otlp-collector     inside lgtm        4318  -      DOWN         nothing listening (connection refused)
+fleet down: no fleet JVM, container or port left
+=== exit=0 ./fleet.sh down (cycle 1) at 2026-10-14T11:53:22Z
+=== 2026-10-14T11:53:22Z ./fleet.sh up (cycle 2)
+postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Created 
+ Network ezeebit-wallet-grpc_default Created 
+ Container ezeebit-wallet-grpc-wiremock-1 Creating 
+ Container ezeebit-wallet-grpc-kafka-1 Creating 
+ Container ezeebit-wallet-grpc-redis-1 Creating 
+ Container ezeebit-wallet-grpc-postgres-1 Creating 
+ Container ezeebit-wallet-grpc-wiremock-1 Created 
+ Container ezeebit-wallet-grpc-postgres-1 Created 
+ Container ezeebit-wallet-grpc-redis-1 Created 
+ Container ezeebit-wallet-grpc-kafka-1 Created 
+ Container ezeebit-wallet-grpc-postgres-1 Starting 
+ Container ezeebit-wallet-grpc-wiremock-1 Starting 
+ Container ezeebit-wallet-grpc-kafka-1 Starting 
+ Container ezeebit-wallet-grpc-redis-1 Starting 
+ Container ezeebit-wallet-grpc-postgres-1 Started 
+ Container ezeebit-wallet-grpc-wiremock-1 Started 
+ Container ezeebit-wallet-grpc-kafka-1 Started 
+ Container ezeebit-wallet-grpc-redis-1 Started 
+ Container ezeebit-wallet-grpc-kafka-1 Waiting 
+ Container ezeebit-wallet-grpc-postgres-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Waiting 
+ Container ezeebit-wallet-grpc-redis-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Healthy 
+ Container ezeebit-wallet-grpc-postgres-1 Healthy 
+ Container ezeebit-wallet-grpc-redis-1 Healthy 
+ Container ezeebit-wallet-grpc-kafka-1 Healthy 
+build
+  config-svc UP on :8888
+  eureka-svc UP on :8761
+  ledger-svc UP on :8081
+  conversion-svc UP on :8082
+  gateway-svc UP on :8080
+  gateway routes to ledger-svc and conversion-svc, and a conversion completes
+lgtm
+ Container ezeebit-wallet-grpc-lgtm-1 Creating 
+ Container ezeebit-wallet-grpc-lgtm-1 Created 
+ Container ezeebit-wallet-grpc-lgtm-1 Starting 
+ Container ezeebit-wallet-grpc-lgtm-1 Started 
+ Container ezeebit-wallet-grpc-lgtm-1 Waiting 
+ Container ezeebit-wallet-grpc-lgtm-1 Healthy 
+waiting for grafana plugins to settle
+grafana plugins settled after 7s
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  96073  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  96143  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  96205  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  96206  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  96207  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000
+=== exit=0 ./fleet.sh up (cycle 2) at 2026-10-14T11:54:14Z
+=== 2026-10-14T11:54:14Z ./fleet.sh status (cycle 2)
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  96073  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  96143  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  96205  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  96206  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  96207  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+=== exit=0 ./fleet.sh status (cycle 2) at 2026-10-14T11:54:15Z
+=== 2026-10-14T11:54:15Z ./fleet.sh down (cycle 2)
+ Container ezeebit-wallet-grpc-lgtm-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopped 
+stopped gateway-svc (96207)
+stopped conversion-svc (96206)
+stopped ledger-svc (96205)
+stopped eureka-svc (96143)
+stopped config-svc (96073)
+ Container ezeebit-wallet-grpc-wiremock-1 Stopping 
+ Container ezeebit-wallet-grpc-kafka-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopping 
+ Container ezeebit-wallet-grpc-postgres-1 Stopping 
+ Container ezeebit-wallet-grpc-redis-1 Stopping 
+ Container ezeebit-wallet-grpc-lgtm-1 Stopped 
+ Container ezeebit-wallet-grpc-lgtm-1 Removing 
+ Container ezeebit-wallet-grpc-lgtm-1 Removed 
+ Container ezeebit-wallet-grpc-postgres-1 Stopped 
+ Container ezeebit-wallet-grpc-postgres-1 Removing 
+ Container ezeebit-wallet-grpc-postgres-1 Removed 
+ Container ezeebit-wallet-grpc-redis-1 Stopped 
+ Container ezeebit-wallet-grpc-redis-1 Removing 
+ Container ezeebit-wallet-grpc-redis-1 Removed 
+ Container ezeebit-wallet-grpc-wiremock-1 Stopped 
+ Container ezeebit-wallet-grpc-wiremock-1 Removing 
+ Container ezeebit-wallet-grpc-wiremock-1 Removed 
+ Container ezeebit-wallet-grpc-kafka-1 Stopped 
+ Container ezeebit-wallet-grpc-kafka-1 Removing 
+ Container ezeebit-wallet-grpc-kafka-1 Removed 
+ Network ezeebit-wallet-grpc_default Removing 
+ Network ezeebit-wallet-grpc_default Removed 
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  -      DOWN         nothing listening (connection refused)
+    eureka-svc         Java microservice  8761  -      DOWN         nothing listening (connection refused)
+  Business
+    ledger-svc         Java microservice  8081  -      DOWN         nothing listening (connection refused)
+    conversion-svc     Java microservice  8082  -      DOWN         nothing listening (connection refused)
+  Edge
+    gateway-svc        Java microservice  8080  -      DOWN         nothing listening (connection refused)
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      NOT RUNNING  no container
+    redis              Docker container   6390  -      NOT RUNNING  no container
+  External stand-ins
+    wiremock           Docker container   8089  -      NOT RUNNING  no container
+  Messaging
+    kafka              Docker container   9092  -      NOT RUNNING  no container
+  Observability
+    lgtm               Docker container   3000  -      NOT RUNNING  no container
+    grafana            inside lgtm        3000  -      DOWN         nothing listening (connection refused)
+    prometheus         inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    loki               inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    tempo              inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    pyroscope          inside lgtm        -     -      SKIPPED      Grafana not answering, so its datasource check cannot run
+    otlp-collector     inside lgtm        4318  -      DOWN         nothing listening (connection refused)
+fleet down: no fleet JVM, container or port left
+=== exit=0 ./fleet.sh down (cycle 2) at 2026-10-14T11:55:19Z
+=== 2026-10-14T11:55:19Z ./fleet.sh up (cycle final)
+postgres, wiremock (the exchange-rate service), redis (the gateway rate limiter), kafka (the dead-letter topic)
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Creating 
+ Network ezeebit-wallet-grpc_default Created 
+ Network ezeebit-wallet-grpc_default Created 
+ Container ezeebit-wallet-grpc-kafka-1 Creating 
+ Container ezeebit-wallet-grpc-wiremock-1 Creating 
+ Container ezeebit-wallet-grpc-postgres-1 Creating 
+ Container ezeebit-wallet-grpc-redis-1 Creating 
+ Container ezeebit-wallet-grpc-wiremock-1 Created 
+ Container ezeebit-wallet-grpc-postgres-1 Created 
+ Container ezeebit-wallet-grpc-kafka-1 Created 
+ Container ezeebit-wallet-grpc-redis-1 Created 
+ Container ezeebit-wallet-grpc-redis-1 Starting 
+ Container ezeebit-wallet-grpc-kafka-1 Starting 
+ Container ezeebit-wallet-grpc-postgres-1 Starting 
+ Container ezeebit-wallet-grpc-wiremock-1 Starting 
+ Container ezeebit-wallet-grpc-redis-1 Started 
+ Container ezeebit-wallet-grpc-kafka-1 Started 
+ Container ezeebit-wallet-grpc-postgres-1 Started 
+ Container ezeebit-wallet-grpc-wiremock-1 Started 
+ Container ezeebit-wallet-grpc-postgres-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Waiting 
+ Container ezeebit-wallet-grpc-redis-1 Waiting 
+ Container ezeebit-wallet-grpc-kafka-1 Waiting 
+ Container ezeebit-wallet-grpc-wiremock-1 Healthy 
+ Container ezeebit-wallet-grpc-postgres-1 Healthy 
+ Container ezeebit-wallet-grpc-redis-1 Healthy 
+ Container ezeebit-wallet-grpc-kafka-1 Healthy 
+build
+  config-svc UP on :8888
+  eureka-svc UP on :8761
+  ledger-svc UP on :8081
+  conversion-svc UP on :8082
+  gateway-svc UP on :8080
+  gateway routes to ledger-svc and conversion-svc, and a conversion completes
+lgtm
+ Container ezeebit-wallet-grpc-lgtm-1 Creating 
+ Container ezeebit-wallet-grpc-lgtm-1 Created 
+ Container ezeebit-wallet-grpc-lgtm-1 Starting 
+ Container ezeebit-wallet-grpc-lgtm-1 Started 
+ Container ezeebit-wallet-grpc-lgtm-1 Waiting 
+ Container ezeebit-wallet-grpc-lgtm-1 Healthy 
+waiting for grafana plugins to settle
+grafana plugins settled after 7s
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  97516  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  97567  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  97627  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  97628  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  97629  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+fleet up: gateway http://localhost:8080, registry http://localhost:8761, grafana http://localhost:3000
+=== exit=0 ./fleet.sh up (cycle final) at 2026-10-14T11:56:09Z
+=== 2026-10-14T11:56:09Z ./fleet.sh status (cycle final)
+SERVICE                TYPE               PORT  PID    STATE        DETAIL
+CORE SERVICES (Java microservices launched by fleet.sh)
+  Control plane
+    config-svc         Java microservice  8888  97516  UP           /actuator/health 200
+    eureka-svc         Java microservice  8761  97567  UP           /actuator/health 200
+  Business
+    ledger-svc         Java microservice  8081  97627  UP           /actuator/health 200, gRPC :9081 listening
+    conversion-svc     Java microservice  8082  97628  UP           /actuator/health 200
+  Edge
+    gateway-svc        Java microservice  8080  97629  UP           routes to ledger-svc and conversion-svc, a conversion completes
+SUPPORTING SERVICES (Docker containers, and the backends inside lgtm)
+  Data stores
+    postgres           Docker container   5432  -      HEALTHY      compose healthcheck passing
+    redis              Docker container   6390  -      HEALTHY      compose healthcheck passing
+  External stand-ins
+    wiremock           Docker container   8089  -      HEALTHY      compose healthcheck passing
+  Messaging
+    kafka              Docker container   9092  -      HEALTHY      compose healthcheck passing
+  Observability
+    lgtm               Docker container   3000  -      HEALTHY      compose healthcheck passing
+    grafana            inside lgtm        3000  -      UP           /api/health 200
+    prometheus         inside lgtm        -     -      UP           datasource health OK
+    loki               inside lgtm        -     -      UP           datasource health OK
+    tempo              inside lgtm        -     -      UP           datasource health OK
+    pyroscope          inside lgtm        -     -      UP           datasource health OK
+    otlp-collector     inside lgtm        4318  -      UP           accepted an empty OTLP export
+RESULT: healthy, all 16 checks passed
+=== exit=0 ./fleet.sh status (cycle final) at 2026-10-14T11:56:10Z
+CYCLES DONE

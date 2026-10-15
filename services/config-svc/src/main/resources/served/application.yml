@@ -13,3 +13,11 @@ management:
     web:
       exposure:
         include: health,info
+ezeebit:
+  gateway:
+    # The gateway adds it to every routed request; ledger-svc and conversion-svc refuse public routes without it.
+    # Defence in depth only, not authentication: anyone who can read this file or the environment holds it.
+    shared-secret: ${GATEWAY_SHARED_SECRET:local-gateway-proof}
+  openapi:
+    # The server named in each public spec: where a Swagger UI "Try it out" sends its calls.
+    public-url: ${OPENAPI_PUBLIC_URL:http://localhost:8080/api}

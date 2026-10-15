@@ -291,6 +291,19 @@ failed. That rehearsal's state history no longer exists in Grafana: `fleet.sh up
 container at 21:03:51, and Grafana's own database is on a tmpfs mount (`compose.yaml`), so the
 recreate wiped it.
 
+The channel itself, `#ezeebit-alerts` in the team's Slack workspace
+(<https://app.slack.com/client/TUKERT8JU/C0C8MUVLZHC>), on 2026-10-15:
+
+![Slack #ezeebit-alerts: ServiceDown firing and resolved for ledger-svc and gateway-svc](docs/observability/evidence/2026-10-15-slack-ezeebit-alerts.png)
+
+**Proves** a human-facing delivery end to end, both directions: the "Prometheus Alerts" app (Grafana
+v13.2.3) posted `[FIRING:1] ServiceDown Ezeebit alerts ledger-svc (critical)` and the same for
+gateway-svc at 10:28, then `[RESOLVED]` for both at 10:29, each with `alertname = ServiceDown` and
+`grafana_folder = Ezeebit alerts`. Captured in the logged-in Google Chrome session (Slack needs no
+separate sign-in there). To recapture: connect the Claude in Chrome extension to that browser and
+screenshot the channel URL above, or drive Chrome with Playwright using a profile that is already
+signed in to Slack.
+
 ### Ledger outage over gRPC (2026-10-14)
 
 A rehearsed outage of the conversion-to-ledger gRPC seam, with `SLACK_WEBHOOK_URL` set: ledger-svc
@@ -367,7 +380,8 @@ change is annotated on its own expression.
 What this section does not prove: the restore's whole-stack bounce wiped Grafana's alert state, so
 the page at t+27s never got an all-clear, and the rules re-fired once after recovery (a second page,
 cleared at t+589s). That run also found the dead-letter topic deleted by the bounce; it has since
-moved to the `kafkadata` volume. The Slack channel itself was not read.
+moved to the `kafkadata` volume. This outage's Slack messages were read from Grafana's notifier counter;
+the channel itself is pictured under [Alerts to Slack](#alerts-to-slack) from 2026-10-15.
 
 ## Static application security testing (SAST)
 
@@ -511,10 +525,10 @@ the console; the distinct totals match the console's distinct column.
 
 ## What this evidence does not prove
 
-- **The Slack channel itself is not pictured.** The Chrome extension was not connected, so the channel
-  carrying the page and the all-clear was not captured; delivery rests on Grafana's notifier counter.
-  One channel and one integration is not an on-call rota either: a page at night reaches a channel,
-  not a person.
+- **One Slack channel is not an on-call rota.** The channel is pictured (page and all-clear, 2026-10-15,
+  [Alerts to Slack](#alerts-to-slack)), but a page at night reaches a channel, not a person.
+- **The 2026-10-13 and 2026-10-14 pages are not pictured in Slack.** Those runs' deliveries rest on
+  Grafana's notifier counter; the channel capture is from a later outage on 2026-10-15.
 - **No 2026-10-13 alert is pictured Firing.** RateFeedRefusing only reached Pending (1 minute against
   a 2-minute hold), and nothing else left Normal. The 2026-10-14 ledger outage is the one Firing
   capture (ConversionLedgerDeadLettered).

@@ -69,8 +69,9 @@ What exists:
   never arrives leaves the conversion PENDING (202), records a dead letter on a Kafka topic that pages
   Slack, and leaves the money to a sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
   in the ledger before it is answered, so money arriving later can never let that conversion post.
-- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3) behind one gateway, each
-  domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
+- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3): two business services
+  (ledger-svc, conversion-svc) behind the gateway (gateway-svc), and config-svc and eureka-svc as the
+  control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
 **Tests.** **610 tests, 0 failures, 0 skipped**, summed from the JUnit Extensible Markup Language (XML)

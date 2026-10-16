@@ -18,48 +18,6 @@ cluster_exists() {
   (( rc == 0 )) && [[ $nodes == *"$NODE_CONTAINER"* ]]
 }
 
-fleet_ports() {
-  # Read from the files that own them, as the other fleet does, so a moved port cannot drift from a copy here.
-  local f port spec var def n=0
-  for f in services/*/src/main/resources/application.yml; do
-    port=$(sed -nE 's/.*\$\{SERVER_PORT:([0-9]+)\}.*/\1/p' "$f")
-    [[ $port =~ ^[0-9]+$ ]] || fail "no \${SERVER_PORT:<port>} in $f"
-    printf '%s\n' "$port"; n=$((n + 1))
-  done
-  (( n == ${#SERVICES[@]} )) || fail "found $n service application.yml files, expected ${#SERVICES[@]}"
-  port=$(sed -nE 's/.*\$\{LEDGER_GRPC_PORT:([0-9]+)\}.*/\1/p' services/ledger-svc/src/main/resources/application.yml)
-  port=${LEDGER_GRPC_PORT:-$port}
-  [[ $port =~ ^[0-9]+$ ]] || fail "no ledger gRPC port in services/ledger-svc/src/main/resources/application.yml"
-  printf '%s\n' "$port"
-  n=0
-  while read -r spec; do
-    if [[ $spec == \$\{*\} ]]; then
-      var=${spec#\$\{}; var=${var%%:-*}; def=${spec#*:-}; def=${def%\}}
-      port=${!var:-$def}
-    else
-      port=$spec
-    fi
-    [[ $port =~ ^[0-9]+$ ]] || fail "compose.yaml host port '$spec' does not resolve to a number"
-    printf '%s\n' "$port"; n=$((n + 1))
-  done < <(sed -nE "s/^[[:space:]]*- '127\.0\.0\.1:(.+):[0-9]+'\$/\1/p" compose.yaml)
-  (( n > 0 )) || fail "no published ports read from compose.yaml"
-}
-
-refuse_if_occupied() {
-  local ports port holder held=()
-  if compose_running; then fail "$(refusal_hint "compose containers of $ROOT are running")"; fi
-  ports=$(fleet_ports) || exit 1
-  ports=$(printf '%s\n' "$ports" | sort -un)
-  # shellcheck disable=SC2086 # one port per line, split on purpose
-  for port in $ports; do
-    holder=$(port_holder "$port")
-    [[ -z $holder || $holder == "container $NODE_CONTAINER" ]] && continue
-    held+=("$port is held by $holder")
-  done
-  (( ${#held[@]} == 0 )) || fail "$(refusal_hint "$(IFS=';'; printf '%s' "${held[*]}" | sed 's/;/; /g')")"
-  log "ports free: $(printf '%s' "$ports" | tr '\n' ' ')"
-}
-
 build_and_load() {
   local version svc rc
   version=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
@@ -209,7 +167,8 @@ cmd_up() {
     [[ " ${STAGES[*]} " == *" $stage "* ]] || fail "unknown stage '$stage' (stages: ${STAGES[*]})"
   done
 
-  refuse_if_occupied
+  "$ROOT/scripts/env-guard.sh" acquire k8s; rc=$?
+  (( rc == 0 )) || exit "$rc"
   mkdir -p "$RUN_DIR"
   if cluster_exists; then
     log "cluster $CLUSTER exists"
@@ -248,6 +207,8 @@ cmd_down() {
     log "cluster $CLUSTER does not exist"
   fi
   if [[ -d $RUN_DIR ]]; then rm -r -- "$RUN_DIR" || fail "could not remove $RUN_DIR"; fi
+  "$ROOT/scripts/env-guard.sh" release k8s; rc=$?
+  (( rc == 0 )) || fail "env-guard release k8s exited $rc"
   log "down: cluster $CLUSTER and $RUN_DIR removed"
 }
 

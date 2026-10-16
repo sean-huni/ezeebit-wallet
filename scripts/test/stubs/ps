@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Test stub: STUB_PIDS holds "pid command line" rows; `ps -o command=|comm= -p <pid>` answers from them. Any other pid
+# goes to the real ps, so a lease holder's liveness is still measured on a real process.
+field='' pid=''
+while (( $# )); do
+  case $1 in
+    -o) field=$2; shift ;;
+    -p) pid=$2; shift ;;
+  esac
+  shift
+done
+while read -r p cmd; do
+  [[ -n $p && $p == "$pid" ]] || continue
+  case $field in
+    command=) printf '%s\n' "$cmd" ;;
+    comm=) printf '%s\n' "${cmd%% *}" ;;
+    *) printf 'ps stub: no field %s for a stubbed pid\n' "$field" >&2; exit 1 ;;
+  esac
+  exit 0
+done <<< "${STUB_PIDS:-}"
+exec /bin/ps -o "$field" -p "$pid"

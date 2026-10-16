@@ -26,3 +26,6 @@ out/
 
 ### kind cluster run state (k8s/kube.sh) ###
 .kube-fleet/
+
+### Environment lease (scripts/env-guard.sh): which fleet may run ###
+.env-lease/

@@ -525,8 +525,16 @@ def checkDashboards = tasks.register('checkDashboards', Exec) {
 	commandLine 'python3', 'docker/lgtm/generate.py', '--check'
 }
 
+// fleet.sh and k8s/kube.sh share one guard; its stubbed suite proves both refusal directions without Docker.
+def checkEnvGuard = tasks.register('checkEnvGuard', Exec) {
+	group = 'verification'
+	description = 'Runs scripts/test/env-guard-test.sh: the guard that keeps the host fleet and the kind fleet from running together.'
+	inputs.files 'scripts/env-guard.sh', 'scripts/test/env-guard-test.sh', fileTree('scripts/test/stubs')
+	commandLine 'bash', 'scripts/test/env-guard-test.sh'
+}
+
 tasks.named('check') {
-	dependsOn checkSecrets, checkDashboards, checkSingleProto
+	dependsOn checkSecrets, checkDashboards, checkSingleProto, checkEnvGuard
 }
 
 tasks.register('checkSupplyChain', Exec) {

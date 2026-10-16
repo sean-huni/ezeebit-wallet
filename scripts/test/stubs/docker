@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Test stub: `docker ps` prints STUB_CONTAINERS (one container per line, in the guard's --format); STUB_DOCKER_DOWN=1
+# answers as an unreachable daemon does.
+if [[ ${STUB_DOCKER_DOWN:-0} == 1 ]]; then
+  printf 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n' >&2
+  exit 1
+fi
+[[ ${1:-} == ps ]] || { printf 'docker stub: only ps is stubbed, got: %s\n' "$*" >&2; exit 125; }
+[[ -n ${STUB_CONTAINERS:-} ]] && printf '%s\n' "$STUB_CONTAINERS"
+exit 0

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Test stub: STUB_LISTENERS is "port=pid ..."; prints the pid listening on -iTCP:<port>, else exits 1 as lsof does.
+port=
+for a in "$@"; do [[ $a == -iTCP:* ]] && port=${a#-iTCP:}; done
+for entry in ${STUB_LISTENERS:-}; do
+  [[ ${entry%%=*} == "$port" ]] && { printf '%s\n' "${entry#*=}"; exit 0; }
+done
+exit 1

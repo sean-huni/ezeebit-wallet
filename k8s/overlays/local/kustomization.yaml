@@ -9,3 +9,4 @@ resources:
   - ../../base/data
   - ../../base/obs
   - ../../base/app
+  - ../../base/metrics-server

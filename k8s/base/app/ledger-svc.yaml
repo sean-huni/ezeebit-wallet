@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-svc
+  labels:
+    app.kubernetes.io/name: ledger-svc
+    ezeebit.io/stage: app
+spec:
+  selector:
+    app.kubernetes.io/name: ledger-svc
+  ports:
+    - {name: http, port: 8081, targetPort: http}
+    - {name: grpc, port: 9081, targetPort: grpc}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-svc
+  labels:
+    app.kubernetes.io/name: ledger-svc
+    ezeebit.io/stage: app
+spec:
+  replicas: 2
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-svc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ledger-svc
+    spec:
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: ledger-svc
+          image: 'ezeebit/ledger-svc:0.2.0'
+          imagePullPolicy: Never
+          ports:
+            - {name: http, containerPort: 8081}
+            - {name: grpc, containerPort: 9081}
+          env:
+            - {name: SERVER_ADDRESS, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+            - {name: HOSTNAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
+            - {name: OTLP_URL, value: 'http://lgtm.ezeebit-obs:4318'}
+            - {name: CONFIG_SERVER_URL, value: 'http://config-svc.ezeebit-app:8888'}
+            - {name: EUREKA_URL, value: 'http://eureka-svc.ezeebit-app:8761/eureka/'}
+            - {name: DB_URL, value: 'jdbc:postgresql://postgres.ezeebit-data:5432/ledger'}
+            - {name: DB_USER, valueFrom: {secretKeyRef: {name: ledger-db, key: DB_USER}}}
+            - {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: ledger-db, key: DB_PASSWORD}}}
+            - {name: GATEWAY_SHARED_SECRET, valueFrom: {secretKeyRef: {name: gateway-proof, key: GATEWAY_SHARED_SECRET}}}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 5
+          lifecycle:
+            # Eureka expiry (15s) plus a client fetch (5s) is when callers stop choosing this pod; until then it keeps
+            # serving, and graceful shutdown (20s) then drains what is in flight.
+            preStop: {sleep: {seconds: 15}}

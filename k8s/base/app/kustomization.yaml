@@ -3,3 +3,10 @@ kind: Kustomization
 namespace: ezeebit-app
 resources:
   - wiremock.yaml
+  - config-svc.yaml
+  - eureka-svc.yaml
+  - ledger-svc.yaml
+  - conversion-svc.yaml
+  - gateway-svc.yaml
+  - hpa.yaml
+  - pdb.yaml

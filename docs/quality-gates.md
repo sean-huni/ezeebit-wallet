@@ -49,7 +49,8 @@ gateway-svc 0.95 / 0.97, config-svc and eureka-svc 0.57 / none (no branches).
 Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/exclude.xml`. Reports land in
 `services/<svc>/build/reports/{spotbugs,checkstyle,jacoco}/`.
 
-The root `check` also runs `checkSecrets` ([supply-chain.md](supply-chain.md)) and `checkDashboards`
+The root `check` also runs `checkSecrets` ([supply-chain.md](supply-chain.md)), `checkSingleProto`
+(see [Architecture gates](#architecture-gates)) and `checkDashboards`
 (`python3 docker/lgtm/generate.py --check`: the committed dashboards and alert rules must equal what the
 generator writes).
 

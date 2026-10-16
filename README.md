@@ -46,7 +46,7 @@ migration belongs.
 | Need | Notes |
 |---|---|
 | Java Development Kit (JDK) 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
-| Docker, running | Postgres, WireMock, Redis, Kafka and Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image for the fleet; Testcontainers (Postgres, Redis, Kafka) and the secrets scanners during the build |
+| Docker, running | Postgres, WireMock, Redis, Kafka and the Grafana LGTM image (`grafana/otel-lgtm`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector) for the fleet; Testcontainers (Postgres, Redis, Kafka) and the secrets scanners during the build |
 | zsh, curl, jq and lsof | `./fleet.sh` is a zsh script (default shell on macOS); jq ships with macOS 15 and later, otherwise `brew install jq`. Without zsh, use the manual commands below |
 | Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 9092 (Kafka), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888, 9081 (ledger-svc's gRPC port). Kafka's internal listener 29092 is not published, so it needs no free host port |
 
@@ -60,8 +60,8 @@ Boot 4.1.1, Spring Cloud 2025.1.3.
 ```
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
-Hypertext Transfer Protocol (HTTP)), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached; the
-first run also downloads them).
+Hypertext Transfer Protocol (HTTP)), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached, a timing that was not logged; the
+first run also downloads them. The 2026-10-14 gate log, with `--no-build-cache --rerun-tasks`, records 4m 9s).
 Test counts are in [SOLUTION.md](SOLUTION.md#1-tasks-chosen-and-status); the tiers and gates are
 described in [docs/quality-gates.md](docs/quality-gates.md).
 
@@ -130,7 +130,7 @@ What `up` and `down` guarantee:
 
 - **A taken port stops `up` before anything starts**, naming the holder and the variable that moves
   the port (`port 6379 (redis) is held by container merchant-svc-redis-1 (compose project
-  merchant-svc); set REDIS_PORT to a free port`). A bounce would not free it, so none is tried.
+  merchant-svc); set REDIS_PORT to a free port (.env or the environment)`). A bounce would not free it, so none is tried.
 - **`up` on a running fleet** reports `fleet already up and healthy` and changes nothing; if any row is
   not healthy it prints the table and bounces the whole stack (`down`, then a fresh start).
 - **A fresh start that does not come up healthy** (a container, a JVM, the routing check or a backend
@@ -363,7 +363,7 @@ ezeebit-wallet/
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
 ├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
 ├── observability/          OTLP settings, logback appender wiring; compiled into every service
-├── fleet.sh                up | status | down; its sweep test is docs/fleet/verification/
+├── fleet.sh                up | status | down | purge; its sweep test is docs/fleet/verification/
 └── services/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry

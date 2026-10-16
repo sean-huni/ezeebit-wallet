@@ -66,7 +66,12 @@ quoting an older console.
 
 ## State
 
-PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run on 2026-10-13 at commit `d538b32` after
+Latest recorded verdict: PASSED on 2026-10-15, 5 of 5 images scanned, trivy database 2026-10-15T07:10Z,
+after the run before it failed on one HIGH, fixable SERVICE finding: CVE-2026-106451 in lz4-java 1.10.1,
+pulled into conversion-svc by kafka-clients 4.2.1. Commit `65f9d0c` pins lz4-java 1.11.4 and records
+both results in its message; that run's console and status file were not committed.
+
+The last run with committed evidence: PASSED, nothing suppressed: `SUPPLY CHAIN GATE: PASSED`, re-run on 2026-10-13 at commit `d538b32` after
 `bootBuildImageAll` rebuilt all 5 images, with the trivy database updated 2026-10-13T01:09:18Z. Its console and
 per-scanner exit codes are committed as [2026-10-13-supply-chain-console.txt](evidence/security/2026-10-13-supply-chain-console.txt)
 and [2026-10-13-supply-chain-status.txt](evidence/security/2026-10-13-supply-chain-status.txt). The first run failed on nine Common Vulnerabilities and Exposures (CVE) entries in jars Spring Boot 4.1.1 manages. They are cleared by patch overrides
@@ -74,6 +79,9 @@ of Boot's own properties in the root `build.gradle` (`tomcat.version`, `jackson-
 `jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties`: Tomcat 11.0.26,
 Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders with it, so it is
 overridden, not excluded). Each override must be dropped once Boot manages that version or newer.
+Since 2026-10-15 conversion-svc also pins lz4-java 1.11.4 (`lz4JavaVersion` in `gradle.properties`,
+a dependency constraint in its `build.gradle`) for CVE-2026-106451. It is a transitive override of
+kafka-clients 4.2.1, not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 
 One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images.
 The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers)

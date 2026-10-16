@@ -10,16 +10,16 @@ drawn from memory.
 ```
 ezeebit-wallet/
 ├── services/        the five Spring Boot services, one Gradle project each (below)
-├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, and this layout
+├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, this layout, evidence/ (security logs), fleet/ (the fleet diagram and its verification logs), superpowers/ (design specs and plans)
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
 ├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml
-├── docker/          local backing services: the Postgres init script, WireMock rate feed, and Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
+├── docker/          local backing services: the Postgres init script, WireMock rate feed, and the Grafana LGTM image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OpenTelemetry Protocol (OTLP) settings and the logback appender, compiled into every service's main source set
 ├── architecture/    the dependency-injection budget gate (DependencyBudgetTest), compiled into every service's test source set
 ├── contracts/       ledger/v1/conversion_postings.proto: the one gRPC Remote Procedure Call (gRPC) contract, compiled by ledger-svc and conversion-svc (checkSingleProto fails on a second copy)
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
 ├── build.gradle     shared conventions: test tiers, quality gates, image builds
-└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ and gradlew (wrapper), .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md
+└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ and gradlew (wrapper), .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md, EVIDENCE.md
 ```
 
 | Service | Package root | One line |
@@ -147,7 +147,7 @@ service.statement         -> data.model(1), data.repo(2), data.repo.query(1), do
 
 ## conversion-svc
 
-96 classes in 28 packages. The use cases call `service/port/` interfaces only; each called service or
+97 classes in 28 packages. The use cases call `service/port/` interfaces only; each called service or
 broker has its own adapter under `outbound/` that implements one, and owns the translation both ways.
 `service.* -> outbound.*` is 0 import lines, enforced by `ServiceImportsNoOutboundTest`.
 
@@ -183,7 +183,7 @@ io.ezeebit.conversion  ConversionApplication
 ├── common/
 │   ├── log/           LogText (log-safe caller and upstream text)
 │   └── metrics/       ConversionMetrics, ConversionSpans
-└── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig, OpenApiConfig
+└── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig, KafkaConfig, OpenApiConfig
     └── properties/    ConversionProperties (served pricing policy)
 ```
 
@@ -238,7 +238,7 @@ service.sweep       -> common.metrics(1), config.properties(1), data.model(1), d
 | `data.model` | row records | `QuoteEntity`, `ConversionEntity` |
 | `common.log` | make caller and upstream text safe for one log line | `LogText` |
 | `common.metrics` | conversion counters; the quote, conversion-accept and sweep spans, reached through `ConversionMetrics.spans()` | `ConversionMetrics`, `ConversionSpans` |
-| `config`, `config.properties` | the rate HTTP client and the ledger gRPC channel, API versioning, proof filter; served pricing policy | `ClientConfig`, `ApiVersionConfig`, `GatewayProofConfig`; `ConversionProperties` |
+| `config`, `config.properties` | the rate HTTP client and the ledger gRPC channel, API versioning, proof filter, a Kafka producer listener that never logs a failed dead letter's value; served pricing policy | `ClientConfig`, `ApiVersionConfig`, `GatewayProofConfig`, `KafkaConfig`; `ConversionProperties` |
 
 ## gateway-svc
 
@@ -305,7 +305,7 @@ ledger-svc:
 
 ```text
 io.ezeebit.ledger    LedgerApplication
-├── ctl/             BalanceCtrl, ConversionPostingCtrl, DepositCtrl, StatementCtrl
+├── ctl/             BalanceCtrl, ConversionPostingCtrl (deleted since, in c965475), DepositCtrl, StatementCtrl
 ├── api/
 │   ├── advice/      BusinessExceptionHandler, GlobalExceptionHandler, ProblemFactory, RoutingExceptionHandler, ValidationExceptionHandler, Violation, ViolationReader
 │   ├── filter/      GatewayProofFilter
@@ -442,8 +442,9 @@ What the package graph says about it (same commands as [Measuring it](#measuring
   2 to 1 (mapping sits in `EntryWriter` and the assembler).
 - Coupling that rose, and why it is accepted: `service.* -> dto.resp` (conversion-svc 2 to 9,
   ledger-svc 5 to 10), because more classes now pass the response record along; the trade-off below
-  covers it. `ctl -> service.*` rose by 3 import lines: ledger `ConversionPostingCtrl` now also imports
-  `ConversionVoidService` and `answer.ConversionPostingReader`, conversion `ConversionCtrl` imports `ConversionReader`.
+  covers it. `ctl -> service.*` rose by 3 import lines: at `fb3e161` ledger `ConversionPostingCtrl` also imported
+  `ConversionVoidService` and `answer.ConversionPostingReader` (the class was deleted in `c965475`, when
+  conversion postings moved to gRPC), and conversion `ConversionCtrl` imports `ConversionReader`.
 - No cycle: `service.conversion.answer` imports nothing from `service.conversion`; `service.posting`
   imports no use case.
 
@@ -494,8 +495,10 @@ every package-to-package import edge with its count; the trees and dependency li
 same numbers (a package count includes the root package holding the application class). An import of
 a generated class from `contracts/` counts as one edge to `contracts`. For the
 refactor BEFORE and AFTER, run it in a checkout of `4e1af9a` and `19bc692`; for the
-dependency-injection BEFORE, `103e5cf`. Last run on 2026-10-14 at `719f084` for ledger-svc and
-conversion-svc (the gRPC change); gateway-svc was unchanged.
+dependency-injection BEFORE, `103e5cf`. Last run on 2026-10-16 at `e1f1682` for all three
+services: the counts, trees and edges above describe the main code at that commit. Since the previous
+run (2026-10-14 at `719f084`) only conversion-svc's class count changed, 96 to 97, when `0cdc830` added
+`KafkaConfig`; it imports nothing from `io.ezeebit`, so no edge moved.
 
 ```sh
 for s in ledger conversion gateway; do

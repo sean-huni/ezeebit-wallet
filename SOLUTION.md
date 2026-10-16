@@ -11,10 +11,12 @@ Walkthrough video: link to be added.
 
 I spent about 3 hours of my own attention, directing AI agents (Claude Code) that wrote most of the
 code and docs under review gates: tests seen failing before they were trusted, reviews of each
-branch, and a final review of the whole repository. The agents' work ran from 02:44 into the evening of
-13 October 2026 (commit timestamps in South African Standard Time, Coordinated Universal Time (UTC)
-plus 2 hours; `git log` has the exact times), well past the brief's two to three hours; release
-`0.1.0` was tagged at 10:19 and the rest landed on `dev` after it. The brief says
+branch, and a final review of the whole repository. The agents' work ran from 02:44 on 13 October 2026
+to the early hours of 16 October (commit timestamps in South African Standard Time, Coordinated
+Universal Time (UTC) plus 2 hours; `git log` has the exact times), well past the brief's two to three
+hours. Release `0.1.0` was tagged on 13 October at 10:19 and the rest landed on `dev` after it;
+release `0.2.0` (gateway, gRPC conversion-to-ledger, Kafka dead letters, Slack alerts) was tagged on
+15 October at 14:26. The brief says
 to stop and write up the rest; I kept building the extras listed below, which a reviewer can
 ignore. Section 8 says where I accepted, changed or rejected what the agents produced.
 
@@ -26,7 +28,7 @@ of it:
 
 | Addition | Merge on `dev` | Where it is described |
 |---|---|---|
-| Local observability: Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image, OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
+| Local observability: the Grafana LGTM image (`grafana/otel-lgtm`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector), OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
 | Static application security testing (SAST) and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
 | Supply-chain gate: secrets scanning, Paketo images, software bills of materials (SBOMs), trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
@@ -34,6 +36,7 @@ of it:
 | Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
 | Use-case packages and a map of every package and class | `refactor-ledger-packages` | [docs/project-layout.md](docs/project-layout.md) |
 | Dependency-injection budget: the build fails on any bean with more than 3 injected dependencies; 8 beans split by job to meet it | `bugfix-di-flooding` | [docs/quality-gates.md](docs/quality-gates.md#architecture-gates) |
+| Conversion to ledger over gRPC instead of REST, Resilience4j retries and circuit breakers, a Kafka dead-letter topic, Slack alert delivery | `feat-ledger-grpc` | [ARCHITECTURE.md](ARCHITECTURE.md#conversion-to-ledger-over-grpc), [docs/observability.md](docs/observability.md) |
 
 Each landed as its own merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means
@@ -70,18 +73,20 @@ What exists:
   domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** `./gradlew --no-build-cache --rerun-tasks clean build` on 2026-10-14, counted from the JUnit
-Extensible Markup Language (XML) reports
-([gate log](docs/fleet/verification/2026-10-14-gate.log); `checkSecrets` ran separately, 0 leaks):
-**608 tests, 0 failures, 0 skipped** (538 on 2026-10-13, before the gRPC change). Each unit count includes the 13 tests of the shared
+**Tests.** **610 tests, 0 failures, 0 skipped**, summed from the JUnit Extensible Markup Language (XML)
+reports `services/*/build/test-results/*/*.xml` last written 2026-10-15 at 14:23 local (the build for
+release `0.2.0`; 538 on 2026-10-13, before the gRPC change). Those reports are not committed; a
+committed gate log with the counts arrives with release `0.3.0`. The
+[2026-10-14 gate log](docs/fleet/verification/2026-10-14-gate.log) records `BUILD SUCCESSFUL` for
+`./gradlew --no-build-cache --rerun-tasks clean build` at `3b92e9d`, but no test counts. Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected
 dependencies (`DependencyBudgetTest`, `InjectionCounterTest`; see
 [docs/quality-gates.md](docs/quality-gates.md#architecture-gates)).
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 106 | 42 | 61 |
-| conversion-svc | 172 | 31 | 49 |
+| ledger-svc | 107 | 42 | 61 |
+| conversion-svc | 173 | 31 | 49 |
 | gateway-svc | 65 | 54 | |
 | config-svc | 14 | | |
 | eureka-svc | 14 | | |
@@ -228,10 +233,12 @@ This is the single list; the other documents link here.
   caller needs the token the brief puts out of scope. Only the shape of the key is bounded: a universally unique identifier (UUID).
 - One Postgres container hosts both databases: logically separate, one shared failure domain.
 - config-svc and eureka-svc run as single instances.
-- CircleCI has never run: no project reads the config until the repository is pushed and connected
-  ([docs/ci.md](docs/ci.md)).
+- CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no
+  check run or status exists on `origin/dev` (checked 2026-10-16; [docs/ci.md](docs/ci.md)).
 - Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
   fixable Common Vulnerabilities and Exposures (CVEs); each override must be dropped once Boot catches up, or it will hold a version back.
+  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.10.1 by kafka-clients
+  4.2.1: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 - trivy has no compose checks, so the misconfiguration stage reports rather than inspects.
 
 **Money correctness**

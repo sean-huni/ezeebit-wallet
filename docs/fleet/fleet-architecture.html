@@ -27,7 +27,7 @@
     <div class="diagram-container">
     <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fleet-architecture-title fleet-architecture-desc">
       <title id="fleet-architecture-title">Ezeebit wallet fleet, as built</title>
-      <desc id="fleet-architecture-desc">Merchants call the gateway, which routes balance reads to ledger-svc and quotes and conversions to conversion-svc over HTTP; conversion-svc posts to the ledger over gRPC with retries and a circuit breaker, records exhausted calls as dead letters on Kafka, and reads rates from WireMock; each service owns a Postgres database, the gateway keeps rate limits in Redis, and every JVM sends telemetry to LGTM, which pages Slack.</desc>
+      <desc id="fleet-architecture-desc">Merchants call the gateway, which routes balance and statement reads to ledger-svc and quotes and conversions to conversion-svc over HTTP; conversion-svc posts to the ledger over gRPC with retries and a circuit breaker, records exhausted calls as dead letters on Kafka, and reads rates from WireMock; each service owns a Postgres database, the gateway keeps rate limits in Redis, and every JVM sends telemetry to LGTM, which pages Slack.</desc>
       <defs>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8b93b8"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#39ff14"/></marker>
@@ -56,7 +56,7 @@
       <rect x="900" y="88" width="320" height="564" rx="10" fill="rgba(232,236,255,0.02)" stroke="rgba(232,236,255,0.10)" stroke-width="0.8"/>
       <rect x="916" y="80" width="181" height="16" rx="2" fill="url(#wall)"/>
       <text x="1006" y="92" fill="#7a83a8" font-size="10" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">SUPPORTING · DOCKER COMPOSE</text>
-      <path d="M 8,392 H 78" fill="none" stroke="#39ff14" stroke-width="1.6" stroke-linecap="round" filter="url(#neon-soft)" marker-end="url(#arrow-accent)"/>
+      <path d="M 8,392 H 78" fill="none" stroke="#22e6ff" stroke-width="1.3" stroke-linecap="round" filter="url(#neon-soft)" marker-end="url(#arrow-link)"/>
       <path d="M 8,268 H 558" fill="none" stroke="#22e6ff" stroke-width="1.3" stroke-linecap="round" filter="url(#neon-soft)" marker-end="url(#arrow-link)"/>
       <path d="M 256,376 H 392 Q 400,376 400,368 V 308 Q 400,300 408,300 H 558" fill="none" stroke="#22e6ff" stroke-width="1.3" stroke-linecap="round" filter="url(#neon-soft)" marker-end="url(#arrow-link)"/>
       <path d="M 256,408 H 416 Q 424,408 424,416 V 484 Q 424,492 432,492 H 558" fill="none" stroke="#22e6ff" stroke-width="1.3" stroke-linecap="round" filter="url(#neon-soft)" marker-end="url(#arrow-link)"/>
@@ -92,8 +92,8 @@
       <text x="888" y="119" fill="#8b93b8" font-size="10" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">OTLP · JVMS</text>
       <rect x="1179" y="74" width="51" height="15" rx="2" fill="url(#wall)"/>
       <text x="1204" y="85" fill="#22e6ff" font-size="10" font-family="'IBM Plex Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">ALERTS</text>
-      <text x="300" y="204" fill="#8b93b8" font-size="13" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">Every JVM reads config-svc at boot and registers with eureka-svc. The gateway routes</text>
-      <text x="300" y="222" fill="#8b93b8" font-size="13" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">by lb:// name; conversion finds ledger's gRPC port in its Eureka metadata.</text>
+      <text x="300" y="204" fill="#8b93b8" font-size="13" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">Ledger, conversion and gateway read config-svc at boot and register with eureka-svc.</text>
+      <text x="300" y="222" fill="#8b93b8" font-size="13" font-style="italic" font-family="'IBM Plex Sans', system-ui, sans-serif">The gateway routes by lb:// name; conversion finds ledger's gRPC port in Eureka metadata.</text>
       <rect x="300" y="108" width="192" height="60" rx="8" fill="url(#surface)"/>
       <rect x="301" y="109" width="190" height="1" fill="rgba(255,255,255,0.10)"/>
       <rect x="300" y="108" width="192" height="60" rx="8" fill="none" stroke="rgba(232,236,255,0.42)" stroke-width="1"/>

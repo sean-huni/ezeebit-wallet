@@ -10,7 +10,8 @@ OpenTelemetry collector in one container (the image keeps the Loki, Grafana, Tem
 Grafana's own database is on tmpfs and resets on every start by design: dashboards, alert rules and
 the contact point re-provision from files in `docker/lgtm/`, and no stale alert state survives a
 restart to page on the next boot. Before that change a restart produced 4 false pages (reproduced
-with Slack disconnected); after it the same script produced 0.
+with Slack disconnected); after it the same script produced 0 (2026-10-13; neither run's log was
+committed).
 
 Every service exports metrics (every 10 s), traces (100% sampled) and logs over OpenTelemetry
 Protocol (OTLP) on Hypertext Transfer Protocol (HTTP) to `localhost:4318` (`OTLP_URL` overrides it). A log line written inside a request carries
@@ -183,7 +184,7 @@ lgtm image over `alerting/promtool/rules.yml`, the generated Prometheus-format m
 LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken, ConversionLedgerDeadLettered,
 DeadLetterPublishFailing and KafkaAbsent (its 60 s hold is evaluated inside a broker blip and after
 it). Red-proof: rewriting LedgerInvariantBroken as `sum(increase(X[5m]))` fails
-both of its cases, because `increase()` cannot see a counter born inside the window
+both of its firing cases (the third, a no-alert case, still passes), because `increase()` cannot see a counter born inside the window
 (`docs/observability/verification/2026-10-13-promtool-red.log`).
 
 `fleet.sh` starts lgtm only after every service is healthy and stops it first on `down`, so neither
@@ -212,7 +213,9 @@ visible in Grafana only. Grafana expands the URL from its environment; it is nev
 
 Repeated at 16:23 South African Standard Time, 2 hours ahead of Coordinated Universal Time
 (UTC), the same day, with the timings in
-[EVIDENCE.md](../EVIDENCE.md#alerts-to-slack). Every other rehearsal below ran once.
+[EVIDENCE.md](../EVIDENCE.md#alerts-to-slack). Every other rehearsal below ran once. The pollers'
+output for the 2026-10-13 rehearsals was not committed: the timings in this section are as recorded
+on the day and cannot be re-read from a log in this repository.
 
 **Business alerts, Slack disconnected.** ledger-svc frozen with SIGSTOP and a conversion accepted
 (202 PENDING); the WireMock rate service stopped while a quote was sent every 2 s:
@@ -274,11 +277,11 @@ every query and the chaos audit are in
 | ledger-svc killed | t+0s |
 | 5 conversions answered 202 PENDING, 0.62 s to 0.97 s each; 5 `POST` dead letters written | t+1s to t+4s |
 | ConversionLedgerDeadLettered `{op=POST, reason=RETRIES_EXHAUSTED}` Alerting (`for: 0s`) | t+16s |
-| Slack page delivered (`grafana_alerting_notifications_total{integration="slack"}` 0 to 1) | t+27s |
+| Slack page delivered (`grafana_alerting_notifications_total{integration="slack"}` absent to 1) | t+27s |
 | ServiceDown `{job=ledger-svc}` Pending | t+35s |
 | Sweeper's first `FIND` dead letter | t+78s |
 | ServiceDown Alerting | t+95s |
-| `FIND` breaker open (`reason=CIRCUIT_OPEN` Alerting) | t+167s |
+| `FIND` breaker open (`reason=CIRCUIT_OPEN` Alerting) | t+166s |
 | `./fleet.sh up` started (bounced once) | t+257s |
 | Sweeper voided all 5 on both sides | t+350s |
 | `up` exit 0, 16 of 16 checks; PENDING count 0 | t+361s, t+369s |
@@ -315,4 +318,6 @@ trace opening in Tempo, the trace view and alert annotations. Captures land in `
 check passing is not the verdict, the pictures are read. The run of 2026-10-13 is
 `2026-10-13-dashboards-playwright-run.log` (65 passed, 0 failed) and the curated captures are in
 [EVIDENCE.md](../EVIDENCE.md#monitoring-and-observability). A new wave of dashboard work adds a new dated
-suite and re-runs this one.
+suite and re-runs this one. The 2026-10-14 Ledger gRPC row did not: it was captured by
+[2026-10-14-ledger-grpc-capture.mjs](observability/verification/2026-10-14-ledger-grpc-capture.mjs),
+and no re-run of the 2026-10-13 suite after it is committed.

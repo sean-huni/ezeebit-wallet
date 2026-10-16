@@ -60,7 +60,7 @@ outbound/deadletter/KafkaDeadLetterPublisher  -> ezeebit.conversion.ledger.deadl
 - This also clears the open item in memory `ports-refactor-pending`: `service/` stops importing a
   concrete `outbound/` client on the ledger seam. The rate seam gets the same port in this change.
 - Every new bean stays at or under 3 injected dependencies (`rules/be/java/dependency-injection.md`).
-- `ConversionPostingCtrl`, its request and response DTOs, and their tests are deleted (D5).
+- `ConversionPostingCtrl`, `VoidReq` and their tests are deleted (D5). `ConversionPostingReq` and `ConversionPostingResp` stay: `grpc/PostingMessages` translates to and from them (as built, checked 2026-10-16).
 - The conversion acceptance tier injects ledger faults through a WireMock HTTP proxy today; it becomes a
   small gRPC forwarding proxy in test code. One scenario step changes wording: with 3 attempts it counts
   distinct conversions posted, not `Post` calls. The rate retry is 2 attempts (4.2s worst case).

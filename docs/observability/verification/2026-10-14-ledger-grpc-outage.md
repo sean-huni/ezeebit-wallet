@@ -30,11 +30,11 @@ t0 = 12:00:04, the `kill -9` of ledger-svc.
 | `ServiceDown{job=ledger-svc}` Pending | 12:00:39 (activeAt 12:00:30) | t+35s |
 | First conversion's deadline (quote expiry + 30 s posting grace) | 12:00:49.68 | t+45s |
 | Sweeper's first `FIND` dead letter (deadline + 30 s max transaction time, next 10 s sweep) | 12:01:22 | t+78s |
-| `ConversionLedgerDeadLettered{op=FIND,reason=RETRIES_EXHAUSTED}` Alerting | 12:01:30 | t+87s |
+| `ConversionLedgerDeadLettered{op=FIND,reason=RETRIES_EXHAUSTED}` Alerting | 12:01:30 | t+86s |
 | `ServiceDown{job=ledger-svc}` Alerting | 12:01:39 | t+95s |
 | Slack counter 2 | 12:01:49 | t+105s |
 | Slack counter 3 | 12:02:31 | t+147s |
-| `ConversionLedgerDeadLettered{op=FIND,reason=CIRCUIT_OPEN}` Alerting: the Find breaker opened | 12:02:50 | t+167s |
+| `ConversionLedgerDeadLettered{op=FIND,reason=CIRCUIT_OPEN}` Alerting: the Find breaker opened | 12:02:50 | t+166s |
 | Slack counter 4, `grafana_alerting_notifications_failed_total` never present | 12:03:30 | t+206s |
 | `./fleet.sh up` started | 12:04:21 | t+257s |
 | Sweeper voided all 5 (ledger `VOID` journals, conversions `REJECTED`/`VOIDED`) | 12:05:54 | t+350s |
@@ -106,13 +106,14 @@ sum by (op, reason) (ezeebit_conversion_ledger_deadletter_total{job="conversion-
   POST RETRIES_EXHAUSTED 5, FIND RETRIES_EXHAUSTED 41, FIND CIRCUIT_OPEN 14
 ```
 
-**After the restore the end offset was 0. Every record was gone.** The kafka service in
-`compose.yaml` has no volume, and `fleet.sh down` (which `up` runs when it bounces) does
-`docker compose down`, which removes the container and its log directory with it. The topic's
-`retention.ms=604800000` (7 days) therefore really means "until the next down or bounce". The
+**After the restore the end offset was 0. Every record was gone.** At the time of this run the
+kafka service in `compose.yaml` had no volume, and `fleet.sh down` (which `up` runs when it bounces)
+does `docker compose down`, which removed the container and its log directory with it. The topic's
+`retention.ms=604800000` (7 days) therefore really meant "until the next down or bounce". The
 recovery path a responder follows after a ledger outage is exactly that bounce, so the record of
-the outage is deleted by its own recovery. Reported as a defect. Not fixed here: the fix is a
-compose change outside this task's scope.
+the outage was deleted by its own recovery. Reported as a defect and not fixed in this run.
+Fixed later the same day by commit `2c9851f` (2026-10-14 14:20 +0200), which gives the broker the
+named `kafkadata` volume: records now survive `down` and a bounce until `./fleet.sh purge`.
 
 ## Audit
 
@@ -232,7 +233,8 @@ count(grpc_client_milliseconds_bucket{job="conversion-svc"}) = 138 series
 
 Void reads NaN because its 5 calls came in one burst right after conversion-svc restarted. That burst
 created the series at 5, so `rate()` sees no increase. This is the counter-appears-mid-window
-shape (`rules/_global/observability.md` section 3). It is a limit of the panel at restart, not
+shape: `increase()` and `rate()` have nothing to extrapolate from when a counter is born inside the
+window. It is a limit of the panel at restart, not
 missing data.
 
 ## Screenshots
@@ -246,7 +248,8 @@ pattern, 1440x900, installed Chrome):
   connections fail fast), all three breakers still CLOSED at capture time, and Dead letters at 5
   for POST RETRIES_EXHAUSTED.
 - [Dead letters panel](../evidence/2026-10-14-fleet-overview-dead-letters.png): one series, POST
-  RETRIES_EXHAUSTED, steps from 0 to 5 at 14:00 local, above the dashed threshold.
+  RETRIES_EXHAUSTED, appears at 5 at 14:00 local (the counter is born with the first dead letter, so
+  no 0 segment is drawn), above the dashed threshold.
 - [Alerts dashboard](../evidence/2026-10-14-alerts-dead-letter-firing.png): ConversionLedgerDeadLettered
   "Firing for 39s" in both lists, and ServiceDown "Pending for 29s".
 - [ConversionLedgerDeadLettered rule input](../evidence/2026-10-14-alerts-dead-letter-input.png): the

@@ -384,14 +384,20 @@ sweep_images() {
     (( rc == 0 )) && [[ $host == sha256:* ]] || { sweep_log "image $ref: host manifest digest unreadable (exit $rc): $host"; SWEEP_FAILED=1; continue; }
     out=$(docker exec "$NODE_CONTAINER" ctr -n k8s.io images ls "name==docker.io/$ref" 2>&1); rc=$?
     (( rc == 0 )) || { sweep_log "image $ref: node ctr images ls exited $rc: $out"; SWEEP_FAILED=1; continue; }
-    node=$(awk -v r="docker.io/$ref" '$1 == r {print $3}' <<< "$out")
+    node=$(awk -v r="docker.io/$ref" '$1 == r {print $3}' <<< "$out"); rc=$?
+    (( rc == 0 )) || { sweep_log "image $ref: awk over ctr output exited $rc"; SWEEP_FAILED=1; continue; }
+    [[ $node != *$'\n'* ]] || { sweep_log "image $ref: ambiguous, the node lists more than one row for that name: ${node//$'\n'/ }"; SWEEP_FAILED=1; continue; }
     [[ $node == sha256:* ]] || { sweep_log "image $ref: the node holds no image by that name"; SWEEP_FAILED=1; continue; }
     out=$(docker exec "$NODE_CONTAINER" crictl inspecti -o json "docker.io/$ref" 2>&1); rc=$?
     (( rc == 0 )) || { sweep_log "image $ref: node crictl inspecti exited $rc"; SWEEP_FAILED=1; continue; }
     cri=$(jq -r '"\(.status.id) \(.info.imageSpec.created // "created-unknown")"' <<< "$out"); rc=$?
     (( rc == 0 )) || { sweep_log "image $ref: jq over crictl output exited $rc"; SWEEP_FAILED=1; continue; }
-    sweep_log "image $ref node manifest=$node (host manifest=$host) cri id=${cri%% *} created=${cri#* }"
-    [[ $node == "$host" ]] || { sweep_log "image $ref: the node's manifest differs from the host build"; SWEEP_FAILED=1; }
+    if [[ $node == "$host" ]]; then
+      sweep_log "image $ref: equal, node manifest=$node host manifest=$host cri id=${cri%% *} created=${cri#* }"
+    else
+      sweep_log "image $ref: DIFFERS, node manifest=$node host manifest=$host cri id=${cri%% *} created=${cri#* }"
+      SWEEP_FAILED=1
+    fi
   done
 }
 

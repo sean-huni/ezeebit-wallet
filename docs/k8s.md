@@ -79,9 +79,10 @@ binds its pod address, so the sweep's `deposit` helper (`k8s/sweep/lib.sh:89-103
 ephemeral container inside a ledger pod, to that pod's own address. That connection stays on the
 pod's loopback interface, so ledger-svc's NetworkPolicy (8081 from gateway-svc only) does not apply to
 it. Measured on 2026-10-16 on a live bring-up: inside ledger pod 10.244.0.11, `ip route get 10.244.0.11`
-answered `local 10.244.0.11 dev lo` and a GET to `10.244.0.11:8081` answered 200, while the same GET
-from the wiremock pod timed out (`wget: download timed out`), so the policy is live and the
-self-address path does not cross it.
+answered `local 10.244.0.11 dev lo`, and a GET to `10.244.0.11:8081` answered 200. The loopback claim
+rests on that route lookup. The same GET from the wiremock pod timed out, but wiremock's own policy
+denies all its egress (`egress: []`, `k8s/base/policy/app.yaml`), so that timeout shows only wiremock's
+egress is denied; it is not evidence that ledger-svc's 8081 ingress rule is enforced.
 
 Data lives in PersistentVolumeClaims inside the kind node. `down` deletes the cluster, so it deletes
 every row, dead letter and metric with it; there is no data-keeping stop.

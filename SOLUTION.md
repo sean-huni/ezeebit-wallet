@@ -216,8 +216,7 @@ This is the single list; the other documents link here.
   gateway-svc on 8081 (`k8s/base/policy/app.yaml`, [docs/k8s.md](docs/k8s.md#network-policy)). It does
   not cover a connection that stays on a ledger pod's loopback interface: the sweep's deposit
   posts to 8081 from a container inside a ledger pod, to that pod's own address, and no policy sees it
-  (measured 2026-10-16: `ip route get <pod IP>` inside the pod answers `local <pod IP> dev lo`, while
-  the same GET from the wiremock pod times out).
+  (measured 2026-10-16: `ip route get <pod IP>` inside the pod answers `local <pod IP> dev lo`).
   Neither fleet has mTLS or a
   service mesh, which production still needs. The gateway proof header covers neither endpoint.
 - Kafka runs as one broker with replication 1. A dead letter Kafka does not take is counted and

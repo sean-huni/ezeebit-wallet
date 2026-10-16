@@ -145,8 +145,10 @@ nothing and one allowed edge answers, so a policy that enforces nothing cannot p
 
 - A CronJob in `ezeebit-chaos`, every 10 minutes, `suspend: true` as shipped.
 - Its ServiceAccount holds namespaced Roles in `ezeebit-app` and `ezeebit-data` only: `get`,
-  `list`, `delete` on pods; `get`, `patch` on deployments and their scale. No Secrets, no access to
-  `ezeebit-obs`. The sweep proves both with `kubectl auth can-i --as=...`.
+  `list`, `delete` on pods; `get`, `list` on deployments and statefulsets (to draw services). No
+  `patch` or `scale` (corrected 2026-10-16: unused by the monkey, and `patch` on a pod template is an
+  indirect path to Secrets; the sweep's outage step scales from the host's own context). No Secrets,
+  no access to `ezeebit-obs`. The sweep proves both with `kubectl auth can-i --as=...`.
 - The victim is drawn uniformly over services, then a running pod of that service is picked, so a
   single-replica service is not starved of faults. The draw and the kill live in one script shared
   by the CronJob and the sweep (shipped to the cluster as a ConfigMap), so the two cannot differ.

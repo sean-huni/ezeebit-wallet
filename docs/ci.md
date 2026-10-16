@@ -2,8 +2,9 @@
 
 Back to [README](../README.md).
 
-**This pipeline has not run anywhere.** No CircleCI project reads `.circleci/config.yml` until the
-repository is pushed and connected, so there is no build number, no badge and no stored result.
+**This pipeline has not run anywhere.** The repository is pushed to GitHub but not connected to
+CircleCI, so nothing reads `.circleci/config.yml`: on 2026-10-16 `origin/dev` carried no check run and
+no commit status, and there is no build number, no badge and no stored result.
 What has been checked is the file and the commands it runs: `circleci config validate` from the
 CircleCI command-line interface (CLI) 1.0.49592 accepts it, and the Gradle commands below pass on a laptop. That validator also accepts
 unknown keys inside a step, so a valid result does not prove every key does something.
@@ -25,7 +26,7 @@ The job has 14 steps. Nine are `run` steps, in this order; the other five (`chec
 | 2 | Install Temurin 25, checksum verified | a tarball whose 256-bit Secure Hash Algorithm (SHA-256) digest is not `JDK_SHA256` |
 | 3 | The running JDK is the pinned one | `$JAVA_HOME/release` not saying `Temurin-25+36`, or `java` on the PATH not being `$JAVA_HOME/bin/java` |
 | 4 | Derive the Gradle dependency cache key | no build file matching, which would make the key the digest of nothing |
-| 5 | `./gradlew --no-build-cache --rerun-tasks clean build` | any test in any tier, a SpotBugs or Checkstyle finding, a coverage floor, `checkSecrets`, `checkDashboards` (generated dashboards or alert rules out of date) |
+| 5 | `./gradlew --no-build-cache --rerun-tasks clean build` | any test in any tier, a SpotBugs or Checkstyle finding, a coverage floor, `checkSecrets`, `checkDashboards` (generated dashboards or alert rules out of date), `checkSingleProto` (a `.proto` outside `contracts/`, or none inside it) |
 | 6 | Every service's test tasks ran | a service in `settings.gradle` with no `:test` line in the log, a `tieredServices` service missing `:integrationTest`, a `cucumberServices` service missing `:acceptanceTest`, any of them leaving no JUnit Extensible Markup Language (XML), any `FROM-CACHE` line, or an empty `tieredServices` or `cucumberServices` in `build.gradle` (fails closed rather than expecting nothing) |
 | 7 | `./gradlew bootBuildImageAll checkSupplyChain` | the supply-chain verdict ([supply-chain.md](supply-chain.md)) or an image that does not build |
 | 8 | `./gradlew sonarAll`, skipped without `SONAR_TOKEN` | the SonarQube quality gate; with no token it prints why it skipped and exits 0 |
@@ -33,9 +34,10 @@ The job has 14 steps. Nine are `run` steps, in this order; the other five (`chec
 
 Step 6 reads the service list from `settings.gradle`, the integration tier from `tieredServices` and the
 acceptance tier from `cucumberServices` in `build.gradle`, so no list is typed into the config. Today it
-expects 10 test tasks: 5 `test`, 3 `integrationTest`, 2 `acceptanceTest`. Run against a real gate log
-(`--no-build-cache --rerun-tasks clean build`, 538 tests, 2026-10-13) it finds all 10 and exits 0; with the
-`:services:ledger-svc:acceptanceTest` line removed from that log it fails naming it. An earlier version
+expects 10 test tasks: 5 `test`, 3 `integrationTest`, 2 `acceptanceTest`. Run once by hand against a real gate log
+(`--no-build-cache --rerun-tasks clean build`, 538 tests, 2026-10-13) it found all 10 and exited 0; with the
+`:services:ledger-svc:acceptanceTest` line removed from that log it failed naming it. That transcript
+was not committed. An earlier version
 took the acceptance tier from `tieredServices` and failed every green build once `gateway-svc` joined
 that list (fixed in `bugfix-ci-test-tasks`). A `FROM-CACHE` line also fails it. The Gradle cache holds
 only the wrapper distribution and the module cache, never task output.

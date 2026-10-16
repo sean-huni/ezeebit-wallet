@@ -242,14 +242,14 @@ cmd_down() {
   else
     log "cluster $CLUSTER does not exist"
   fi
-  # sweep/ keeps the sweep's full build output, which the committed sweep log points at.
+  # builds/ keeps the sweep's full image-build output, which the committed sweep log points at.
   if [[ -d $RUN_DIR ]]; then
-    find "$RUN_DIR" -mindepth 1 -maxdepth 1 ! -name sweep -exec rm -r -- {} + || fail "could not clear $RUN_DIR"
+    find "$RUN_DIR" -mindepth 1 -maxdepth 1 ! -name builds -exec rm -r -- {} + || fail "could not clear $RUN_DIR"
     rmdir "$RUN_DIR" 2> /dev/null
   fi
   "$ROOT/scripts/env-guard.sh" release k8s; rc=$?
   (( rc == 0 )) || fail "env-guard release k8s exited $rc"
-  log "down: cluster $CLUSTER and $RUN_DIR removed (except $RUN_DIR/sweep)"
+  log "down: cluster $CLUSTER and $RUN_DIR removed (except $RUN_DIR/builds)"
 }
 
 cmd_status() {
@@ -372,19 +372,26 @@ sweep_finish() {
   exit "$SWEEP_FAILED"
 }
 
-# The id is the evidence of which build ran: Paketo pins every image's Created to 1980-01-01 for reproducibility.
+# The manifest digest is the evidence of which build ran: Paketo pins every image's Created to 1980-01-01.
+# Compared like with like: the host's manifest digest (.Descriptor, containerd image store; absent on the classic
+# store, so the inspect fails closed) against the node's ctr image target. crictl's id is the config digest.
 sweep_images() {
-  local version svc host node rc
+  local version svc ref host out node cri rc
   version=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
   for svc in "${SERVICES[@]}"; do
-    host=$(docker image inspect --format '{{.Id}} {{.Created}}' "ezeebit/$svc:$version" 2>&1); rc=$?
-    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: host inspect exited $rc: $host"; SWEEP_FAILED=1; continue; }
-    node=$(docker exec "$NODE_CONTAINER" crictl inspecti -o json "docker.io/ezeebit/$svc:$version" 2>&1); rc=$?
-    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: node crictl inspecti exited $rc"; SWEEP_FAILED=1; continue; }
-    node=$(jq -r '"\(.status.id) \(.info.imageSpec.created // "created-unknown")"' <<< "$node"); rc=$?
-    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: jq over crictl output exited $rc"; SWEEP_FAILED=1; continue; }
-    sweep_log "image ezeebit/$svc:$version node id=${node%% *} created=${node#* } (host id=${host%% *})"
-    [[ ${node%% *} == "${host%% *}" ]] || { sweep_log "image ezeebit/$svc:$version: node id differs from the host build"; SWEEP_FAILED=1; }
+    ref="ezeebit/$svc:$version"
+    host=$(docker image inspect --format '{{.Descriptor.digest}}' "$ref" 2>&1); rc=$?
+    (( rc == 0 )) && [[ $host == sha256:* ]] || { sweep_log "image $ref: host manifest digest unreadable (exit $rc): $host"; SWEEP_FAILED=1; continue; }
+    out=$(docker exec "$NODE_CONTAINER" ctr -n k8s.io images ls "name==docker.io/$ref" 2>&1); rc=$?
+    (( rc == 0 )) || { sweep_log "image $ref: node ctr images ls exited $rc: $out"; SWEEP_FAILED=1; continue; }
+    node=$(awk -v r="docker.io/$ref" '$1 == r {print $3}' <<< "$out")
+    [[ $node == sha256:* ]] || { sweep_log "image $ref: the node holds no image by that name"; SWEEP_FAILED=1; continue; }
+    out=$(docker exec "$NODE_CONTAINER" crictl inspecti -o json "docker.io/$ref" 2>&1); rc=$?
+    (( rc == 0 )) || { sweep_log "image $ref: node crictl inspecti exited $rc"; SWEEP_FAILED=1; continue; }
+    cri=$(jq -r '"\(.status.id) \(.info.imageSpec.created // "created-unknown")"' <<< "$out"); rc=$?
+    (( rc == 0 )) || { sweep_log "image $ref: jq over crictl output exited $rc"; SWEEP_FAILED=1; continue; }
+    sweep_log "image $ref node manifest=$node (host manifest=$host) cri id=${cri%% *} created=${cri#* }"
+    [[ $node == "$host" ]] || { sweep_log "image $ref: the node's manifest differs from the host build"; SWEEP_FAILED=1; }
   done
 }
 
@@ -414,7 +421,7 @@ cmd_sweep() {
   fi
   SWEEP_UP=1
   # Gitignored and kept by down: the full build output stays on this machine, the log keeps its summary and path.
-  build_log="$RUN_DIR/sweep/$(date +%F)-build.log"
+  build_log="$RUN_DIR/builds/$(date +%F)-build.log"
   mkdir -p "$(dirname "$build_log")"
   ( KUBE_BUILD_LOG=$build_log cmd_up ) >> "$SWEEP_LOG" 2>&1; rc=$?
   sweep_log "up exit=$rc (image build output: ${build_log#"$ROOT"/})"

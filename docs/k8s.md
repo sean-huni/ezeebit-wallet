@@ -44,7 +44,7 @@ the host at all.
 ```sh
 ./k8s/kube.sh up        # guard, cluster, image build and load, secrets, configmaps, then every stage until Ready
 ./k8s/kube.sh status    # pods in the four namespaces, then every HPA
-./k8s/kube.sh down      # deletes the ezeebit cluster and .kube-fleet/ (except the sweep's build output in .kube-fleet/sweep/), then releases the guard
+./k8s/kube.sh down      # deletes the ezeebit cluster and .kube-fleet/ (except .kube-fleet/builds/, the sweep's image-build logs), then releases the guard
 ./k8s/kube.sh sweep     # from no cluster to a deleted one: up, seven checks, down (see The sweep)
 ```
 
@@ -76,9 +76,12 @@ Grafana is at
 http://127.0.0.1:3000 and the gateway at http://127.0.0.1:8080, on the same routes as under
 `fleet.sh`. A deposit has no host path: `/internal/**` is never routed, and ledger-svc
 binds its pod address, so the sweep's `deposit` helper (`k8s/sweep/lib.sh:89-103`) posts it from an
-ephemeral container inside a ledger pod, to that pod's own address. That connection never leaves the
-pod's network namespace, so ledger-svc's NetworkPolicy (8081 from gateway-svc only) does not apply to
-it.
+ephemeral container inside a ledger pod, to that pod's own address. That connection stays on the
+pod's loopback interface, so ledger-svc's NetworkPolicy (8081 from gateway-svc only) does not apply to
+it. Measured on 2026-10-16 on a live bring-up: inside ledger pod 10.244.0.11, `ip route get 10.244.0.11`
+answered `local 10.244.0.11 dev lo` and a GET to `10.244.0.11:8081` answered 200, while the same GET
+from the wiremock pod timed out (`wget: download timed out`), so the policy is live and the
+self-address path does not cross it.
 
 Data lives in PersistentVolumeClaims inside the kind node. `down` deletes the cluster, so it deletes
 every row, dead letter and metric with it; there is no data-keeping stop.
@@ -376,7 +379,7 @@ Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP g
 ./k8s/kube.sh sweep               # takes no options: it always builds the images it tests
 ```
 
-One command from no cluster to a deleted one (`k8s/kube.sh:375-440`). **It refuses a dirty working
+One command from no cluster to a deleted one (`k8s/kube.sh:375-447`). **It refuses a dirty working
 tree** (`git status --porcelain` non-empty, the count named), so the log describes exactly one commit.
 **For a release run, Slack delivery is asserted only when the webhook is in the sweep's environment**:
 `kube.sh` never reads `.env`, so run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that
@@ -384,18 +387,24 @@ shell first, and never echo or log its value. Without it the outage step records
 asserted.
 **It deletes an existing `ezeebit` cluster first**, so it always starts from a fresh bring-up, and it
 always builds the five images. The log's first line names the full commit sha and the branch. The full
-image-build output goes to `.kube-fleet/sweep/<YYYY-MM-DD>-build.log` (gitignored, kept by `down`); the
+image-build output goes to `.kube-fleet/builds/<YYYY-MM-DD>-build.log` (gitignored; `down` keeps `.kube-fleet/builds/` and deletes everything else under `.kube-fleet/`, including the checks' working files in `.kube-fleet/sweep/`); the
 committed log keeps the build's exit code, its line count and that path. After `up`, the log records
-each `ezeebit/<svc>` image as the node holds it (`crictl inspecti`: image id and Created) beside the
-host's id, and fails the sweep when they differ. Created reads 1980-01-01 on every Paketo image (the
-builder pins it for reproducible builds), so the image id is what ties a run to its build. Each step appends its output and
+each `ezeebit/<svc>` image's manifest digest as the node holds it (`ctr -n k8s.io images ls`, the
+image's target digest) beside the host's (`docker image inspect` `.Descriptor.digest`), and fails the
+sweep when they differ; it also logs the CRI image id and Created (`crictl inspecti`). The two sides
+are compared as manifest digests because this Docker uses the containerd image store, where
+`docker image inspect .Id` is the manifest digest, while the CRI image id is the config digest, so
+those two never match (measured 2026-10-16: config-svc manifest `sha256:e9e70024...`, CRI id
+`sha256:9581ff0e...`). On Docker's classic store `.Descriptor` is absent and the check fails rather
+than compare unlike ids. Created reads 1980-01-01 on every Paketo image (the builder pins it for
+reproducible builds), so the digest is what ties a run to its build. Each step appends its output and
 a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-sweep.log` (that day's file is
 truncated at the start), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
 the cluster is deleted and the lease released on every exit path, Ctrl-C included.
 
 | Step | Script | What it asserts |
 |---|---|---|
-| up | `kube.sh up` | manifest tags equal the `build.gradle` version; images built; every workload of every stage Ready; each node image id equals the host build's |
+| up | `kube.sh up` | manifest tags equal the `build.gradle` version; images built; every workload of every stage Ready; each node image's manifest digest equals the host build's |
 | monitoring begin | `k8s/sweep/monitoring.sh` | exactly one lgtm pod (its uid and restart count recorded); Grafana `/api/health` 200 |
 | parity | `k8s/sweep/parity.sh` | the third-party images running in the cluster equal `compose.yaml`'s, both ways (the chaos image, metrics-server and kind's own images excepted); exactly 5 distinct `ezeebit/*` images, all at the `build.gradle` version; config-svc and eureka-svc at 1 desired and 1 ready, with no HPA targeting them; each of the three HPAs `ScalingActive=True` within 180 s; zero kubelet `Pulling` events |
 | money | `k8s/sweep/money.sh` | a 100.00 ZAR deposit (201, from inside a ledger pod); a 50.00 ZAR to USDT quote and conversion through the gateway (201, COMPLETED); balances through the gateway read ZAR 50.00 and USDT equal to the conversion's `buyAmount`; exactly one POSTED CONVERSION journal keyed by the conversion id in the ledger database |
@@ -404,7 +413,7 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 | chaos | `k8s/sweep/chaos.sh` | quote-and-convert traffic from 3 merchants runs throughout; one pod each of gateway-svc, ledger-svc and conversion-svc is killed 30 s apart with `monkey.sh --service`, and the check fails unless exactly 3 kills happened; every 5xx or unanswered request lands at most 20 s after the latest kill before it, none before the first; each 30 s kill window carries at least 20 requests; conversions complete before the first kill and after the last kill's 20 s; the three Deployments recover; PENDING conversions settle within 120 s; then the cross-store reconciliation: every COMPLETED conversion has exactly one POSTED CONVERSION journal keyed by its id and every such journal a COMPLETED conversion, none posted twice, and the conversion rows lie between the 201/202 answers and the requests sent |
 | outage | `k8s/sweep/outage.sh` | ConversionLedgerDeadLettered has no Alerting instance before the outage (waits up to 360 s); ledger-svc is scaled to 0 from the host's context; conversions run until `ezeebit_conversion_ledger_deadletter_total` rises (up to 180 s); the rule reaches firing with an Alerting instance whose `activeAt` is after the scale-down, within its `for` + 120 s; with the `slack` Secret present, `grafana_alerting_notifications_total{integration="slack"}` rises within 120 s, and without it the log says delivery was not asserted; the declared replica count is restored and read back on every exit path |
 | monitoring end | `k8s/sweep/monitoring.sh` | the lgtm pod uid and restart count unchanged; Grafana `/api/health` 200 at the start, after every check and at the end |
-| down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `sweep/`, the lease released |
+| down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `builds/` (the build logs), the lease released |
 
 **The release evidence is the committed passing log** under `docs/k8s/verification/`. As of
 2026-10-16 at `e7aed35` no sweep log is committed.

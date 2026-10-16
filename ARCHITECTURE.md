@@ -170,8 +170,9 @@ service-to-service, plaintext, bound to loopback locally, and need a network pol
 privilege (https://owasp.org/Top10/A01_2021-Broken_Access_Control/) wants the gRPC port to admit
 only conversion-svc. The kind fleet has the NetworkPolicy half: from other pods, ledger-svc admits only
 conversion-svc on 9081 and only gateway-svc on 8081 ([docs/k8s.md](docs/k8s.md#network-policy)); a
-connection from inside a ledger pod to its own address (the sweep's deposit) never leaves the pod's
-network namespace, so no policy applies to it. mTLS or a mesh is not
+connection from inside a ledger pod to its own address (the sweep's deposit) is routed over the pod's
+loopback interface, so no policy applies to it (measured on a live bring-up on 2026-10-16:
+`ip route get <pod IP>` inside the pod answers `local <pod IP> dev lo`; [docs/k8s.md](docs/k8s.md)). mTLS or a mesh is not
 built, because locally loopback is the control.
 
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into

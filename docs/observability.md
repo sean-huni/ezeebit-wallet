@@ -123,6 +123,7 @@ a known currency or pair, an outcome, a code. No tag carries a merchant, a key o
 | `ezeebit_conversion_ledger_deadletter_publish_failed_total` | counter | `op` | `KafkaDeadLetterPublisher`, when Kafka did not take a dead letter (the record is then only in the log) |
 | `ezeebit_gateway_ratelimit_total` | counter | `outcome` allowed, limited, contention, unavailable, refused_path | gateway `RateLimitFilter`, once per merchant request or refused path; every outcome registered at zero on start |
 | `ezeebit_gateway_ratelimit_store_up` | gauge | none | gateway `StorePingScheduler`: 1 while Redis answers PING within 250 ms, else 0, every 10 s. One view per replica: read with `min()` |
+| `ezeebit_gateway_upstream_resend_total` | counter | `route` (the served route id: `ledger`, `conversion`) | gateway `RetryUnsent` filter (`UnsentRetryFilterFunctions`), once per attempt sent again to another instance because the previous connect was refused or timed out; every route carrying the filter registered at zero on start (`RouteFilterConfig`). No panel or alert reads it yet ([docs/k8s.md](k8s.md#replica-fixes-r1-to-r6)) |
 
 Requests refused before the service layer (malformed JSON, a missing field) are counted only by the
 HTTP metrics.

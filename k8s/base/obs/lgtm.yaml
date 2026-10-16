@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm
+  labels:
+    app.kubernetes.io/name: lgtm
+spec:
+  selector:
+    app.kubernetes.io/name: lgtm
+  ports:
+    - {name: grafana, port: 3000, targetPort: 3000}
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+    - {name: otlp-http, port: 4318, targetPort: 4318}
+---
+# Grafana alone reaches the host (kind maps node 30300 to 127.0.0.1:3000); OTLP stays inside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm-grafana
+  labels:
+    app.kubernetes.io/name: lgtm-grafana
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: lgtm
+  ports:
+    - {name: grafana, port: 3000, targetPort: 3000, nodePort: 30300}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lgtm-data
+  labels:
+    app.kubernetes.io/name: lgtm
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lgtm
+  labels:
+    app.kubernetes.io/name: lgtm
+spec:
+  replicas: 1
+  # One ReadWriteOnce volume: a second pod during a rollout could not mount it.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lgtm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lgtm
+    spec:
+      initContainers:
+        # A ConfigMap holds one flat directory; this rebuilds the docker/lgtm tree from one ConfigMap per directory,
+        # so a new dashboard file needs no manifest change.
+        - name: tree
+          image: 'grafana/otel-lgtm:0.36.0'
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              for pair in root:. dashboards:dashboards alerting:alerting promtool:alerting/promtool; do
+                mkdir -p "/ezeebit/${pair#*:}"
+                cp -L /src/${pair%%:*}/* "/ezeebit/${pair#*:}/"
+              done
+              chmod 0755 /ezeebit/start.sh /ezeebit/test-rules.sh
+          resources:
+            limits: {cpu: 500m, memory: 128Mi}
+          volumeMounts:
+            - {name: tree, mountPath: /ezeebit}
+            - {name: cm-root, mountPath: /src/root, readOnly: true}
+            - {name: cm-dashboards, mountPath: /src/dashboards, readOnly: true}
+            - {name: cm-alerting, mountPath: /src/alerting, readOnly: true}
+            - {name: cm-promtool, mountPath: /src/promtool, readOnly: true}
+      containers:
+        - name: lgtm
+          image: 'grafana/otel-lgtm:0.36.0'
+          command: ['/ezeebit/start.sh']
+          env:
+            - name: SLACK_WEBHOOK_URL
+              valueFrom: {secretKeyRef: {name: slack, key: url, optional: true}}
+          ports:
+            - {name: grafana, containerPort: 3000}
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+          readinessProbe:
+            # run-all.sh writes this file once Grafana, Prometheus, Tempo, Loki and the collector answer.
+            exec:
+              command: ['sh', '-c', 'test -f /tmp/ready']
+            periodSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: "2", memory: 3Gi}
+          volumeMounts:
+            - {name: tree, mountPath: /ezeebit, readOnly: true}
+            - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml, subPath: dashboards.yaml, readOnly: true}
+            - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml, subPath: alerting/rules.yaml, readOnly: true}
+            - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml, subPath: datasources.yaml, readOnly: true}
+            - {name: data, mountPath: /data}
+            # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted Pending
+            # alert restored after downtime fires the instant a booting fleet is first evaluated.
+            - {name: grafana-db, mountPath: /data/grafana/data}
+      volumes:
+        - name: tree
+          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: lgtm-data
+        - name: grafana-db
+          emptyDir: {medium: Memory}
+        - name: cm-root
+          configMap: {name: lgtm-root}
+        - name: cm-dashboards
+          configMap: {name: lgtm-dashboards}
+        - name: cm-alerting
+          configMap: {name: lgtm-alerting}
+        - name: cm-promtool
+          configMap: {name: lgtm-alerting-promtool}

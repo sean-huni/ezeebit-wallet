@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app.kubernetes.io/name: kafka
+spec:
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  labels:
+    app.kubernetes.io/name: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: 'apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837'
+          env:
+            - {name: KAFKA_NODE_ID, value: "1"}
+            - {name: KAFKA_PROCESS_ROLES, value: "broker,controller"}
+            - {name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093"}
+            - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka.ezeebit-data.svc:9092"}
+            - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT"}
+            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER"}
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093"}
+            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"}
+            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1"}
+            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: "false"}
+            # Unset, log.dirs falls back to /tmp/kafka-logs in the container layer and every restart erases the dead letters.
+            - {name: KAFKA_LOG_DIRS, value: "/var/lib/kafka/data"}
+            # The start script's default heap is 1G, which alone fills the 1Gi pod limit.
+            - {name: KAFKA_HEAP_OPTS, value: "-Xms512m -Xmx512m"}
+          ports:
+            - {name: kafka, containerPort: 9092}
+            - {name: controller, containerPort: 9093}
+          readinessProbe:
+            # Asks the controller directly: a client probe on 9092 follows the advertised Service address, which has
+            # no endpoint until this pod is Ready.
+            exec:
+              command: ["/opt/kafka/bin/kafka-metadata-quorum.sh", "--bootstrap-controller", "localhost:9093", "describe", "--status"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 15
+          resources:
+            requests: {cpu: 200m, memory: 768Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/kafka/data}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: kafka
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+---
+# A Job rather than compose's create-in-the-healthcheck: that probe would run through the advertised Service address,
+# which publishes no endpoint until the probe has passed. Topic name, partitions and retention: compose.yaml kafka.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topics
+  labels:
+    app.kubernetes.io/name: kafka-topics
+spec:
+  # No activeDeadlineSeconds: it counts the image pull, which alone took 3.5 minutes on a fresh node.
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kafka-topics
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: kafka-topics
+          image: 'apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837'
+          command:
+            - sh
+            - -c
+            - |
+              bs=kafka.ezeebit-data.svc:9092 topic=ezeebit.conversion.ledger.deadletter
+              n=0
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server $bs --create --if-not-exists --topic $topic --partitions 1 --replication-factor 1 --config retention.ms=604800000; do
+                n=$((n + 1)); [ $n -lt 60 ] || exit 1; sleep 3
+              done
+              exec /opt/kafka/bin/kafka-topics.sh --bootstrap-server $bs --describe --topic $topic
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}

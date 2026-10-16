@@ -23,3 +23,6 @@ out/
 
 # Subagent-driven-development scratch (ledger, briefs, reports)
 .superpowers/
+
+### kind cluster run state (k8s/kube.sh) ###
+.kube-fleet/

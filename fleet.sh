@@ -461,9 +461,9 @@ purge() {
 }
 
 case ${1:-} in
-  up) up ;;
-  down) down ;;
-  purge) purge ;;
+  up) scripts/env-guard.sh acquire compose || exit; up ;;
+  down) down && scripts/env-guard.sh release compose ;;
+  purge) purge && scripts/env-guard.sh release compose ;;
   status) load_ports && fleet_status ;;
   *) print -u2 "usage: $0 up|down|purge|status"; exit 2 ;;
 esac

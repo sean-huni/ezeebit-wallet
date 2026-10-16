@@ -1,7 +1,6 @@
 package io.ezeebit.gateway.api.advice;
 
-import java.net.ConnectException;
-
+import io.ezeebit.gateway.api.filter.UnsentRetryFilterFunctions;
 import io.ezeebit.gateway.exception.ErrorCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,10 +24,11 @@ public class UpstreamUnavailableAdvice {
 		return problems.of(ErrorCode.UPSTREAM_UNAVAILABLE);
 	}
 
-	// Refused connection: the request never reached the service. Anything else (reset, timeout) may have.
+	// A failed connect (refused or timed out): the request never reached the service. Anything else (reset, read
+	// timeout) may have. One definition of "never sent", shared with the RetryUnsent filter.
 	@ExceptionHandler(ResourceAccessException.class)
 	ProblemDetail upstreamUnreachable(final ResourceAccessException ex) {
-		return problems.of(ex.getMostSpecificCause() instanceof ConnectException ? ErrorCode.UPSTREAM_UNAVAILABLE
+		return problems.of(UnsentRetryFilterFunctions.neverSent(ex) ? ErrorCode.UPSTREAM_UNAVAILABLE
 				: ErrorCode.UPSTREAM_OUTCOME_UNKNOWN);
 	}
 

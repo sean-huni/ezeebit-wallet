@@ -11,10 +11,12 @@ Walkthrough video: link to be added.
 
 I spent about 3 hours of my own attention, directing AI agents (Claude Code) that wrote most of the
 code and docs under review gates: tests seen failing before they were trusted, reviews of each
-branch, and a final review of the whole repository. The agents' work ran from 02:44 into the evening of
-13 October 2026 (commit timestamps in South African Standard Time, Coordinated Universal Time (UTC)
-plus 2 hours; `git log` has the exact times), well past the brief's two to three hours; release
-`0.1.0` was tagged at 10:19 and the rest landed on `dev` after it. The brief says
+branch, and a final review of the whole repository. The agents' work ran from 02:44 on 13 October 2026
+to the early hours of 16 October (commit timestamps in South African Standard Time, Coordinated
+Universal Time (UTC) plus 2 hours; `git log` has the exact times), well past the brief's two to three
+hours. Release `0.1.0` was tagged on 13 October at 10:19 and the rest landed on `dev` after it;
+release `0.2.0` (gateway, gRPC conversion-to-ledger, Kafka dead letters, Slack alerts) was tagged on
+15 October at 14:26. The brief says
 to stop and write up the rest; I kept building the extras listed below, which a reviewer can
 ignore. Section 8 says where I accepted, changed or rejected what the agents produced.
 
@@ -26,7 +28,7 @@ of it:
 
 | Addition | Merge on `dev` | Where it is described |
 |---|---|---|
-| Local observability: Grafana's Loki, Grafana, Tempo and Mimir (LGTM) image, OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
+| Local observability: the Grafana LGTM image (`grafana/otel-lgtm`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector), OpenTelemetry Protocol (OTLP) export, generated and provisioned dashboards, alert rules with promtool tests, optional Slack delivery | `feat-observability`, `feat-business-observability`, `feat-lgtm-otlp` | [docs/observability.md](docs/observability.md) |
 | Static application security testing (SAST) and coverage gates: SpotBugs with Find Security Bugs, Checkstyle, JaCoCo floors, opt-in SonarQube | `feat-sast` | [docs/quality-gates.md](docs/quality-gates.md) |
 | Supply-chain gate: secrets scanning, Paketo images, software bills of materials (SBOMs), trivy | `feat-supply-chain` | [docs/supply-chain.md](docs/supply-chain.md) |
 | CircleCI pipeline running the same Gradle commands | `feat-ci` | [docs/ci.md](docs/ci.md) |
@@ -34,6 +36,7 @@ of it:
 | Gateway edge: per-merchant Redis rate limiter (replica-safe, fail-closed), `/api/v1` to `/v1` path rewrite, gateway proof header on the services' public routes | `feat-gateway-edge` | [ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology), [README](README.md#rate-limiting) |
 | Use-case packages and a map of every package and class | `refactor-ledger-packages` | [docs/project-layout.md](docs/project-layout.md) |
 | Dependency-injection budget: the build fails on any bean with more than 3 injected dependencies; 8 beans split by job to meet it | `bugfix-di-flooding` | [docs/quality-gates.md](docs/quality-gates.md#architecture-gates) |
+| Conversion to ledger over gRPC instead of REST, Resilience4j retries and circuit breakers, a Kafka dead-letter topic, Slack alert delivery | `feat-ledger-grpc` | [ARCHITECTURE.md](ARCHITECTURE.md#conversion-to-ledger-over-grpc), [docs/observability.md](docs/observability.md) |
 
 Each landed as its own merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means
@@ -66,22 +69,25 @@ What exists:
   never arrives leaves the conversion PENDING (202), records a dead letter on a Kafka topic that pages
   Slack, and leaves the money to a sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
   in the ledger before it is answered, so money arriving later can never let that conversion post.
-- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3) behind one gateway, each
-  domain service owning its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
+- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3): two business services
+  (ledger-svc, conversion-svc) behind the gateway (gateway-svc), and config-svc and eureka-svc as the
+  control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** `./gradlew --no-build-cache --rerun-tasks clean build` on 2026-10-14, counted from the JUnit
-Extensible Markup Language (XML) reports
-([gate log](docs/fleet/verification/2026-10-14-gate.log); `checkSecrets` ran separately, 0 leaks):
-**608 tests, 0 failures, 0 skipped** (538 on 2026-10-13, before the gRPC change). Each unit count includes the 13 tests of the shared
+**Tests.** **610 tests, 0 failures, 0 skipped**, summed from the JUnit Extensible Markup Language (XML)
+reports `services/*/build/test-results/*/*.xml` last written 2026-10-15 at 14:23 local (the build for
+release `0.2.0`; 538 on 2026-10-13, before the gRPC change). Those reports are not committed; a
+committed gate log with the counts arrives with release `0.3.0`. The
+[2026-10-14 gate log](docs/fleet/verification/2026-10-14-gate.log) records `BUILD SUCCESSFUL` for
+`./gradlew --no-build-cache --rerun-tasks clean build` at `3b92e9d`, but no test counts. Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected
 dependencies (`DependencyBudgetTest`, `InjectionCounterTest`; see
 [docs/quality-gates.md](docs/quality-gates.md#architecture-gates)).
 
 | Service | Unit (`test`) | Integration (`integrationTest`) | Acceptance (`acceptanceTest`, Cucumber scenarios) |
 |---|---|---|---|
-| ledger-svc | 106 | 42 | 61 |
-| conversion-svc | 172 | 31 | 49 |
+| ledger-svc | 107 | 42 | 61 |
+| conversion-svc | 173 | 31 | 49 |
 | gateway-svc | 65 | 54 | |
 | config-svc | 14 | | |
 | eureka-svc | 14 | | |
@@ -205,9 +211,14 @@ This is the single list; the other documents link here.
 **Security and deployment**
 
 - `/internal/**` and ledger-svc's gRPC port (9081) have no authentication and the gRPC channel is
-  plaintext. Locally every service binds loopback; production needs a network policy or mTLS before
-  these endpoints are deployable. On Kubernetes the gRPC port needs mTLS or a service mesh plus a
-  NetworkPolicy naming conversion-svc as its only client. The gateway proof header covers neither.
+  plaintext. Under `fleet.sh` every service binds loopback and there is no network policy. On the kind
+  fleet ledger-svc's NetworkPolicy admits, from other pods, only conversion-svc on 9081 and only
+  gateway-svc on 8081 (`k8s/base/policy/app.yaml`, [docs/k8s.md](docs/k8s.md#network-policy)). It does
+  not cover a connection that stays on a ledger pod's loopback interface: the sweep's deposit
+  posts to 8081 from a container inside a ledger pod, to that pod's own address, and no policy sees it
+  (measured 2026-10-16: `ip route get <pod IP>` inside the pod answers `local <pod IP> dev lo`).
+  Neither fleet has mTLS or a
+  service mesh, which production still needs. The gateway proof header covers neither endpoint.
 - Kafka runs as one broker with replication 1. A dead letter Kafka does not take is counted and
   paged (DeadLetterPublishFailing) and stays in conversion-svc's log only; nothing consumes the topic
   by design, so it is a record, not a queue.
@@ -227,11 +238,14 @@ This is the single list; the other documents link here.
   authentication a caller can spread load over many merchant ids; a limit keyed on the verified
   caller needs the token the brief puts out of scope. Only the shape of the key is bounded: a universally unique identifier (UUID).
 - One Postgres container hosts both databases: logically separate, one shared failure domain.
-- config-svc and eureka-svc run as single instances.
-- CircleCI has never run: no project reads the config until the repository is pushed and connected
-  ([docs/ci.md](docs/ci.md)).
+- config-svc and eureka-svc run as single instances (on the kind fleet too, held at 1 replica with
+  no autoscaler by the `replicas` build gate).
+- CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no
+  check run or status exists on `origin/dev` (checked 2026-10-16; [docs/ci.md](docs/ci.md)).
 - Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
   fixable Common Vulnerabilities and Exposures (CVEs); each override must be dropped once Boot catches up, or it will hold a version back.
+  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.10.1 by kafka-clients
+  4.2.1: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 - trivy has no compose checks, so the misconfiguration stage reports rather than inspects.
 
 **Money correctness**
@@ -264,6 +278,27 @@ This is the single list; the other documents link here.
   Gradle build or the CircleCI pipeline.
 - KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
   the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.
+
+**Kubernetes (the kind fleet, [docs/k8s.md](docs/k8s.md))**
+
+- The sweep (`./k8s/kube.sh sweep`) has not yet had a committed run: what it checks is written down,
+  what it found is not ([docs/k8s.md](docs/k8s.md#the-sweep)).
+- One node, one environment (`local`), no service mesh, no secret store (Secrets come from the
+  caller's environment), no registry push; the images are arm64 on Apple Silicon, and an amd64 cloud
+  cluster would need `linux/amd64` builds.
+- Slack delivery through lgtm's narrowed egress (any public address on 443) has not been proven by a
+  run with a webhook.
+- A connect that fails with `NoRouteToHostException` is not one of the two "never sent" exceptions,
+  so the gateway answers 504 and does not resend it.
+- `ezeebit_gateway_upstream_resend_total` is exported but no dashboard panel or alert reads it.
+- On the first bring-up a service pod can restart until config-svc is Ready: the config import is
+  not optional and `up` applies config-svc together with the services that import from it.
+- The chaos namespace's API-server NetworkPolicy was observed once during development to decide
+  nothing on kindnet; no committed log shows it either way. RBAC is the control on what the monkey
+  can do.
+- A force-killed instance stays in Eureka about 30 s after its last renewal, because eureka-core
+  2.0.6 counts the 15 s lease twice; the gateway's resend covers merchants meanwhile, at about the
+  1 s connect timeout per request while a dead pod's address swallows connects.
 
 **Not built**
 

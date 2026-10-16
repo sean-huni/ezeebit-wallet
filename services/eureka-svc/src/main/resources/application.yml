@@ -2,7 +2,11 @@ server:
   port: ${SERVER_PORT:8761}
   # Loopback unless SERVER_ADDRESS says otherwise: /internal/** moves money and has no authentication.
   address: ${SERVER_ADDRESS:127.0.0.1}
+  shutdown: graceful
 spring:
+  # This service does not import the served config, so it repeats the fleet's shutdown budget here.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   application:
     name: eureka-svc
 eureka:
@@ -12,3 +16,6 @@ eureka:
   server:
     # Default 30s: a freshly registered service stays invisible to the gateway that long.
     response-cache-update-interval-ms: 5000
+    # Self-preservation reads one lost pod of a five-service fleet as a partition and stops evicting.
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Test stub: answers only `lsof -nP -t -iTCP:<port> -sTCP:LISTEN`. STUB_LISTENERS is "port=pid ..."; STUB_LSOF_ERROR=1
+# fails as lsof does when it cannot look (exit 1 with stderr). Any other call exits 125.
+if [[ $# -ne 4 || $1 != -nP || $2 != -t || $3 != -iTCP:* || $4 != -sTCP:LISTEN ]]; then
+  printf 'lsof stub: unexpected call: lsof %s\n' "$*" >&2
+  exit 125
+fi
+if [[ ${STUB_LSOF_ERROR:-0} == 1 ]]; then
+  printf 'lsof: no pwd entry for UID 501\n' >&2
+  exit 1
+fi
+port=${3#-iTCP:}
+for entry in ${STUB_LISTENERS:-}; do
+  [[ ${entry%%=*} == "$port" ]] && { printf '%s\n' "${entry#*=}"; exit 0; }
+done
+exit 1

@@ -1,0 +1,38 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gateway-svc
+  labels:
+    app.kubernetes.io/name: gateway-svc
+    ezeebit.io/stage: app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-svc
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ledger-svc
+  labels:
+    app.kubernetes.io/name: ledger-svc
+    ezeebit.io/stage: app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-svc
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: conversion-svc
+  labels:
+    app.kubernetes.io/name: conversion-svc
+    ezeebit.io/stage: app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: conversion-svc

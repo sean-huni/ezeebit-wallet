@@ -9,13 +9,15 @@ meant to show.
 Captured on 2026-10-13 at commit `d538b32` (`git rev-parse --short HEAD`), on one laptop, with
 uncommitted changes in the working tree (the refreshed images themselves). Times are South African
 Standard Time, 2 hours ahead of Coordinated Universal Time (UTC). The one exception is
-[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14), captured on 2026-10-14 at `3b92e9d`.
+[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14), captured on 2026-10-14 at `3b92e9d`, and
+[Service discovery](#service-discovery-eureka-on-kind-2026-10-16), captured on 2026-10-16 at `8fd3c12`.
 
 How to reproduce each section:
 
 | Section | Command | Detail |
 |---|---|---|
 | Monitoring and observability | `REDIS_PORT=6390 ./fleet.sh up`, then `cd docs/observability/verification && npm install && node 2026-10-13-dashboards-playwright.mjs` | [docs/observability.md](docs/observability.md#verifying-the-dashboards-playwright); the run log is [2026-10-13-dashboards-playwright-run.log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log). The suite made 12 of the 15 monitoring images. The other 3 come from two small Playwright scripts beside it, run the same way: `alerts-rule-list.png` and `alerts-state-history.png` from [2026-10-13-alert-pages-capture.mjs](docs/observability/verification/2026-10-13-alert-pages-capture.mjs) (opens each page, waits 7 s), and `traces-service-map.png` from [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs) (scrolls to the Service map, clicks its zoom-out button once) |
+| Service discovery | `./k8s/kube.sh up`, the socat bridge below, then `cd docs/observability/verification && node 2026-10-16-eureka-capture.mjs` | [2026-10-16-eureka-capture.mjs](docs/observability/verification/2026-10-16-eureka-capture.mjs) reads the registry table, fails unless it holds exactly gateway-svc, ledger-svc and conversion-svc at `UP (2)` each, and takes the image |
 | SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
@@ -23,6 +25,7 @@ How to reproduce each section:
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
 [Metrics](#metrics) · [Traces](#traces) · [Logs](#logs) · [Alerts](#alerts) ·
 [Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14)) ·
+[Service discovery](#service-discovery-eureka-on-kind-2026-10-16) ·
 [SAST](#static-application-security-testing-sast) · [SCA](#software-composition-analysis-sca) ·
 [What this evidence does not prove](#what-this-evidence-does-not-prove)
 
@@ -53,13 +56,16 @@ balance reads on one merchant (102 answered 200, 78 answered 429).
 
 Sources: the suite, metric identity, correlation, content floor and time picker rows, and the 4
 alert annotations, are in the committed
-[run log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log); the end time
-21:18:58 was that file's modification time when it was written. The 15 of 15 fleet checks at `up` are in
+[run log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log). The 9 provisioned
+rules and their holds are in `docker/lgtm/alerting/rules.yaml` as committed at `d538b32`
+(`git show d538b32:docker/lgtm/alerting/rules.yaml`). The 15 of 15 fleet checks at `up` are in
 [2026-10-13-fleet-up-before-capture.log](docs/observability/verification/2026-10-13-fleet-up-before-capture.log), and the
 crashed first run (exit 1 after 6 checks) in
 [2026-10-13-dashboards-playwright-run1-crashed.log](docs/observability/verification/2026-10-13-dashboards-playwright-run1-crashed.log). These numbers have **no committed source**, because they
-were read from terminal output or a live system that was not saved to the repository: the start time 21:10:07, the 9 provisioned rules and their holds, the Alerts to Slack
-timings and counter, the 32 of 173 trace ids of the crashed first run, and trace
+were read from terminal output or a live system that was not saved to the repository: the start time 21:10:07, the end time
+21:18:58 (the run log's modification time when it was written; a checkout has since reset it), the
+provisioning API's live answer of 9 rules, the lgtm recreate at 21:03:51 (the state-history image
+shows provisioning at 21:03:53), the Alerts to Slack timings and counter, the 32 of 173 trace ids of the crashed first run, and trace
 `1da752b225ab41c41cb44000e260f031`.
 
 ### Fleet Overview
@@ -186,7 +192,7 @@ The Traces board's Service map after one zoom-out click. Six nodes: user; gatewa
 conversion-svc 14.49 ms/r; ledger-svc 4.60 ms/r; config-svc 6.05 ms/r; eureka-svc 1.24 ms/r. Edges run
 user to gateway-svc, config-svc, eureka-svc and conversion-svc; gateway-svc to eureka-svc,
 conversion-svc and ledger-svc; conversion-svc to ledger-svc. Every node ring is green. Below it, span
-rate by service and status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate, uncommitted script, not the suite.
+rate by service and status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate committed script, [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs), not the suite.
 
 **Proves** Tempo derives the call graph from spans (gateway to conversion and ledger, conversion to
 ledger), and its span metrics give rates and status per service as a cross-check on the services' own
@@ -227,8 +233,8 @@ Alerting, Alert rules, list view filtered to the "Ezeebit alerts" folder. Each v
 Provisioned, on the Prometheus datasource: ServiceDown ("{{ $labels.job }} has exported no metrics for
 30s"), HighErrorRate, RateFeedRefusing, ConversionsStuckPending, RateLimiterUnavailable,
 RateLimiterStoreDown, LatencySLOBurn and DbPoolSaturated (cut at the bottom). The ninth,
-LedgerInvariantBroken, is below the fold. Captured 21:20:54 by a separate, uncommitted script, not
-the suite.
+LedgerInvariantBroken, is below the fold. Captured 21:20:54 by a separate committed script,
+[2026-10-13-alert-pages-capture.mjs](docs/observability/verification/2026-10-13-alert-pages-capture.mjs), not the suite.
 
 **Proves** the provisioned rules load and evaluate, and each summary names its service or pair. The
 provisioning API lists 9 rules, with holds of 1m (ServiceDown, RateLimiterUnavailable,
@@ -248,10 +254,13 @@ Captured 21:11:58.
 
 The 20:45 to 21:03 inputs, and the heap spike at about 20:52 on the JVM row, are consistent with the
 `fleet.sh` sweep test, which deliberately stops and starts the fleet: it stops wiremock, kills
-ledger-svc, bounces the whole stack and stops it. Its committed log,
-[2026-10-13-fleet-sweep-run.log](docs/fleet/verification/2026-10-13-fleet-sweep-run.log), starts at
-2026-10-13T18:51:44Z (20:51:44 here), and an earlier run of the same sweep,
-whose log is not committed, preceded it that evening. The committed log does not timestamp each
+ledger-svc, bounces the whole stack and stops it. The log of that run is the version of
+[2026-10-13-fleet-sweep-run.log](docs/fleet/verification/2026-10-13-fleet-sweep-run.log) committed in
+`d538b32` (`git show d538b32:docs/fleet/verification/2026-10-13-fleet-sweep-run.log`), which starts at
+2026-10-13T18:51:44Z (20:51:44 here); an earlier run of the same sweep, whose log is not committed,
+preceded it that evening. The working copy of that file is a later run: it was overwritten twice the
+same evening and now starts at 2026-10-13T20:45:29Z (22:45:29 here, commit `1b7053f`, after every
+screenshot), so it cannot explain these inputs. The committed log does not timestamp each
 case, so it cannot place every flap.
 
 **Proves** each rule's expression is plotted against its threshold, with state changes as annotations.
@@ -263,7 +272,8 @@ and new JVM as two series across the 21:03 restart.
 
 The RateFeedRefusing rule (evaluated every 10 s, severity warning, pending period 2m) on its History
 tab for pair USDT/ZAR: Pending at 21:04:25 (A=1), Normal at 21:05:25 (A=0), Pending at 21:10:25 (A=1),
-Normal at 21:11:25 (A=0). Captured 21:21:01 by a separate, uncommitted script, not the suite.
+Normal at 21:11:25 (A=0). Captured 21:21:01 by a separate committed script,
+[2026-10-13-alert-pages-capture.mjs](docs/observability/verification/2026-10-13-alert-pages-capture.mjs), not the suite.
 
 **Proves** Grafana keeps state history for the rule, with the value of A at each transition. One
 stale-rate refusal holds the rule Pending for 1 minute, less than its 2-minute hold, so it does not
@@ -271,7 +281,8 @@ fire.
 
 #### Alerts to Slack
 
-One rehearsed outage earlier on 2026-10-13 with `SLACK_WEBHOOK_URL` set: conversion-svc was stopped
+The second of two rehearsed outages on 2026-10-13 with `SLACK_WEBHOOK_URL` set (the first is in
+[docs/observability.md](docs/observability.md#rehearsals-local-2026-10-13)): conversion-svc was stopped
 with `kill`, left down until ServiceDown fired, then started again. State was polled every 5 seconds
 from Grafana's rules API (`/api/prometheus/grafana/api/v1/rules`), so each time is accurate to 5
 seconds.
@@ -291,6 +302,22 @@ failed. That rehearsal's state history no longer exists in Grafana: `fleet.sh up
 container at 21:03:51, and Grafana's own database is on a tmpfs mount (`compose.yaml`), so the
 recreate wiped it.
 
+The channel itself, `#ezeebit-alerts` in the team's Slack workspace
+(<https://app.slack.com/client/TUKERT8JU/C0C8MUVLZHC>), captured on 2026-10-16 with the Claude in Chrome
+extension in the already signed-in Chrome session (no new sign-in), message pane only:
+
+![Slack #ezeebit-alerts: ServiceDown firing for conversion-svc, config-svc and ledger-svc, then ledger-svc and conversion-svc resolved](docs/observability/evidence/2026-10-16-slack-ezeebit-alerts.png)
+
+**Proves** a human-facing delivery end to end, both directions: Grafana v13.2.3 posted
+`[FIRING:1] ServiceDown Ezeebit alerts conversion-svc (critical)`, and the same for config-svc and
+ledger-svc, at 01:52, then `[RESOLVED] ServiceDown Ezeebit alerts ledger-svc (critical)` at 02:57 (and
+conversion-svc below it), each with `alertname = ServiceDown` and `grafana_folder = Ezeebit alerts`.
+Slack shows those times in the viewer's local time zone. What took the three services down that
+night was not recorded: no commit, log or doc of this repository describes it.
+To recapture: with the Claude in Chrome extension connected to the signed-in browser, open the channel
+URL above and screenshot the message pane. Never point Playwright or any DevTools launch at the
+everyday Chrome profile: its mock keychain signs Chrome out and drops account extensions.
+
 ### Ledger outage over gRPC (2026-10-14)
 
 A rehearsed outage of the conversion-to-ledger gRPC seam, with `SLACK_WEBHOOK_URL` set: ledger-svc
@@ -307,9 +334,9 @@ at 1440 x 900. The panels show local time (UTC+2), so 14:00 on them is 12:00 UTC
 | ledger-svc killed (12:00:04 UTC) | t+0s |
 | 5 conversions answered 202 PENDING; 5 `POST` dead letters written | t+1s to t+4s |
 | `ConversionLedgerDeadLettered{op="POST",reason="RETRIES_EXHAUSTED"}` Alerting (`for: 0s`, no Pending stage) | t+16s |
-| Page delivered to Slack (`grafana_alerting_notifications_total{integration="slack"}` 0 to 1) | t+27s |
+| Page delivered to Slack (`grafana_alerting_notifications_total{integration="slack"}` absent to 1) | t+27s |
 | `ServiceDown{job="ledger-svc"}` Pending, then Alerting | t+35s, t+95s |
-| `FIND` breaker open (`reason="CIRCUIT_OPEN"` Alerting) | t+167s |
+| `FIND` breaker open (`reason="CIRCUIT_OPEN"` Alerting) | t+166s |
 | `./fleet.sh up` started; it bounced the stack once | t+257s |
 | Sweeper voided all 5 conversions on both sides | t+350s |
 | `up` exit 0, 16 of 16 checks; PENDING count 0 | t+361s, t+369s |
@@ -367,26 +394,63 @@ change is annotated on its own expression.
 What this section does not prove: the restore's whole-stack bounce wiped Grafana's alert state, so
 the page at t+27s never got an all-clear, and the rules re-fired once after recovery (a second page,
 cleared at t+589s). That run also found the dead-letter topic deleted by the bounce; it has since
-moved to the `kafkadata` volume. The Slack channel itself was not read.
+moved to the `kafkadata` volume. This outage's Slack messages were read from Grafana's notifier counter;
+the channel itself is pictured under [Alerts to Slack](#alerts-to-slack) from 2026-10-16.
+
+## Service discovery (Eureka on kind, 2026-10-16)
+
+The Spring Eureka dashboard of the kind fleet, at release `0.3.0` (`8fd3c12`), with every scaled
+service at 2 replicas:
+
+![Eureka: gateway-svc, ledger-svc and conversion-svc each UP (2)](docs/observability/evidence/2026-10-16-eureka-registry-kind.png)
+
+*Captured 16:03:27 SAST (14:03:27 UTC in the page's Current time).* Under "Instances currently
+registered with Eureka" there are three applications, CONVERSION-SVC, GATEWAY-SVC and LEDGER-SVC,
+each `UP (2)`. Each instance id is `<pod name>:<service>:<port>`, and the six pod names are the six
+pods `kubectl -n ezeebit-app get pods` listed at that moment, so every replica registered itself.
+config-svc and eureka-svc are not in the table: config-svc serves the Eureka settings and is not a
+Eureka client, and eureka-svc does not register with itself. The red banner is expected: self
+preservation is switched off on purpose, so that a killed replica leaves the registry in about 30 s
+([docs/k8s.md](docs/k8s.md)). The page shows an uptime of 00:02 because the fleet had just come up.
+
+How it was reached: eureka-svc binds its pod IP (so a killed pod's address is the one it registers),
+so `kubectl port-forward`, which dials the pod's loopback, is refused. A socat ephemeral container in
+the same pod bridges loopback to the pod IP; it shares the pod's network namespace, so no
+NetworkPolicy is involved:
+
+```bash
+P=$(kubectl -n ezeebit-app get pod -l app.kubernetes.io/name=eureka-svc -o name | head -1)
+IP=$(kubectl -n ezeebit-app get "$P" -o jsonpath='{.status.podIP}')
+kubectl -n ezeebit-app debug "$P" --image=alpine/socat:1.8.0.3 --container=bridge -- \
+  socat tcp-listen:18761,bind=127.0.0.1,fork,reuseaddr "tcp:$IP:8761"
+kubectl -n ezeebit-app port-forward "$P" 18761:18761
+```
+
+The run printed `registered applications: 3 (want 3)`, `UP=2 want 2 PASS` for each of the three, and
+`eureka capture PASS (0 mismatches)`, exit 0. Only a desktop width is captured: Eureka's own page is
+not responsive, and at 390 px it crops the Status column, so a phone image would hide the evidence.
 
 ## Static application security testing (SAST)
 
 SAST reads this repository's own code for defects without running it. Here that is SpotBugs 4.10.5
 with the Find Security Bugs plugin over the compiled classes, and Checkstyle 14.3.0 over every Java
 source set, both failing the build on any finding outside their filters; see
-[docs/quality-gates.md](docs/quality-gates.md). SpotBugs runs with the exclusion filter
+[docs/quality-gates.md](docs/quality-gates.md). At the captured commit `d538b32`, SpotBugs ran with the exclusion filter
 `config/spotbugs/exclude.xml` (6 `<Match>` entries, each preceded by a comment giving its reason, as
 `docs/quality-gates.md` requires), and Checkstyle with `config/checkstyle/checkstyle.xml` (2
 suppressions: one limits the main-code catch rule to main sources, one exempts gateway-svc's
-`RateLimitFilter`, the limiter's fail-closed line, with its reason). "Zero findings" below means zero
+`RateLimitFilter`, the limiter's fail-closed line, with its reason). Both files have grown since:
+from 2026-10-14 they hold 7 `<Match>` entries (the new one covers the generated gRPC code under
+`io.ezeebit.contracts`) and 5 suppressions (the new three exempt `DiscoveryNameResolver`, `LedgerGuard`
+and `KafkaDeadLetterPublisher`), each with its reason. "Zero findings" below means zero
 outside those filters.
 The architecture and coverage images below are gates from the same build, not SAST.
 
 | Fact | Number | Universe | Command |
 |---|---|---|---|
 | Full gate | `BUILD SUCCESSFUL`, 86 of 86 tasks executed, 2m 57s (the shell exit code was not logged) | all 5 services, no build cache | `./gradlew --console=plain --no-build-cache --rerun-tasks clean build`; result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
-| SpotBugs exclusions | 6 `<Match>` entries, 6 with a reason comment | `config/spotbugs/exclude.xml` | `python3 -c "import xml.etree.ElementTree as E; print(len(E.parse('config/spotbugs/exclude.xml').getroot().findall('{https://github.com/spotbugs/filter/3.0.0}Match')))"` |
-| Checkstyle suppressions | 2 `SuppressionSingleFilter` modules | `config/checkstyle/checkstyle.xml` | read the file; both sit at its top |
+| SpotBugs exclusions | 6 `<Match>` entries, 6 with a reason comment | `config/spotbugs/exclude.xml` at `d538b32` | `python3 -c "import xml.etree.ElementTree as E; print(len(E.parse('config/spotbugs/exclude.xml').getroot().findall('{https://github.com/spotbugs/filter/3.0.0}Match')))"` on a checkout of `d538b32` |
+| Checkstyle suppressions | 2 `SuppressionSingleFilter` modules | `config/checkstyle/checkstyle.xml` at `d538b32` | read the file at `d538b32`; both sit at its top |
 | Tests | 538 passed, 0 failed, 0 errors, 0 skipped | every tier: config-svc 14, conversion-svc 210, eureka-svc 14, gateway-svc 119, ledger-svc 181 | sum of `services/*/build/test-results/*/*.xml` |
 | SpotBugs findings | 0 | 222 class files: config-svc 2, conversion-svc 100, eureka-svc 2, gateway-svc 19, ledger-svc 99 | `BugInstance` count in `services/<svc>/build/reports/spotbugs/main.xml` |
 | Find Security Bugs | enabled in 5 of 5, 0 analysis errors, 0 missing classes | same reports | `checkSpotbugsReport` |
@@ -511,10 +575,11 @@ the console; the distinct totals match the console's distinct column.
 
 ## What this evidence does not prove
 
-- **The Slack channel itself is not pictured.** The Chrome extension was not connected, so the channel
-  carrying the page and the all-clear was not captured; delivery rests on Grafana's notifier counter.
-  One channel and one integration is not an on-call rota either: a page at night reaches a channel,
-  not a person.
+- **One Slack channel is not an on-call rota.** The channel is pictured (page and all-clear, 2026-10-16,
+  [Alerts to Slack](#alerts-to-slack)), but a page at night reaches a channel, not a person.
+- **The 2026-10-13 and 2026-10-14 pages are not pictured in Slack.** Those runs' deliveries rest on
+  Grafana's notifier counter; the channel capture is from a later outage on 2026-10-16, whose cause
+  was not recorded.
 - **No 2026-10-13 alert is pictured Firing.** RateFeedRefusing only reached Pending (1 minute against
   a 2-minute hold), and nothing else left Normal. The 2026-10-14 ledger outage is the one Firing
   capture (ConversionLedgerDeadLettered).
@@ -538,7 +603,7 @@ the console; the distinct totals match the console's distinct column.
   observation), yet the suite reported 0 empty panels for that board.
 - **Two images frame less than the claim.** `trace-three-services.png` cuts off the ledger-svc row
   and the `ledger posting` span. ledger-svc is confirmed by a suite check and the overview bars, and
-  `ledger posting` by suite check line 6 of the run log, not by a readable label. `traces-service-map.png` was taken by a separate, uncommitted script that clicked
+  `ledger posting` by suite check line 6 of the run log, not by a readable label. `traces-service-map.png` was taken by a separate committed script, [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs), that clicked
   the map's zoom-out button once, because the default zoom clips the bottom row of nodes.
 - **A cosmetic dashboard defect.** The Money board's "Ledger posting p95" axis labels read 40.824562 ms,
   40.82456 ms, 40.824558 ms, because a near-flat series auto-scales to microsecond precision.
@@ -553,6 +618,7 @@ the console; the distinct totals match the console's distinct column.
   comes only from the console.
 - **The scanned images are not what produced the monitoring evidence.** `fleet.sh` runs each service
   as a JVM from its `bootJar` on the host (`java -jar services/<svc>/build/libs/...`); it never runs
-  the `ezeebit/<svc>:0.1.0` images. Those images are what would ship, and `bootBuildImageAll` built
-  them only for the supply-chain scan. The SCA verdict covers the images; the monitoring evidence
+  the `ezeebit/<svc>:0.1.0` images scanned on 2026-10-13. Those images were what would ship at the
+  time, and `bootBuildImageAll` built them only for the supply-chain scan. Release `0.2.0` has since
+  shipped (2026-10-15); its images were not scanned for this evidence. The SCA verdict covers the images; the monitoring evidence
   covers the host jars.

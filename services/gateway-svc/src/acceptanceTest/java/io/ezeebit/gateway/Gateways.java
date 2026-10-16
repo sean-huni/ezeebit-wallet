@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -47,6 +48,17 @@ final class Gateways {
 			request = request.header(headers[i], headers[i + 1]);
 		}
 		return request.retrieve().toEntity(String.class);
+	}
+
+	static ResponseEntity<String> post(final ConfigurableApplicationContext gateway, final String rawPath, final String body,
+			final String... headers) {
+		RestClient.RequestBodySpec request = CLIENT.post().uri(URI.create("http://127.0.0.1:%s%s"
+				.formatted(gateway.getEnvironment().getRequiredProperty("local.server.port"), rawPath)))
+				.contentType(MediaType.APPLICATION_JSON);
+		for (int i = 0; i < headers.length; i += 2) {
+			request = request.header(headers[i], headers[i + 1]);
+		}
+		return request.body(body).retrieve().toEntity(String.class);
 	}
 
 	static Map<String, Double> outcomes(final ConfigurableApplicationContext gateway) {

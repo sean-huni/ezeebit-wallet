@@ -4,6 +4,11 @@ spring:
     clients:
       # Proxy read timeout: no answer within it is 504 UPSTREAM_OUTCOME_UNKNOWN. Above conversion-svc's own outbound budget.
       read-timeout: 10s
+      # A deleted pod's IP can swallow SYNs. Past this the attempt counts as unsent and goes to another instance.
+      connect-timeout: 1s
+      # Explicit, not classpath-detected: RetryUnsent matches this client's connect-timeout exception.
+      imperative:
+        factory: http-components
   cloud:
     loadbalancer:
       cache:
@@ -23,6 +28,10 @@ spring:
                 - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
                 - RemoveRequestHeader=X-Ezeebit-Gateway
                 - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+                # A killed pod stays registered for seconds. Only a connect that failed is resent, to another instance:
+                # nothing reached a service. A read timeout or any answer is never resent. The body is not cached: a
+                # resend carries it only because the pinned client connects before it reads the request body.
+                - RetryUnsent=3
             - id: conversion
               uri: lb://conversion-svc
               predicates:
@@ -31,6 +40,10 @@ spring:
                 - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
                 - RemoveRequestHeader=X-Ezeebit-Gateway
                 - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
+                # A killed pod stays registered for seconds. Only a connect that failed is resent, to another instance:
+                # nothing reached a service. A read timeout or any answer is never resent. The body is not cached: a
+                # resend carries it only because the pinned client connects before it reads the request body.
+                - RetryUnsent=3
             # The two public specs behind the Swagger UI: not merchant routes, so uncharged by design. Each is one literal
             # path, GET only, outside /api/ (RouteCoverageIT allow-lists them); the internal spec is never routed.
             - id: ledger-api-docs

@@ -2,7 +2,11 @@ server:
   port: ${SERVER_PORT:8888}
   # Loopback unless SERVER_ADDRESS says otherwise: /internal/** moves money and has no authentication.
   address: ${SERVER_ADDRESS:127.0.0.1}
+  shutdown: graceful
 spring:
+  # This service does not import the served config, so it repeats the fleet's shutdown budget here.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   application:
     name: config-svc
   profiles:

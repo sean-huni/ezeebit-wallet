@@ -1,0 +1,52 @@
+# Stage data, not app: it is a third-party stand-in, up before the services that call it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: wiremock
+  labels:
+    app.kubernetes.io/name: wiremock
+    ezeebit.io/stage: data
+spec:
+  selector:
+    app.kubernetes.io/name: wiremock
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wiremock
+  labels:
+    app.kubernetes.io/name: wiremock
+    ezeebit.io/stage: data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wiremock
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wiremock
+    spec:
+      containers:
+        - name: wiremock
+          # Not the -alpine tag: that ships amd64 only.
+          image: 'wiremock/wiremock:3.13.2-3'
+          args: ['--disable-banner']
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            httpGet: {path: /__admin/health, port: 8080}
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          volumeMounts:
+            - {name: mappings, mountPath: /home/wiremock/mappings, readOnly: true}
+      volumes:
+        - name: mappings
+          configMap:
+            name: wiremock-mappings

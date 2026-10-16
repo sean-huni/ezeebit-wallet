@@ -292,17 +292,18 @@ container at 21:03:51, and Grafana's own database is on a tmpfs mount (`compose.
 recreate wiped it.
 
 The channel itself, `#ezeebit-alerts` in the team's Slack workspace
-(<https://app.slack.com/client/TUKERT8JU/C0C8MUVLZHC>), on 2026-10-15:
+(<https://app.slack.com/client/TUKERT8JU/C0C8MUVLZHC>), captured on 2026-10-16 with the Claude in Chrome
+extension in the already signed-in Chrome session (no new sign-in), message pane only:
 
-![Slack #ezeebit-alerts: ServiceDown firing and resolved for ledger-svc and gateway-svc](docs/observability/evidence/2026-10-15-slack-ezeebit-alerts.png)
+![Slack #ezeebit-alerts: ServiceDown firing for conversion-svc, config-svc and ledger-svc, then resolved](docs/observability/evidence/2026-10-16-slack-ezeebit-alerts.png)
 
-**Proves** a human-facing delivery end to end, both directions: the "Prometheus Alerts" app (Grafana
-v13.2.3) posted `[FIRING:1] ServiceDown Ezeebit alerts ledger-svc (critical)` and the same for
-gateway-svc at 10:28, then `[RESOLVED]` for both at 10:29, each with `alertname = ServiceDown` and
-`grafana_folder = Ezeebit alerts`. Captured in the logged-in Google Chrome session (Slack needs no
-separate sign-in there). To recapture: connect the Claude in Chrome extension to that browser and
-screenshot the channel URL above, or sign in to Slack once in a separate Chrome profile kept for
-automation and drive that with Playwright. Never point Playwright at the everyday Chrome profile.
+**Proves** a human-facing delivery end to end, both directions: Grafana v13.2.3 posted
+`[FIRING:1] ServiceDown Ezeebit alerts conversion-svc (critical)`, and the same for config-svc and
+ledger-svc, at 01:52, then `[RESOLVED] ServiceDown Ezeebit alerts ledger-svc (critical)` at 02:57 (and
+conversion-svc below it), each with `alertname = ServiceDown` and `grafana_folder = Ezeebit alerts`.
+To recapture: with the Claude in Chrome extension connected to the signed-in browser, open the channel
+URL above and screenshot the message pane. Never point Playwright or any DevTools launch at the
+everyday Chrome profile: its mock keychain signs Chrome out and drops account extensions.
 
 ### Ledger outage over gRPC (2026-10-14)
 
@@ -381,7 +382,7 @@ What this section does not prove: the restore's whole-stack bounce wiped Grafana
 the page at t+27s never got an all-clear, and the rules re-fired once after recovery (a second page,
 cleared at t+589s). That run also found the dead-letter topic deleted by the bounce; it has since
 moved to the `kafkadata` volume. This outage's Slack messages were read from Grafana's notifier counter;
-the channel itself is pictured under [Alerts to Slack](#alerts-to-slack) from 2026-10-15.
+the channel itself is pictured under [Alerts to Slack](#alerts-to-slack) from 2026-10-16.
 
 ## Static application security testing (SAST)
 
@@ -525,10 +526,10 @@ the console; the distinct totals match the console's distinct column.
 
 ## What this evidence does not prove
 
-- **One Slack channel is not an on-call rota.** The channel is pictured (page and all-clear, 2026-10-15,
+- **One Slack channel is not an on-call rota.** The channel is pictured (page and all-clear, 2026-10-16,
   [Alerts to Slack](#alerts-to-slack)), but a page at night reaches a channel, not a person.
 - **The 2026-10-13 and 2026-10-14 pages are not pictured in Slack.** Those runs' deliveries rest on
-  Grafana's notifier counter; the channel capture is from a later outage on 2026-10-15.
+  Grafana's notifier counter; the channel capture is from a later outage on 2026-10-16.
 - **No 2026-10-13 alert is pictured Firing.** RateFeedRefusing only reached Pending (1 minute against
   a 2-minute hold), and nothing else left Normal. The 2026-10-14 ledger outage is the one Firing
   capture (ConversionLedgerDeadLettered).

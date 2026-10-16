@@ -31,7 +31,7 @@
 
 1. A POST that reached a service and then failed (read timeout, 5xx) is never sent again by the gateway retry: tested in Task 2.
 2. A stale `DATABASECHANGELOGLOCK` row left by a killed migrator does not block the next start: tested in Task 3.
-3. `kube.sh up` while `fleet.sh` runs refuses and names the holder instead of half-starting: tested in Task 5.
+3. Either fleet's `up` while any part of the other runs (containers, a host JVM, a held port, a stopped kind node) refuses and names it: tested in Task 5b, both directions.
 4. A chaos run that kills nothing exits non-zero: tested in Task 8.
 5. A sweep check that cannot reach the cluster reports FAIL, never PASS: every check in Task 9 maps an empty or unrecognised answer to FAIL, and Task 9 Step 4 shows one check failing.
 
@@ -47,6 +47,7 @@
 | `persistence/src/main/java/io/ezeebit/persistence/AdvisoryLockService.java` | Liquibase lock on a PostgreSQL session advisory lock |
 | `persistence/src/main/resources/META-INF/services/liquibase.lockservice.LockService` | Registers it |
 | `build.gradle` | Wires `persistence/` into ledger-svc and conversion-svc; `checkK8s` |
+| `scripts/env-guard.sh` | The one place that knows both fleets: lease plus positive detection |
 | `k8s/kind-cluster.yaml` | The one cluster definition |
 | `k8s/base/{namespaces,data,obs,app,metrics-server,policy,chaos}/` | Manifests per concern |
 | `k8s/overlays/local/kustomization.yaml` | The only overlay |
@@ -487,6 +488,25 @@ Deployment `lgtm` in `ezeebit-obs`, image byte-equal, command `/ezeebit/start.sh
 `./fleet.sh up`, then `./k8s/kube.sh up --no-build; echo exit=$?`. Expected: exit 1 and the holder named. Paste both lines into the report. Then `./fleet.sh down`.
 
 - [ ] **Step 6:** `./k8s/kube.sh up --no-build --only data,obs`, confirm Ready and Grafana `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health` is 200, then `./k8s/kube.sh down`. Commit (`k8s: kind cluster, data plane, observability and kube.sh up/down/status`).
+
+---
+
+### Task 5b: One environment guard: only one fleet runs at a time
+
+**Files:**
+- Create: `scripts/env-guard.sh`, `scripts/test/env-guard-test.sh`, `scripts/test/stubs/{docker,ps,lsof}`
+- Modify: `fleet.sh` (`up` acquires `compose`; `down` and `purge` release it), `k8s/kube.sh` and `k8s/lib/common.sh` (`up` acquires `k8s` and replaces the Task 5 refusal; `down` releases), `build.gradle` (`checkEnvGuard` in root `check`), `.gitignore` (`.env-lease/`)
+
+**Interfaces:**
+- Produces: `scripts/env-guard.sh acquire <compose|k8s>` exit 0 (lease held) or 1 (refused, the blocker named on stderr) or 2 (could not look: fails closed); `release <owner>` exit 0; `state` prints `lease <owner|none>`, `compose <running|absent>`, `jvms <n>`, `ports <list|none>`, `kind <running|stopped|absent>`.
+
+- [ ] **Step 1: Write the failing test script.** Bash, with `PATH` pointed at `scripts/test/stubs` whose `docker`, `ps` and `lsof` answer from env vars the test sets (e.g. `STUB_COMPOSE_CONTAINERS`, `STUB_KIND_STATE`, `STUB_DOCKER_DOWN=1`, `STUB_PIDS`, `STUB_LISTENERS`). Cases, each asserting the exact exit code and one stderr phrase: k8s acquire refused while compose containers run (1, "compose"); refused while a live fleet JVM pid exists with no containers (1, "config-svc"); refused while a non-kind listener holds 8081 (1, "8081"); compose acquire refused while the kind node runs (1, "kind") and while it is stopped (1, "stopped"); a stale lease (owner k8s, kind absent) is reclaimed by compose (0, "stale"); a live lease of the other owner refuses (1); same-owner re-acquire is 0; Docker unreachable is 2; two concurrent acquires by different owners: exactly one 0 and one 1; release by the wrong owner leaves the lease. A final line `PASS n/n` or `FAIL`; exit 0 only when all pass.
+- [ ] **Step 2: Run red** (`bash scripts/test/env-guard-test.sh; echo exit=$?`, guard absent): FAIL. Paste it.
+- [ ] **Step 3: Implement `scripts/env-guard.sh`.** Lease = `mkdir .env-lease` (atomic) with `owner`, `pid`, `since` files inside; acquire takes the lease FIRST, then probes the other fleet, and drops the lease again if it refuses. Fleet ports come from the services' `application.yml` (`SERVER_PORT:<n>`, plus ledger's gRPC port) and compose's published ports parsed read-only from `compose.yaml` (`${VAR:-default}` resolves to the env var or default); never a hardcoded copy. JVM liveness mirrors `fleet.sh`'s `ours()`: the pid's command line contains `$PWD/services/<svc>/build/libs/`. Kind node: `docker ps -a --filter label=io.x-k8s.kind.cluster=ezeebit --format '{{.State}}'`. Compose: `docker ps --filter label=com.docker.compose.project=<project>` (project name as `fleet.sh` derives it). Every probe captures its own exit code; a probe that fails is exit 2, never "absent".
+- [ ] **Step 4: Green** the test script; wire `checkEnvGuard` (an `Exec` of the test script) into root `check`; mutation-check two arms (drop the JVM probe; drop the stopped-kind arm): each turns the suite red; restore with a fresh mtime.
+- [ ] **Step 5: Wire both fleets.** `fleet.sh up`: `scripts/env-guard.sh acquire compose || exit` before compose or any JVM starts; `down`/`purge`: release after the stop succeeded. `kube.sh up`: `acquire k8s` replaces the Task 5 refusal in `common.sh` (delete the replaced code, keep `port_holder` only if still used); `down`: release after the cluster is deleted. Update the fleet-separation gate's allow-list in the spec to this one file.
+- [ ] **Step 6: Live red-proof, both directions.** (a) `./fleet.sh up`, then `./k8s/kube.sh up --no-build --only data; echo exit=$?` is 1 naming compose; `./fleet.sh down`. (b) `./k8s/kube.sh up --no-build --only data`, then `./fleet.sh up; echo exit=$?` is 1 naming kind; `./k8s/kube.sh down`. (c) kill -9 a fleet JVM's parent shell scenario is covered by the stub suite; live, `./fleet.sh down` must leave no lease (`ls .env-lease` fails). Paste all. Leave both fleets down.
+- [ ] **Step 7: Commit** (`One environment guard: fleet.sh and the kind fleet never run at the same time`)
 
 ---
 

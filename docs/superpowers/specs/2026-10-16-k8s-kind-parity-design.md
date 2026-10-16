@@ -82,12 +82,31 @@ other's:
 | Host ports | compose's published ports and the service ports | only 127.0.0.1:8080 and 127.0.0.1:3000, through the kind node |
 | Images | builds `ezeebit/<svc>:<version>` | reads the same tags and `kind load`s a copy; never retags or removes |
 
-- Mutual refusal: `kube.sh up` refuses while any compose container of this project runs or a
-  service port is held, and `fleet.sh up` already refuses a port held by anything but its own
-  compose project, which includes the kind node. Both name the holder.
-- A build gate keeps it that way: `k8s/**` contains no `docker compose`, `fleet.sh` or compose
-  volume name, and `fleet.sh` and `compose.yaml` contain no `kind`, `kubectl` or `.kube-fleet`
-  reference. Red-proofed by inserting one of each.
+- **Only one fleet runs at a time, enforced by one guard both call** (Sean, 2026-10-16: block either
+  fleet from launching while any part of the other still runs). `scripts/env-guard.sh` (bash) is the
+  only file that knows both fleets, so neither entry point has to know how the other is built:
+  - `acquire <compose|k8s>`: takes an exclusive lease atomically (`mkdir` of `.env-lease/`), then
+    looks for the OTHER fleet positively and refuses, naming what it found, while any of it runs:
+    compose containers by the compose project label, host JVMs from `.fleet/*.pid` that are alive
+    and are this checkout's jars, any listener on a fleet port that is not the kind node, and the
+    kind node container by its `io.x-k8s.kind.cluster=ezeebit` label. Running or merely stopped
+    both count for kind: a stopped node would rebind its ports on the next Docker start.
+  - A lease whose owner's resources are all gone is stale (a crash, a reboot) and is reclaimed with
+    a log line; a lease whose owner still runs is never taken over. The same owner acquiring again
+    (a second `up`) is idempotent.
+  - Fails closed: Docker unreachable, an unreadable state or a lease held by an unknown owner all
+    refuse, because "could not look" is not "nothing is running".
+  - `release <owner>` after a successful `down`; `state` prints one line per fact for status.
+  - Improves on a pairwise check where each script asks the other: no coupling between the two
+    entry points, no race between two `up` runs started together, and no reliance on ports alone.
+- `fleet.sh up` calls `acquire compose` and `kube.sh up` calls `acquire k8s` before touching
+  anything; `fleet.sh down|purge` and `kube.sh down` release. `fleet.sh`'s own port check stays as
+  a second line of defence.
+- A build gate keeps the separation: `k8s/**` contains no `docker compose`, `fleet.sh` invocation or
+  compose volume name, and `fleet.sh` and `compose.yaml` contain no `kind`, `kubectl` or
+  `.kube-fleet` reference; `scripts/env-guard.sh` is the one allowed exception. The guard has its own
+  test script with a stubbed `docker`, `ps` and `lsof`, run by `check`, covering both refusal
+  directions, a stale lease, a concurrent acquire and Docker unreachable. Red-proofed.
 - `kube.sh down` deletes the `ezeebit` cluster only, by name and context; it never runs a
   `docker ... prune` or touches a container it did not create.
 

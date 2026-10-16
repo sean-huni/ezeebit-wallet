@@ -12,3 +12,6 @@ eureka:
   server:
     # Default 30s: a freshly registered service stays invisible to the gateway that long.
     response-cache-update-interval-ms: 5000
+    # Self-preservation reads one lost pod of a five-service fleet as a partition and stops evicting.
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000

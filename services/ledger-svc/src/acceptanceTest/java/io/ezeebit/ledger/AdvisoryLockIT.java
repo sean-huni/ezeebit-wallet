@@ -25,6 +25,7 @@ import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.LockException;
 import liquibase.integration.spring.SpringLiquibase;
+import liquibase.lockservice.DatabaseChangeLogLock;
 import liquibase.lockservice.LockService;
 import liquibase.lockservice.LockServiceFactory;
 import liquibase.resource.ClassLoaderResourceAccessor;
@@ -146,6 +147,42 @@ class AdvisoryLockIT {
 	}
 
 	@Test
+	void theHolderListingNamesAHolderInThisDatabase() throws Exception {
+		try (Connection holder = connect(); Connection reader = connect()) {
+			lock(holder);
+			try {
+				DatabaseChangeLogLock[] holders = LockServiceFactory.getInstance().getLockService(database(reader)).listLocks();
+
+				assertThat(holders).singleElement().satisfies(lock -> {
+					assertThat(lock.getLockedBy()).startsWith("pid %d (".formatted(pidOf(holder)));
+					assertThat(lock.getLockGranted()).isNotNull();
+				});
+			}
+			finally {
+				unlock(holder);
+			}
+		}
+	}
+
+	// Advisory locks are per database, so a holder of the same key elsewhere on the server blocks nothing here.
+	@Test
+	void theHolderListingIgnoresAHolderInAnotherDatabase() throws Exception {
+		String other = "advisory_other_%d".formatted(System.nanoTime());
+		jdbc.sql("CREATE DATABASE " + other).update();
+		try {
+			try (Connection elsewhere = connect(other); Connection reader = connect()) {
+				lock(elsewhere);
+				assertThat(heldKeyLocks()).as("control: the key is held on the server").isEqualTo(1);
+
+				assertThat(LockServiceFactory.getInstance().getLockService(database(reader)).listLocks()).isEmpty();
+			}
+		}
+		finally {
+			jdbc.sql("DROP DATABASE IF EXISTS " + other).update();
+		}
+	}
+
+	@Test
 	void theLockIsReleasedWhenItsConnectionDies() throws Exception {
 		Connection doomed = connect();
 		lock(doomed);
@@ -197,6 +234,11 @@ class AdvisoryLockIT {
 
 	private Connection connect() throws SQLException {
 		return DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+	}
+
+	private Connection connect(final String databaseName) throws SQLException {
+		String url = postgres.getJdbcUrl().replaceFirst("/%s(\\?|$)".formatted(postgres.getDatabaseName()), "/%s$1".formatted(databaseName));
+		return DriverManager.getConnection(url, postgres.getUsername(), postgres.getPassword());
 	}
 
 	private static Database database(final Connection connection) throws Exception {

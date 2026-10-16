@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: config-svc
-          image: 'ezeebit/config-svc:0.2.0'
+          image: 'ezeebit/config-svc:0.3.0'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8888}

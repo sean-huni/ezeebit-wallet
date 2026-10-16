@@ -418,10 +418,16 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 | monitoring end | `k8s/sweep/monitoring.sh` | the lgtm pod uid and restart count unchanged; Grafana `/api/health` 200 at the start, after every check and at the end |
 | down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `builds/` (the build logs), the lease released |
 
-**The release evidence is the committed passing log** under `docs/k8s/verification/`. As of
-2026-10-16 at `e7aed35` no sweep log is committed.
+**The release evidence is the committed passing log**:
+[2026-10-16-sweep.log](k8s/verification/2026-10-16-sweep.log), one run started 13:51:01Z on
+`rel-0.3.0` at `86289c4` with a clean tree, ending `sweep exit=0` after `down exit=0`. It is the only
+sweep run on the release commit; no failed run preceded it. From that log: 3 kills, 1768 requests
+during the chaos check, 1 merchant failure (a `convert` 504, 3229 ms after the conversion-svc kill),
+884 COMPLETED conversions against 884 POSTED journals with none posted twice; the outage alert fired
+5 s after the first dead letter. The run had no `SLACK_WEBHOOK_URL`, so it logs
+`no webhook: delivery not asserted`: Slack delivery on kind is not proven by this log.
 
-**What a passing run would show** (none is committed yet): the fleet comes up from nothing on Kubernetes with the compose images; the
+**What the passing run shows**: the fleet comes up from nothing on Kubernetes with the compose images; the
 money path works through the gateway; every replica of the three scaled services serves; the rate
 limit is one bucket across gateway pods; one denied and one allowed network edge behave; pod kills
 mid-traffic leave the two databases agreeing, with merchant failures bounded in time; an outage

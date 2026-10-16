@@ -33,7 +33,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: ledger-svc
-          image: 'ezeebit/ledger-svc:0.2.0'
+          image: 'ezeebit/ledger-svc:0.3.0'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8081}

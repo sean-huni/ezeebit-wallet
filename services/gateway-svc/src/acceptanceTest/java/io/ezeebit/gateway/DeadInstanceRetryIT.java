@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class DeadInstanceRetryIT {
 	private static UpstreamStub slow;
 	private static ConfigurableApplicationContext gateway;
 	private static ConfigurableApplicationContext slowGateway;
+	private static ConfigurableApplicationContext deadGateway;
 
 	@BeforeAll
 	static void start() {
@@ -47,10 +50,14 @@ class DeadInstanceRetryIT {
 		slowGateway = Gateways.start(store.args(), List.of("--eureka.client.enabled=false",
 				"--spring.http.clients.read-timeout=500ms",
 				"--spring.cloud.discovery.client.simple.instances.conversion-svc[0].uri=%s".formatted(slow.uri())));
+		deadGateway = Gateways.start(store.args(), List.of("--eureka.client.enabled=false",
+				"--spring.cloud.discovery.client.simple.instances.conversion-svc[0].uri=%s".formatted(refusedUri()),
+				"--spring.cloud.discovery.client.simple.instances.ledger-svc[0].uri=%s".formatted(BLACK_HOLE)));
 	}
 
 	@AfterAll
 	static void stop() {
+		deadGateway.close();
 		slowGateway.close();
 		gateway.close();
 		slow.close();
@@ -61,6 +68,7 @@ class DeadInstanceRetryIT {
 	@Test
 	void aRefusedInstanceIsSkippedAndEveryPostArrivesOnce() {
 		int before = live.hits();
+		double resent = resends(gateway, "conversion");
 		String merchant = UUID.randomUUID().toString();
 
 		for (int i = 0; i < 20; i++) {
@@ -70,6 +78,39 @@ class DeadInstanceRetryIT {
 
 		assertThat(live.hits() - before).isEqualTo(20);
 		assertThat(live.seen().subList(before, live.hits())).allSatisfy(seen -> assertThat(seen.body()).isEqualTo(BODY));
+		// Round-robin over one dead and one live instance: a resent request moves the pointer by two, so every request
+		// after the first lands on the dead one first. 19 or 20 resends, by where the pointer started.
+		assertThat(resends(gateway, "conversion") - resent).isBetween(19.0, 20.0);
+	}
+
+	@Test
+	void everyResendIsCountedOnItsRoute() {
+		double conversion = resends(deadGateway, "conversion");
+		double ledger = resends(deadGateway, "ledger");
+
+		for (int i = 0; i < 5; i++) {
+			ResponseEntity<String> answer = post(deadGateway, "/api/v1/merchants/%s/quotes".formatted(UUID.randomUUID()), BODY);
+			assertThat(answer.getStatusCode().value()).as(answer.getBody()).isEqualTo(503);
+		}
+
+		// Three attempts per request against a pool with no live instance: two resends each.
+		assertThat(resends(deadGateway, "conversion") - conversion).isEqualTo(10);
+		assertThat(resends(deadGateway, "ledger") - ledger).isZero();
+	}
+
+	@Test
+	@Timeout(value = 20, unit = TimeUnit.SECONDS)
+	void aPoolThatNeverAcceptsAnswers503BecauseNothingWasSent() {
+		ResponseEntity<String> answer = post(deadGateway, "/api/v1/merchants/%s/entries".formatted(UUID.randomUUID()), BODY);
+
+		assertThat(answer.getStatusCode().value()).as(answer.getBody()).isEqualTo(503);
+		assertThat(Gateways.code(answer)).isEqualTo("UPSTREAM_UNAVAILABLE");
+	}
+
+	@Test
+	void everyMerchantRouteCountsResendsFromZero() {
+		assertThat(resends(slowGateway, "ledger")).isZero();
+		assertThat(resends(slowGateway, "conversion")).isZero();
 	}
 
 	@Test
@@ -95,6 +136,12 @@ class DeadInstanceRetryIT {
 		assertThat(answer.getStatusCode().value()).as(answer.getBody()).isEqualTo(504);
 		assertThat(Gateways.code(answer)).isEqualTo("UPSTREAM_OUTCOME_UNKNOWN");
 		assertThat(slow.hits()).isEqualTo(1);
+	}
+
+	private static double resends(final ConfigurableApplicationContext context, final String route) {
+		Counter counter = context.getBean(MeterRegistry.class).find("ezeebit.gateway.upstream.resend").tag("route", route).counter();
+		assertThat(counter).as("resend counter for route %s", route).isNotNull();
+		return counter.count();
 	}
 
 	// A port that was bound and released: nothing listens, so a connect is refused at once.

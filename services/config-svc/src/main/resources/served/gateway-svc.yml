@@ -29,7 +29,8 @@ spring:
                 - RemoveRequestHeader=X-Ezeebit-Gateway
                 - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
                 # A killed pod stays registered for seconds. Only a connect that failed is resent, to another instance:
-                # nothing reached a service. A read timeout or any answer is never resent.
+                # nothing reached a service. A read timeout or any answer is never resent. The body is not cached: a
+                # resend carries it only because the pinned client connects before it reads the request body.
                 - RetryUnsent=3
             - id: conversion
               uri: lb://conversion-svc
@@ -40,7 +41,8 @@ spring:
                 - RemoveRequestHeader=X-Ezeebit-Gateway
                 - AddRequestHeader=X-Ezeebit-Gateway, ${ezeebit.gateway.shared-secret}
                 # A killed pod stays registered for seconds. Only a connect that failed is resent, to another instance:
-                # nothing reached a service. A read timeout or any answer is never resent.
+                # nothing reached a service. A read timeout or any answer is never resent. The body is not cached: a
+                # resend carries it only because the pinned client connects before it reads the request body.
                 - RetryUnsent=3
             # The two public specs behind the Swagger UI: not merchant routes, so uncharged by design. Each is one literal
             # path, GET only, outside /api/ (RouteCoverageIT allow-lists them); the internal spec is never routed.

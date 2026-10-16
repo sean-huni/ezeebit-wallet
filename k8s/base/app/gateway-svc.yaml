@@ -33,7 +33,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: gateway-svc
-          image: 'ezeebit/gateway-svc:0.3.0'
+          image: 'ezeebit/gateway-svc:0.3.1'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8080}

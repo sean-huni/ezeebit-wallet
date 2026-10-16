@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: eureka-svc
-          image: 'ezeebit/eureka-svc:0.3.0'
+          image: 'ezeebit/eureka-svc:0.3.1'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8761}

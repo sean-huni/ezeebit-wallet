@@ -411,7 +411,7 @@ sweep_images() {
 }
 
 cmd_sweep() {
-  local check rc out sha branch dirty build_log
+  local check rc out sha branch dirty build_log ver
   (( $# == 0 )) || fail "sweep takes no options: it always builds the images it tests"
   out=$(git status --porcelain); rc=$?
   (( rc == 0 )) || fail "git status exited $rc: cannot tell whether the tree is clean"
@@ -423,7 +423,12 @@ cmd_sweep() {
   (( rc == 0 )) || fail "git rev-parse HEAD exited $rc"
   branch=$(git rev-parse --abbrev-ref HEAD); rc=$?
   (( rc == 0 )) || fail "git rev-parse --abbrev-ref HEAD exited $rc"
-  SWEEP_LOG="$ROOT/docs/k8s/verification/$(date +%F)-sweep.log"
+  ver=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
+  [[ -n $ver ]] || fail "no version = '...' line in build.gradle"
+  # One file per release and day, so a later sweep can never truncate evidence an earlier release committed.
+  SWEEP_LOG="$ROOT/docs/k8s/verification/$(date +%F)-$ver-sweep.log"
+  git ls-files --error-unmatch "${SWEEP_LOG#"$ROOT"/}" > /dev/null 2>&1 \
+    && fail "${SWEEP_LOG#"$ROOT"/} is committed: a new run would overwrite it; remove it in a commit first"
   mkdir -p "$(dirname "$SWEEP_LOG")"
   : > "$SWEEP_LOG"
   trap sweep_finish EXIT

@@ -407,8 +407,9 @@ those two never match (measured 2026-10-16: config-svc manifest `sha256:e9e70024
 `sha256:9581ff0e...`). On Docker's classic store `.Descriptor` is absent and the check fails rather
 than compare unlike ids. Created reads 1980-01-01 on every Paketo image (the builder pins it for
 reproducible builds), so the digest is what ties a run to its build. Each step appends its output and
-a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-sweep.log` (that day's file is
-truncated at the start), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
+a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log` (truncated at
+the start; the sweep refuses to run when that file is already committed, and the 0.3.0 log predates
+the version in the name), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
 the cluster is deleted and the lease released on every exit path, Ctrl-C included.
 
 | Step | Script | What it asserts |

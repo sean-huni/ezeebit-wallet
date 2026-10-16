@@ -212,8 +212,11 @@ This is the single list; the other documents link here.
 
 - `/internal/**` and ledger-svc's gRPC port (9081) have no authentication and the gRPC channel is
   plaintext. Under `fleet.sh` every service binds loopback and there is no network policy. On the kind
-  fleet ledger-svc's NetworkPolicy admits only conversion-svc on 9081 and only gateway-svc on 8081
-  (`k8s/base/policy/app.yaml`, [docs/k8s.md](docs/k8s.md#network-policy)); neither fleet has mTLS or a
+  fleet ledger-svc's NetworkPolicy admits, from other pods, only conversion-svc on 9081 and only
+  gateway-svc on 8081 (`k8s/base/policy/app.yaml`, [docs/k8s.md](docs/k8s.md#network-policy)). It does
+  not cover a connection that never leaves a ledger pod's own network namespace: the sweep's deposit
+  posts to 8081 from a container inside a ledger pod, to that pod's own address, and no policy sees it.
+  Neither fleet has mTLS or a
   service mesh, which production still needs. The gateway proof header covers neither endpoint.
 - Kafka runs as one broker with replication 1. A dead letter Kafka does not take is counted and
   paged (DeadLetterPublishFailing) and stays in conversion-svc's log only; nothing consumes the topic

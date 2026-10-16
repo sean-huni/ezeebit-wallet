@@ -169,8 +169,11 @@ nothing and one allowed edge answers, so a policy that enforces nothing cannot p
    reads back through the other.
 5. Network policy: one denied edge, one allowed edge.
 6. Chaos: traffic runs throughout; one kill per scaled service (the run fails if fewer kills happened
-   than were asked for); the duplicate audit afterwards (`count(*) = count(DISTINCT business key)` on
-   ledger postings and conversions); merchant 5xx during the kill window reported with its count,
+   than were asked for); afterwards a cross-store reconciliation: every COMPLETED conversion has
+   exactly one POSTED CONVERSION ledger journal keyed by its conversion id, every such journal has a
+   COMPLETED conversion, none is posted twice, and PENDING conversions left unswept are reported (a
+   `count(*) = count(DISTINCT key)` audit over a unique-constrained key cannot fail, so it was
+   replaced); merchant 5xx during the kill window reported with its count,
    and the R1 budget asserted: no 5xx later than 20s after a kill.
 7. Outage: ledger-svc scaled to zero, held past the dead-letter rule's wait, the rule reaching
    Alerting asserted, and the Grafana notification counter moving when a webhook is set; then the

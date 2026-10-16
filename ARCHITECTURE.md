@@ -168,8 +168,10 @@ network policy or mutual Transport Layer Security (mTLS). `/internal/**` and led
 service-to-service, plaintext, bound to loopback locally, and need a network policy or mTLS in production
 ([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)). `[!CONVENTION-OVERRIDE]` Least
 privilege (https://owasp.org/Top10/A01_2021-Broken_Access_Control/) wants the gRPC port to admit
-only conversion-svc. The kind fleet has the NetworkPolicy half: ledger-svc admits conversion-svc alone on
-9081 and gateway-svc alone on 8081 ([docs/k8s.md](docs/k8s.md#network-policy)). mTLS or a mesh is not
+only conversion-svc. The kind fleet has the NetworkPolicy half: from other pods, ledger-svc admits only
+conversion-svc on 9081 and only gateway-svc on 8081 ([docs/k8s.md](docs/k8s.md#network-policy)); a
+connection from inside a ledger pod to its own address (the sweep's deposit) never leaves the pod's
+network namespace, so no policy applies to it. mTLS or a mesh is not
 built, because locally loopback is the control.
 
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into

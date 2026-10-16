@@ -202,6 +202,10 @@ kubectl, and only 127.0.0.1:8080 and 127.0.0.1:3000 on the host. Everything else
 ./k8s/kube.sh sweep          # clean tree only: build, then from no cluster to a deleted one, every check logged under docs/k8s/verification/
 ```
 
+`kube.sh` reads only the shell's environment, never `.env`. For a release sweep to assert Slack delivery,
+run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that shell first and never print it;
+without it the sweep logs that delivery was not asserted.
+
 **Only one fleet runs at a time.** `fleet.sh up` and `kube.sh up` both take one lease through
 `scripts/env-guard.sh`, and each refuses while any part of the other still runs, naming what it found and the
 command that stops it. `kube.sh up` also refuses when something outside both fleets holds 127.0.0.1:8080 or

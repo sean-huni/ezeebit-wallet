@@ -76,7 +76,9 @@ Grafana is at
 http://127.0.0.1:3000 and the gateway at http://127.0.0.1:8080, on the same routes as under
 `fleet.sh`. A deposit has no host path: `/internal/**` is never routed, and ledger-svc
 binds its pod address, so the sweep's `deposit` helper (`k8s/sweep/lib.sh:89-103`) posts it from an
-ephemeral container inside a ledger pod.
+ephemeral container inside a ledger pod, to that pod's own address. That connection never leaves the
+pod's network namespace, so ledger-svc's NetworkPolicy (8081 from gateway-svc only) does not apply to
+it.
 
 Data lives in PersistentVolumeClaims inside the kind node. `down` deletes the cluster, so it deletes
 every row, dead letter and metric with it; there is no data-keeping stop.
@@ -376,6 +378,10 @@ Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP g
 
 One command from no cluster to a deleted one (`k8s/kube.sh:375-440`). **It refuses a dirty working
 tree** (`git status --porcelain` non-empty, the count named), so the log describes exactly one commit.
+**For a release run, Slack delivery is asserted only when the webhook is in the sweep's environment**:
+`kube.sh` never reads `.env`, so run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that
+shell first, and never echo or log its value. Without it the outage step records that delivery was not
+asserted.
 **It deletes an existing `ezeebit` cluster first**, so it always starts from a fresh bring-up, and it
 always builds the five images. The log's first line names the full commit sha and the branch. The full
 image-build output goes to `.kube-fleet/sweep/<YYYY-MM-DD>-build.log` (gitignored, kept by `down`); the
@@ -412,7 +418,8 @@ reaches Grafana alerting; monitoring survives all of it.
 **What it cannot show, even passing:** no service mesh or mutual TLS; no secret store (Secrets are created
 from the environment); a single node, so no node loss, zone spread or anti-affinity; the arm64
 images of this machine, not the amd64 a cloud cluster would run; one environment (`local`), no
-registry push; Slack delivery only when `SLACK_WEBHOOK_URL` is set for the run; an HPA scaling out
+registry push; Slack delivery only when `SLACK_WEBHOOK_URL` is exported in the shell that runs the
+sweep (below); an HPA scaling out
 under load (it asserts only that each HPA has its CPU signal); Grafana's health only at check
 boundaries, not continuously.
 

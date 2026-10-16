@@ -1,0 +1,260 @@
+sweep started 2026-10-16T15:32:02Z at commit ba589da8394b2c3447441f1515079c8d33bfd693 on branch rel-0.3.1, working tree clean
+build.gradle version: 0.3.1; ezeebit image refs checked: 5
+PASS app-image-version
+[env-guard] lease held by k8s
+Creating cluster "ezeebit" ...
+ • Ensuring node image (kindest/node:v1.36.1) 🖼  ...
+ ✓ Ensuring node image (kindest/node:v1.36.1) 🖼
+ • Preparing nodes 📦   ...
+ ✓ Preparing nodes 📦 
+ • Writing configuration 📜  ...
+ ✓ Writing configuration 📜
+ • Starting control-plane 🕹️  ...
+ ✓ Starting control-plane 🕹️
+ • Installing CNI 🔌  ...
+ ✓ Installing CNI 🔌
+ • Installing StorageClass 💾  ...
+ ✓ Installing StorageClass 💾
+ • Waiting ≤ 2m0s for control-plane = Ready ⏳  ...
+ ✓ Waiting ≤ 2m0s for control-plane = Ready ⏳
+ • Ready after 16s 💚
+Set kubectl context to "kind-ezeebit"
+You can now use your cluster with:
+
+kubectl cluster-info --context kind-ezeebit
+
+Not sure what to do next? 😅  Check out https://kind.sigs.k8s.io/docs/user/quick-start/
+[kube] bootBuildImageAll exit=0, 773 lines of output in .kube-fleet/builds/2026-10-16-build.log
+Image: "ezeebit/config-svc:0.3.1" with ID "sha256:596ce1bf55b78494b11149fde5496686bb36965da578d24824d03ee2dec6fe7d" not yet present on node "ezeebit-control-plane", loading...
+Image: "ezeebit/eureka-svc:0.3.1" with ID "sha256:27cd0bb9d27d8ab3b794d3cd25b6080287b4b5fe592c0092863e4dfa12adee99" not yet present on node "ezeebit-control-plane", loading...
+Image: "ezeebit/ledger-svc:0.3.1" with ID "sha256:4391e94215e2333aa02b04261618015ac3becb386e8dbc444409dbf8f08fc805" not yet present on node "ezeebit-control-plane", loading...
+Image: "ezeebit/conversion-svc:0.3.1" with ID "sha256:5d77bcab80545b1b31d656b5fa8da833d9da8543f40ce49afd48d9a171db0691" not yet present on node "ezeebit-control-plane", loading...
+Image: "ezeebit/gateway-svc:0.3.1" with ID "sha256:181620cd767fa611c4a3b651de36a42c42ffeaafadd319588834e2eb3e590b1f" not yet present on node "ezeebit-control-plane", loading...
+[kube] loaded wiremock/wiremock:3.13.2-3 (linux/arm64) from the host
+[kube] loaded redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0 (linux/arm64) from the host
+[kube] loaded grafana/otel-lgtm:0.36.0 (linux/arm64) from the host
+[kube] loaded registry.k8s.io/metrics-server/metrics-server:v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0 (linux/arm64) from the host
+[kube] loaded apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 (linux/arm64) from the host
+[kube] loaded postgres:18.6-alpine (linux/arm64) from the host
+[kube] loaded alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00 (linux/arm64) from the host
+[kube] node resolves wiremock/wiremock:3.13.2-3 without a registry
+[kube] node resolves redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0 without a registry
+[kube] node resolves grafana/otel-lgtm:0.36.0 without a registry
+[kube] node resolves registry.k8s.io/metrics-server/metrics-server:v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0 without a registry
+[kube] node resolves apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 without a registry
+[kube] node resolves postgres:18.6-alpine without a registry
+[kube] node resolves alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00 without a registry
+namespace/ezeebit-app created
+namespace/ezeebit-chaos created
+namespace/ezeebit-data created
+namespace/ezeebit-obs created
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/default-deny created
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/api-server created
+networkpolicy.networking.k8s.io/default-deny created
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/default-deny created
+networkpolicy.networking.k8s.io/allow-dns created
+networkpolicy.networking.k8s.io/default-deny created
+[kube] secrets: postgres-admin redis ledger-db conversion-db gateway-proof, slack absent
+[kube] configmaps: postgres-initdb wiremock-mappings lgtm-root lgtm-dashboards lgtm-alerting lgtm-alerting-promtool chaos-monkey
+serviceaccount/chaos-monkey created
+serviceaccount/metrics-server created
+role.rbac.authorization.k8s.io/chaos-monkey created
+role.rbac.authorization.k8s.io/chaos-monkey created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/chaos-monkey created
+rolebinding.rbac.authorization.k8s.io/chaos-monkey created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/config-svc created
+service/conversion-svc created
+service/eureka-svc created
+service/gateway-svc created
+service/ledger-svc created
+service/wiremock created
+service/kafka created
+service/postgres created
+service/redis created
+service/lgtm created
+service/lgtm-grafana created
+service/metrics-server created
+persistentvolumeclaim/lgtm-data created
+deployment.apps/config-svc created
+deployment.apps/conversion-svc created
+deployment.apps/eureka-svc created
+deployment.apps/gateway-svc created
+deployment.apps/ledger-svc created
+deployment.apps/wiremock created
+deployment.apps/redis created
+deployment.apps/lgtm created
+deployment.apps/metrics-server created
+statefulset.apps/kafka created
+statefulset.apps/postgres created
+cronjob.batch/chaos-monkey created
+poddisruptionbudget.policy/conversion-svc created
+poddisruptionbudget.policy/gateway-svc created
+poddisruptionbudget.policy/ledger-svc created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+horizontalpodautoscaler.autoscaling/conversion-svc created
+horizontalpodautoscaler.autoscaling/gateway-svc created
+horizontalpodautoscaler.autoscaling/ledger-svc created
+job.batch/kafka-topics created
+networkpolicy.networking.k8s.io/config-svc created
+networkpolicy.networking.k8s.io/conversion-svc created
+networkpolicy.networking.k8s.io/eureka-svc created
+networkpolicy.networking.k8s.io/gateway-svc created
+networkpolicy.networking.k8s.io/ledger-svc created
+networkpolicy.networking.k8s.io/wiremock created
+networkpolicy.networking.k8s.io/kafka created
+networkpolicy.networking.k8s.io/kafka-topics created
+networkpolicy.networking.k8s.io/postgres created
+networkpolicy.networking.k8s.io/redis created
+networkpolicy.networking.k8s.io/lgtm created
+STAGE  WORKLOAD                     NAMESPACE      READY  STATUS
+data   deployment/wiremock          ezeebit-app    1/1    exit=0
+data   deployment/redis             ezeebit-data   1/1    exit=0
+data   statefulset/kafka            ezeebit-data   1/1    exit=0
+data   statefulset/postgres         ezeebit-data   1/1    exit=0
+data   job/kafka-topics             ezeebit-data   1/1    exit=0
+obs    deployment/lgtm              ezeebit-obs    1/1    exit=0
+app    deployment/config-svc        ezeebit-app    1/1    exit=0
+app    deployment/conversion-svc    ezeebit-app    2/2    exit=0
+app    deployment/eureka-svc        ezeebit-app    1/1    exit=0
+app    deployment/gateway-svc       ezeebit-app    2/2    exit=0
+app    deployment/ledger-svc        ezeebit-app    2/2    exit=0
+app    deployment/metrics-server    kube-system    1/1    exit=0
+[kube] up: stages data,obs,app,chaos ready; grafana http://127.0.0.1:3000
+up exit=0 (image build output: .kube-fleet/builds/2026-10-16-build.log)
+image ezeebit/config-svc:0.3.1: equal, node manifest=sha256:596ce1bf55b78494b11149fde5496686bb36965da578d24824d03ee2dec6fe7d host manifest=sha256:596ce1bf55b78494b11149fde5496686bb36965da578d24824d03ee2dec6fe7d cri id=sha256:dfab9207e34d4bc5d1f6a71846b7d8790de8a0d039ce08406634980aa885df45 created=1980-01-01T00:00:01Z
+image ezeebit/eureka-svc:0.3.1: equal, node manifest=sha256:27cd0bb9d27d8ab3b794d3cd25b6080287b4b5fe592c0092863e4dfa12adee99 host manifest=sha256:27cd0bb9d27d8ab3b794d3cd25b6080287b4b5fe592c0092863e4dfa12adee99 cri id=sha256:82cad5452696c29c3d1eb1c08a803c3829a58006b29f46d27fe90481ab412e6b created=1980-01-01T00:00:01Z
+image ezeebit/ledger-svc:0.3.1: equal, node manifest=sha256:4391e94215e2333aa02b04261618015ac3becb386e8dbc444409dbf8f08fc805 host manifest=sha256:4391e94215e2333aa02b04261618015ac3becb386e8dbc444409dbf8f08fc805 cri id=sha256:48d7e62075e3c19ebe5d86690862116c68bd45dec4b023de4741bd819cf86cdf created=1980-01-01T00:00:01Z
+image ezeebit/conversion-svc:0.3.1: equal, node manifest=sha256:5d77bcab80545b1b31d656b5fa8da833d9da8543f40ce49afd48d9a171db0691 host manifest=sha256:5d77bcab80545b1b31d656b5fa8da833d9da8543f40ce49afd48d9a171db0691 cri id=sha256:804ca9b6cf9558897eb53d274d66af4cfd0dfe39b16ee63a16264f0a52b0d55e created=1980-01-01T00:00:01Z
+image ezeebit/gateway-svc:0.3.1: equal, node manifest=sha256:181620cd767fa611c4a3b651de36a42c42ffeaafadd319588834e2eb3e590b1f host manifest=sha256:181620cd767fa611c4a3b651de36a42c42ffeaafadd319588834e2eb3e590b1f cri id=sha256:b3f75e6b06ce0200ad517dff9add2cf9ace16474f7e50fd6980aa6afc405ea2f created=1980-01-01T00:00:01Z
+lgtm pod uid restarts at begin: 60bd7d1c-5f70-48ee-ba75-285cd2cddeac 0
+grafana /api/health at begin: 200
+PASS monitoring-begin
+monitoring-begin exit=0
+== parity
+live third-party images: 5; compose images: 5
+  live = compose: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+  live = compose: grafana/otel-lgtm:0.36.0
+  live = compose: postgres:18.6-alpine
+  live = compose: redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+  live = compose: wiremock/wiremock:3.13.2-3
+live ezeebit images: ezeebit/config-svc:0.3.1 ezeebit/conversion-svc:0.3.1 ezeebit/eureka-svc:0.3.1 ezeebit/gateway-svc:0.3.1 ezeebit/ledger-svc:0.3.1 (want :0.3.1)
+config-svc spec/ready replicas: 1 1 (want 1 1)
+eureka-svc spec/ready replicas: 1 1 (want 1 1)
+HPAs: ezeebit-app/conversion-svc conversion-svc;ezeebit-app/gateway-svc gateway-svc;ezeebit-app/ledger-svc ledger-svc
+hpa/gateway-svc ScalingActive=True after 25s (want True within 180s)
+hpa/ledger-svc ScalingActive=True after 15s (want True within 180s)
+hpa/conversion-svc ScalingActive=True after 0s (want True within 180s)
+kubelet Pulling events: 0 (want 0)
+PASS parity
+parity exit=0
+grafana /api/health at after-parity: 200
+== money
+merchant 4fa01bda-92d8-480b-b52a-380dbe7e6e67
+deposit 100.00 ZAR: ledger pod ledger-svc-54db46487b-26zfv ip 10.244.0.5: 201
+quote 201; convert 201 status=COMPLETED id=90dd95e6-4790-4185-98be-e4f28a8b527e buy=2.699136 USDT
+balances 200: ZAR=50.00 (want 50.00) USDT=2.699136 (want 2.699136)
+ledger journal rows for conversion 90dd95e6-4790-4185-98be-e4f28a8b527e: 1 (want 1, psql exit 0)
+PASS money
+money exit=0
+grafana /api/health at after-money: 200
+== replicas
+gateway-svc Ready pods at the snapshot: 2 (gateway-svc-5c954f5b89-rmwt2 gateway-svc-5c954f5b89-zrrsx)(want >= 2)
+ledger-svc Ready pods at the snapshot: 2 (ledger-svc-54db46487b-26zfv ledger-svc-54db46487b-7l62p)(want >= 2)
+conversion-svc Ready pods at the snapshot: 2 (conversion-svc-78fb55d597-9d8pt conversion-svc-78fb55d597-xd6kc)(want >= 2)
+60 requests (balances 200, quotes 201 wanted): 200 x30 201 x30 
+requests served, per snapshotted pod (service pod before after delta), read 5s after the traffic:
+  gateway-svc gateway-svc-5c954f5b89-rmwt2 0 23 23
+  gateway-svc gateway-svc-5c954f5b89-zrrsx 0 40 40
+  ledger-svc ledger-svc-54db46487b-26zfv 0 17 17
+  ledger-svc ledger-svc-54db46487b-7l62p 0 15 15
+  conversion-svc conversion-svc-78fb55d597-9d8pt 0 16 16
+  conversion-svc conversion-svc-78fb55d597-xd6kc 0 16 16
+gateway-svc Ready pods at the snapshot: 2 (gateway-svc-5c954f5b89-rmwt2 gateway-svc-5c954f5b89-zrrsx)(want >= 2)
+burst 200 for one merchant in 286ms (curl exit 0): admitted=72 limited=128 other=0; bound capacity 100 + 20 x 1s = 120
+burst, per snapshotted pod (service pod before after delta), read 10s after the traffic:
+  gateway-svc gateway-svc-5c954f5b89-rmwt2 23 104 81
+  gateway-svc gateway-svc-5c954f5b89-zrrsx 40 159 119
+wrote conversion 14dcd755-57da-465d-8c6e-4cd0dd67606f (COMPLETED)
+conversion-svc Ready pods at the snapshot: 2 (conversion-svc-78fb55d597-9d8pt conversion-svc-78fb55d597-xd6kc)(want >= 2)
+reads of 14dcd755-57da-465d-8c6e-4cd0dd67606f: 10 of 10 answered 200 with that id
+reads, per snapshotted pod (service pod before after delta), read 10s after the traffic:
+  conversion-svc conversion-svc-78fb55d597-9d8pt 0 5 5
+  conversion-svc conversion-svc-78fb55d597-xd6kc 0 5 5
+PASS replicas
+replicas exit=0
+grafana /api/health at after-replicas: 200
+== policy
+== allowed: ledger-svc (ledger-svc-54db46487b-26zfv) -> postgres.ezeebit-data:5432, want open
+  resolved 10.108.47.82      postgres.ezeebit-data.svc.cluster.local  postgres.ezeebit-data.svc.cluster.local postgres.ezeebit-data
+  psql exit=2: psql: error: connection to server at "postgres.ezeebit-data" (10.108.47.82), port 5432 failed: FATAL:  password authentication failed for user "sweep-probe"
+  RESULT pg open
+  result=open probe exit=0
+== denied: default/sweep-policy-1792164961-29059 -> postgres.ezeebit-data:5432, want closed; control -> kube-dns.kube-system:53, want open
+  nc kube-dns.kube-system:53 exit=0: 
+  RESULT control open
+  resolved 10.108.47.82      postgres.ezeebit-data.svc.cluster.local  postgres.ezeebit-data.svc.cluster.local postgres.ezeebit-data
+  psql exit=2: psql: error: connection to server at "postgres.ezeebit-data" (10.108.47.82), port 5432 failed: timeout expired
+  RESULT pg closed
+  control=open denied=closed
+PASS policy
+policy exit=0
+grafana /api/health at after-policy: 200
+== chaos
+merchants: ed753268-8590-4ba2-9dfb-24ad3ce73beb 1acb51c1-6d74-46e7-bd22-2c1b21e81fdd 02583997-fe85-40e3-90d2-45c60e500ab9
+t=1792164984853 monkey --service gateway-svc exit=0: KILL ezeebit-app/gateway-svc-5c954f5b89-rmwt2 service=gateway-svc KILLED 1
+t=1792165015056 monkey --service ledger-svc exit=0: KILL ezeebit-app/ledger-svc-54db46487b-7l62p service=ledger-svc KILLED 1
+t=1792165045352 monkey --service conversion-svc exit=0: KILL ezeebit-app/conversion-svc-78fb55d597-xd6kc service=conversion-svc KILLED 1
+KILL lines: 3 (want 3)
+requests: 1634; by op and status: convert 503 x1; convert 504 x1; quote 504 x2; convert 201 x814; quote 201 x816; 
+merchant failures (5xx or no answer): 4
+  1792165048961 quote 504 +3609ms after kill at 1792165045352
+  1792165048978 quote 504 +3626ms after kill at 1792165045352
+  1792165049287 convert 504 - +3935ms after kill at 1792165045352
+  1792165052322 convert 503 - +6970ms after kill at 1792165045352
+window gateway-svc kill +30s: 510 requests; 201 x510;  4xx: 0
+window ledger-svc kill +30s: 520 requests; 201 x520;  4xx: 0
+window conversion-svc kill +30s: 442 requests; 503 x1; 504 x3; 201 x438;  4xx: 0
+conversions 201 before the first kill: 75; after the last kill + 20000ms: 90 (want both > 0)
+gateway-svc after the kills: ready 2/2 (rollout exit 0)
+ledger-svc after the kills: ready 2/2 (rollout exit 0)
+conversion-svc after the kills: ready 2/2 (rollout exit 0)
+PENDING conversions of this run: 0 after 0s (want 0 within 120s)
+conversion-svc by status: COMPLETED 814
+ledger CONVERSION journals by status: POSTED 814
+COMPLETED conversions: 814; POSTED CONVERSION journals: 814; COMPLETED without a journal: 0; journals without a COMPLETED conversion: 0; journals posted more than once: none
+this run: 816 convert requests, 814 answered 201/202, 814 conversion rows (want answered <= rows <= requests)
+PASS chaos
+chaos exit=0
+grafana /api/health at after-chaos: 200
+== outage
+ledger-svc declared replicas: 2 (exit 0)
+dead letters before: 0; ConversionLedgerDeadLettered before (state, for, Alerting instances): 'inactive 0 0' after 0s (want 0 Alerting within 360s)
+slack secret: absent; notifications to slack before: n/a
+t=1792165077903 scaled ledger-svc to 0 (exit 0)
+after 9 conversions in 20s: dead letters 0 -> 1; convert answers: 201/COMPLETED 201/COMPLETED 201/COMPLETED 201/COMPLETED 201/COMPLETED 201/COMPLETED 201/COMPLETED 201/COMPLETED 202/PENDING 
+ConversionLedgerDeadLettered: state, for, Alerting instances active since the scale-down = 'firing 0 1' 5s after the dead letter (want firing and >= 1 within 120s = for 0s + 120s)
+no webhook: delivery not asserted (the slack Secret is absent, so Grafana has no Slack contact point)
+ledger-svc restored: spec ready = 2 2 (want 2 2, rollout exit 0)
+PASS outage
+outage exit=0
+grafana /api/health at after-outage: 200
+== monitoring
+lgtm pod uid restarts: begin '60bd7d1c-5f70-48ee-ba75-285cd2cddeac 0' end '60bd7d1c-5f70-48ee-ba75-285cd2cddeac 0' (want equal)
+grafana /api/health at end: 200
+grafana 200 at 8 of 8 check boundaries
+PASS monitoring
+monitoring exit=0
+Deleting cluster "ezeebit" ...
+Deleted nodes: ["ezeebit-control-plane"]
+[env-guard] released by k8s
+[kube] down: cluster ezeebit and /Users/sean/env/repo/be/java/spring/ezeebit-wallet/.kube-fleet removed (except /Users/sean/env/repo/be/java/spring/ezeebit-wallet/.kube-fleet/builds)
+down exit=0
+sweep exit=0

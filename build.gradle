@@ -16,7 +16,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 	apply plugin: 'io.spring.dependency-management'
 
 	group = 'io.ezeebit'
-	version = '0.3.0'
+	version = '0.3.1'
 
 	java {
 		sourceCompatibility = JavaVersion.VERSION_25
@@ -552,7 +552,7 @@ def checkK8s = tasks.register('checkK8s', Exec) {
 	group = 'verification'
 	description = 'Runs the k8s/gates scripts: fleet separation, image parity, app image version, replica counts and the connection budget.'
 	inputs.files fileTree('k8s'), 'compose.yaml', 'fleet.sh', 'build.gradle', fileTree('services/config-svc/src/main/resources/served')
-	commandLine 'bash', '-c', 'rc=0; for g in fleet-separation image-parity app-image-version replicas pool-budget; do bash "k8s/gates/$g.sh" . || rc=1; done; echo "checkK8s exit=$rc"; exit $rc'
+	commandLine 'bash', '-c', 'rc=0; for g in fleet-separation image-parity app-image-version replicas pool-budget virtual-threads; do bash "k8s/gates/$g.sh" . || rc=1; done; echo "checkK8s exit=$rc"; exit $rc'
 }
 
 tasks.named('check') {

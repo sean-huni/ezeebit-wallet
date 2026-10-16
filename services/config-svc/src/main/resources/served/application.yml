@@ -18,6 +18,10 @@ server:
 spring:
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  # Every pod has CPU limit 2; k8s/gates/virtual-threads.sh fails the build if a limit and this disagree.
+  threads:
+    virtual:
+      enabled: true
 management:
   endpoints:
     web:

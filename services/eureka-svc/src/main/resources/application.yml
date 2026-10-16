@@ -4,9 +4,12 @@ server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   shutdown: graceful
 spring:
-  # This service does not import the served config, so it repeats the fleet's shutdown budget here.
+  # This service does not import the served config, so it repeats the fleet's shutdown budget and threads here.
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  threads:
+    virtual:
+      enabled: true
   application:
     name: eureka-svc
 eureka:

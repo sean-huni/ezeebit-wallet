@@ -190,6 +190,12 @@ third-party stand-in, so it carries the `data` stage and comes up before the ser
 - **Connection budget**: (3 ledger + 3 conversion) maxReplicas x 10 pooled connections + 10 reserved
   = 70, at or below PostgreSQL `max_connections=100` (`k8s/base/app/hpa.yaml:1`,
   `k8s/base/data/postgres.yaml:35`), enforced by the `pool-budget` gate.
+- **Virtual threads are on in every JVM pod** (`spring.threads.virtual.enabled: true`), because every
+  pod's CPU limit is 2: above 1 core the JVM has more than one carrier, so one pinned virtual thread
+  cannot stall the pod. The clients take it from `served/application.yml`; config-svc and eureka-svc,
+  which do not import the served config, repeat it. The `virtual-threads` gate fails the build when a
+  CPU limit above 1 core meets virtual threads off, or a limit of 1 core meets them on. Pool sizes are
+  unchanged: concurrency stays bounded by the database pool, not by carriers.
 
 ## Configuration and images
 
@@ -475,5 +481,6 @@ On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` 
 | `checkK8s` / `app-image-version` | every `ezeebit/<svc>` image ref under `k8s/` is `ezeebit/<svc>:<version>` with `build.gradle`'s version, all five services named, no kustomize tag override | PASS, 5 refs (added in the final fix wave) |
 | `checkK8s` / `replicas` | config-svc and eureka-svc at 1 replica with no HPA; the scaled three at 2 under HPA 2-4, 2-3, 2-3 at 70% | PASS |
 | `checkK8s` / `pool-budget` | maxReplicas x pool per database service + 10 reserved <= `max_connections` | PASS, 30 + 30 + 10 = 70 of 100 |
+| `checkK8s` / `virtual-threads` | each `ezeebit/*` Deployment: CPU limit above 1 core means `spring.threads.virtual.enabled` is `true`, 1 core or less means it is not; the value is read with Spring's precedence (manifest env, served per-service file, served shared file, the service's own file) | PASS, 5 services at limit 2 (added in 0.3.1; red-proofed on 7 mutations) |
 | `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 at `e7aed35`; 48/48 after the final fix wave narrowed the k8s port scan |
 | `checkChaosMonkey` | the draw and its refusals against a stubbed kubectl | PASS 14/14 |

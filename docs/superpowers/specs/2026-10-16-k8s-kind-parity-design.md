@@ -138,8 +138,10 @@ other's:
 Default deny in each namespace, then only the edges the fleet uses: gateway to ledger and
 conversion HTTP; conversion to ledger gRPC, WireMock, Kafka and PostgreSQL; ledger to PostgreSQL;
 gateway to Redis; every service to config-svc, eureka-svc and the OTLP ports; DNS. The host reaches
-only the gateway and Grafana. The sweep asserts one denied edge (WireMock to PostgreSQL) answers
-nothing and one allowed edge answers, so a policy that enforces nothing cannot pass.
+only the gateway and Grafana. The sweep asserts one denied ingress edge answers nothing: a probe pod in
+`default`, whose egress no policy restricts, reaches kube-dns (its positive control) and times out on
+PostgreSQL, so only PostgreSQL's ingress rule can refuse it. One allowed edge (ledger-svc to PostgreSQL)
+answers. Together they show PostgreSQL's ingress rule is enforced; no other edge is asserted live.
 
 ## 5. Chaos monkey
 
@@ -167,7 +169,7 @@ nothing and one allowed edge answers, so a policy that enforces nothing cannot p
    (per-pod counters on each pod's own actuator endpoint); a burst across both gateway pods admits at
    most capacity plus refill over the elapsed time; a conversion written through one conversion pod
    reads back through the other.
-5. Network policy: one denied edge, one allowed edge.
+5. Network policy: PostgreSQL's ingress, one denied edge (from an unrestricted probe pod, with a positive control) and one allowed edge.
 6. Chaos: traffic runs throughout; one kill per scaled service (the run fails if fewer kills happened
    than were asked for); afterwards a cross-store reconciliation: every COMPLETED conversion has
    exactly one POSTED CONVERSION ledger journal keyed by its conversion id, every such journal has a

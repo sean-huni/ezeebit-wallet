@@ -386,8 +386,9 @@ compiled by both services; a build check (`checkSingleProto`) fails if any other
 | `ConversionSettlement` | `Find(PostingLookup)` | the sweeper (`PendingLedgerCheck`) | `grpc/ConversionSettlementRpc` |
 | `ConversionSettlement` | `Void(PostingLookup)` | the sweeper | `grpc/ConversionSettlementRpc` |
 
-The methods sit in two services so each server class stays within 3 injected dependencies. Both
-call the existing `ConversionPostingService` and `ConversionVoidService` unchanged;
+The methods sit in two services so each server class stays within 3 injected dependencies. They
+call the existing `ConversionPostingService`, `ConversionVoidService` and
+`answer.ConversionPostingReader` (behind `Find`) unchanged;
 `grpc/PostingMessages` translates messages and `grpc/GrpcErrors` turns a `LedgerException` into a
 status with `ErrorInfo`.
 

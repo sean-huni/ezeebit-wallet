@@ -1,5 +1,6 @@
 # metrics-server v0.9.0, verbatim from https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
-# except --kubelet-insecure-tls: kind's kubelet serves a self-signed certificate.
+# except --kubelet-insecure-tls (kind's kubelet serves a self-signed certificate) and the image's index digest, read with
+# `docker buildx imagetools inspect registry.k8s.io/metrics-server/metrics-server:v0.9.0` on 2026-10-16.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -141,7 +142,7 @@ spec:
         - --kubelet-use-node-status-port
         - --metric-resolution=15s
         - --kubelet-insecure-tls
-        image: registry.k8s.io/metrics-server/metrics-server:v0.9.0
+        image: registry.k8s.io/metrics-server/metrics-server:v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

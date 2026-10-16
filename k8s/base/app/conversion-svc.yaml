@@ -62,6 +62,6 @@ spec:
             httpGet: {path: /actuator/health/readiness, port: http}
             periodSeconds: 5
           lifecycle:
-            # Eureka expiry (15s) plus a client fetch (5s) is when callers stop choosing this pod; until then it keeps
-            # serving, and graceful shutdown (20s) then drains what is in flight.
-            preStop: {sleep: {seconds: 15}}
+            # Endpoint removal reaches kube-proxy within these 5s. Then DeregisterBeforeDrain sets the instance DOWN in
+            # Eureka and serves 10s while callers drop it, and graceful shutdown (20s) drains: 35s inside the 40s grace.
+            preStop: {sleep: {seconds: 5}}

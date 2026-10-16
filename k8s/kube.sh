@@ -195,6 +195,9 @@ cmd_up() {
     [[ " ${STAGES[*]} " == *" $stage "* ]] || fail "unknown stage '$stage' (stages: ${STAGES[*]})"
   done
 
+  # The manifests name the tag build_and_load produces; a mismatch would run whatever old image the node still holds.
+  bash k8s/gates/app-image-version.sh "$ROOT"; rc=$?
+  (( rc == 0 )) || fail "manifest image tags do not match build.gradle's version (gate output above): refusing to apply"
   "$ROOT/scripts/env-guard.sh" acquire k8s; rc=$?
   (( rc == 0 )) || exit "$rc"
   mkdir -p "$RUN_DIR"

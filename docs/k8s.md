@@ -202,10 +202,13 @@ and `KAFKA_BOOTSTRAP` name the in-cluster Services. Grafana provisioning comes f
 `docker/lgtm/` files, loaded as ConfigMaps.
 
 **Images.** The services are the Paketo images from `./gradlew bootBuildImageAll`,
-`ezeebit/<svc>:0.2.0` (the `version` in `build.gradle:19`), loaded into the node with
-`kind load docker-image`. Third-party images use byte-identical refs to `compose.yaml`
+`ezeebit/<svc>:<version>`, where `<version>` is the `version` in `build.gradle`, loaded into the node with
+`kind load docker-image`. The manifests name that tag literally, so the `app-image-version` gate fails
+`checkK8s` when any `ezeebit/<svc>` ref under `k8s/` differs from it, and `kube.sh up` runs the same gate
+first and refuses to apply on a mismatch, naming both versions. A version bump edits `build.gradle`
+and the five manifests in one commit. Third-party images use byte-identical refs to `compose.yaml`
 (the `image-parity` gate), and are preloaded so a bring-up does not depend on Docker Hub once the host
-has a copy. **Apple Silicon builds arm64**: `docker image inspect ezeebit/gateway-svc:0.2.0` reads
+has a copy. **Apple Silicon builds arm64**: `docker image inspect ezeebit/gateway-svc:<version>` reads
 `linux/arm64` on this machine, and kind here runs arm64 too. A real cloud cluster on amd64 nodes
 needs `linux/amd64` images, which nothing here builds.
 
@@ -431,6 +434,7 @@ On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` 
 |---|---|---|
 | `checkK8s` / `fleet-separation` | no `docker compose`, `fleet.sh` or compose volume name in `k8s/**`; no `kind`, `kubectl`, `.kube-fleet`, `kind-ezeebit` or `ezeebit-control-plane` in `fleet.sh` or `compose.yaml` | PASS, 48 files under `k8s/` scanned |
 | `checkK8s` / `image-parity` | third-party image refs in `k8s/base` and `compose.yaml` identical both ways, except the chaos image, metrics-server and the kind node | PASS, 5 and 5 compared |
+| `checkK8s` / `app-image-version` | every `ezeebit/<svc>` image ref under `k8s/` is `ezeebit/<svc>:<version>` with `build.gradle`'s version, all five services named, no kustomize tag override | PASS, 5 refs (added in the final fix wave) |
 | `checkK8s` / `replicas` | config-svc and eureka-svc at 1 replica with no HPA; the scaled three at 2 under HPA 2-4, 2-3, 2-3 at 70% | PASS |
 | `checkK8s` / `pool-budget` | maxReplicas x pool per database service + 10 reserved <= `max_connections` | PASS, 30 + 30 + 10 = 70 of 100 |
 | `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 |

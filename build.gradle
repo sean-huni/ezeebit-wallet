@@ -547,8 +547,16 @@ def checkChaosMonkey = tasks.register('checkChaosMonkey', Exec) {
 	commandLine 'bash', 'k8s/chaos/test/monkey-test.sh'
 }
 
+// Every gate runs even when an earlier one fails, so one run reports every broken gate.
+def checkK8s = tasks.register('checkK8s', Exec) {
+	group = 'verification'
+	description = 'Runs the k8s/gates scripts: fleet separation, image parity, replica counts and the connection budget.'
+	inputs.files fileTree('k8s'), 'compose.yaml', 'fleet.sh', fileTree('services/config-svc/src/main/resources/served')
+	commandLine 'bash', '-c', 'rc=0; for g in fleet-separation image-parity replicas pool-budget; do bash "k8s/gates/$g.sh" . || rc=1; done; echo "checkK8s exit=$rc"; exit $rc'
+}
+
 tasks.named('check') {
-	dependsOn checkSecrets, checkDashboards, checkSingleProto, checkEnvGuard, checkChaosMonkey
+	dependsOn checkSecrets, checkDashboards, checkSingleProto, checkEnvGuard, checkChaosMonkey, checkK8s
 }
 
 tasks.register('checkSupplyChain', Exec) {

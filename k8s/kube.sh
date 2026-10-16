@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the fleet on a local kind cluster.
-# Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status
+# Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep [--no-build]
 # Written for the bash 3.2 macOS ships: no ${x,,}, no mapfile, and empty arrays expanded with ${a[@]+...}.
 set -uo pipefail
 # shellcheck source=lib/common.sh
@@ -33,11 +33,20 @@ build_and_load() {
   done
 }
 
+# containerd's name for a Docker-style ref: docker.io/library/redis:8, registry.k8s.io/x:v1 unchanged.
+cri_name() {
+  local ref=$1 first=${1%%/*}
+  if [[ $ref != */* ]]; then printf 'docker.io/library/%s' "$ref"
+  elif [[ $first == *.* || $first == *:* || $first == localhost ]]; then printf '%s' "$ref"
+  else printf 'docker.io/%s' "$ref"; fi
+}
+
 preload_images() {
-  # A fresh node pulled otel-lgtm for over 14 minutes; the host's copy loads in seconds. A one-platform archive drops
-  # the index digest a pinned ref names, so the node still pulls that index, but its layers are then already present.
-  # A pinned ref is saved by its tag: saved by digest it imports nameless, and the kubelet then cannot create it.
-  local platform rendered line ref src id seen=" " archive rc
+  # The node never pulls: every third-party ref is loaded from the host, pulled to the host first when absent.
+  # A one-platform archive drops the index digest a pinned ref names, so the node's copy is also tagged repo@digest:
+  # the CRI resolves a tag+digest ref by repo@digest, and finding it skips the registry. A pinned ref is saved by its
+  # tag: saved by digest it imports nameless, and the kubelet then cannot create it.
+  local platform rendered line ref src id seen=" " archive rc refs=()
   platform=$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}'); rc=$?
   (( rc == 0 )) || fail "docker version exited $rc"
   rendered=$(kctl kustomize "$OVERLAY"); rc=$?
@@ -50,18 +59,33 @@ preload_images() {
     seen+="$ref "
     src=${ref%@*}
     id=$(docker image inspect --format '{{.Id}}' "$src" 2>/dev/null); rc=$?
-    if (( rc != 0 )) || [[ $ref == *@* && $id != "${ref#*@}" ]]; then
-      log "node pulls $ref (the host has no $src${ref#"$src"})"
-      continue
+    if (( rc != 0 )); then
+      log "the host has no $src: pulling it once, later runs load the host copy"
+      docker pull --platform "$platform" "$src" > /dev/null; rc=$?
+      (( rc == 0 )) || fail "docker pull $src exited $rc"
+      id=$(docker image inspect --format '{{.Id}}' "$src"); rc=$?
+      (( rc == 0 )) || fail "docker image inspect $src exited $rc after the pull"
     fi
+    [[ $ref != *@* || $id == "${ref#*@}" ]] || fail "host $src is $id, the manifests pin ${ref#*@}: re-pull or re-pin"
     archive="$RUN_DIR/images/${src//[\/:]/_}.tar"
     docker save --platform "$platform" -o "$archive" "$src"; rc=$?
     (( rc == 0 )) || fail "docker save $ref exited $rc"
     kind load image-archive --name "$CLUSTER" "$archive"; rc=$?
     rm -f -- "$archive"
     (( rc == 0 )) || fail "kind load image-archive $ref exited $rc"
+    if [[ $ref == *@* ]]; then
+      docker exec "$NODE_CONTAINER" ctr -n k8s.io images tag --force "$(cri_name "$src")" "$(cri_name "${src%:*}")@${ref#*@}" > /dev/null; rc=$?
+      (( rc == 0 )) || fail "tagging $ref on the node exited $rc"
+    fi
+    refs+=("$ref")
     log "loaded $ref ($platform) from the host"
   done <<< "$rendered"
+  # The same lookup the kubelet makes before deciding to pull.
+  for ref in ${refs[@]+"${refs[@]}"}; do
+    docker exec "$NODE_CONTAINER" crictl inspecti "$ref" > /dev/null 2>&1; rc=$?
+    (( rc == 0 )) || fail "the node cannot resolve $ref locally (crictl inspecti exited $rc): it would pull"
+    log "node resolves $ref without a registry"
+  done
 }
 
 apply_generated() {
@@ -310,10 +334,55 @@ cmd_chaos() {
   esac
 }
 
+# Spec 6 order. Monitoring wraps the others: it records the lgtm pod at the start and compares at the end.
+SWEEP_CHECKS=(parity money replicas policy chaos outage)
+
+cmd_sweep() {
+  local log failed=0 check rc out
+  log="$ROOT/docs/k8s/verification/$(date +%F)-sweep.log"
+  mkdir -p "$(dirname "$log")"
+  : > "$log"
+  sweep_log() { printf '%s\n' "$*" | tee -a "$log"; }
+  sweep_log "sweep started $(date -u +%FT%TZ) at $(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
+  if cluster_exists; then
+    ( cmd_down ) >> "$log" 2>&1; rc=$?
+    sweep_log "pre-down exit=$rc"
+    (( rc == 0 )) || exit 1
+  fi
+  ( cmd_up "$@" ) >> "$log" 2>&1; rc=$?
+  sweep_log "up exit=$rc"
+  if (( rc == 0 )); then
+    out=$(bash k8s/sweep/monitoring.sh begin 2>&1); rc=$?
+    printf '%s\n' "$out" >> "$log"
+    sweep_log "monitoring-begin exit=$rc"
+    (( rc == 0 )) || failed=1
+    for check in "${SWEEP_CHECKS[@]}"; do
+      out=$(bash "k8s/sweep/$check.sh" 2>&1); rc=$?
+      printf '== %s\n%s\n' "$check" "$out" >> "$log"
+      sweep_log "$check exit=$rc"
+      (( rc == 0 )) || failed=1
+      out=$(bash k8s/sweep/monitoring.sh mark "after-$check" 2>&1); rc=$?
+      printf '%s\n' "$out" >> "$log"
+    done
+    out=$(bash k8s/sweep/monitoring.sh end 2>&1); rc=$?
+    printf '== monitoring\n%s\n' "$out" >> "$log"
+    sweep_log "monitoring exit=$rc"
+    (( rc == 0 )) || failed=1
+  else
+    failed=1
+  fi
+  ( cmd_down ) >> "$log" 2>&1; rc=$?
+  sweep_log "down exit=$rc"
+  (( rc == 0 )) || failed=1
+  sweep_log "sweep exit=$failed"
+  exit "$failed"
+}
+
 case ${1:-} in
   up) shift; cmd_up "$@" ;;
+  sweep) shift; cmd_sweep "$@" ;;
   down) cmd_down ;;
   status) cmd_status ;;
   chaos) shift; cmd_chaos "$@" ;;
-  *) printf 'usage: %s up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status\n' "$0" >&2; exit 2 ;;
+  *) printf 'usage: %s up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep [--no-build]\n' "$0" >&2; exit 2 ;;
 esac

@@ -51,17 +51,19 @@ the host at all.
 `up` takes `--no-build` (load the `ezeebit/<svc>:<version>` images already in Docker) and
 `--only data,obs,app,chaos` (a subset of the stages: the selected ones are applied together, then
 waited on in that order). Step by step
-(`k8s/kube.sh:187-235`):
+(`k8s/kube.sh:196-244`):
 
 1. The `app-image-version` gate: every `ezeebit/<svc>` manifest tag must equal `build.gradle`'s version, or
    `up` refuses before touching anything. Then `scripts/env-guard.sh acquire k8s`; a refusal ends `up`
    with the guard's exit code.
 2. `kind create cluster --name ezeebit --config k8s/kind-cluster.yaml`, unless it exists.
-3. `./gradlew bootBuildImageAll` and `kind load docker-image` of the five service images, only when
-   the `app` stage is selected and `--no-build` is absent.
+3. When the `app` stage is selected: `./gradlew bootBuildImageAll` (skipped by `--no-build`), then
+   `kind load docker-image` of the five service images, always, since a fresh node holds none. With
+   `--no-build`, an `ezeebit/<svc>:<version>` missing from the host's Docker stops `up` naming the image
+   and `./gradlew bootBuildImageAll`.
 4. Every third-party image the manifests name is loaded from the host's Docker into the node
    (pulled to the host once when absent), and `crictl inspecti` on the node must resolve each one, so
-   the kubelet never needs a registry (`k8s/kube.sh:49-94`).
+   the kubelet never needs a registry (`k8s/kube.sh:58-103`).
 5. The namespaces and their deny-all policies, then the Secrets and ConfigMaps, then
    `kubectl apply -k k8s/overlays/local` for the selected stages.
 6. `kubectl rollout status` (or `wait --for=condition=complete` for a Job) on every workload of
@@ -109,9 +111,9 @@ directions.
 | Images | third-party images by the `compose.yaml` refs | the same refs, copied from the host into the node; builds and loads `ezeebit/<svc>:<version>` |
 
 `scripts/env-guard.sh` is the one file that knows both fleets. `fleet.sh up` calls
-`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:206`);
+`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:215`);
 `fleet.sh down|purge` release the lease only when the stop succeeded (`fleet.sh:465-466`), and
-`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:250`).
+`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:259`).
 
 ```sh
 scripts/env-guard.sh acquire <compose|k8s>
@@ -194,7 +196,7 @@ third-party stand-in, so it carries the `data` stage and comes up before the ser
 **Variables.** `kube.sh` reads the caller's environment only; it never reads `.env` (a grep of
 `k8s/kube.sh`, `k8s/lib/common.sh` and `k8s/sweep/` for `.env` finds nothing). It creates the
 Secrets from the same variable names as the README's configuration table, each with the committed
-local default (`k8s/kube.sh:116-136`):
+local default (`k8s/kube.sh:125-145`):
 
 | Secret (namespace) | From |
 |---|---|
@@ -380,7 +382,7 @@ Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP g
 ./k8s/kube.sh sweep               # takes no options: it always builds the images it tests
 ```
 
-One command from no cluster to a deleted one (`k8s/kube.sh:375-447`). **It refuses a dirty working
+One command from no cluster to a deleted one (`k8s/kube.sh:384-462`). **It refuses a dirty working
 tree** (`git status --porcelain` non-empty, the count named), so the log describes exactly one commit.
 **For a release run, Slack delivery is asserted only when the webhook is in the sweep's environment**:
 `kube.sh` never reads `.env`, so run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that

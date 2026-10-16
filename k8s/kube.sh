@@ -21,17 +21,26 @@ cluster_exists() {
   (( rc == 0 )) && [[ $nodes == *"$NODE_CONTAINER"* ]]
 }
 
+# build_and_load <build>: <build> 0 skips only the Gradle build; the host's images are always loaded, since a fresh node
+# holds none and every app pod would otherwise sit in ErrImageNeverPull.
 build_and_load() {
-  local version svc rc
+  local build=$1 version svc out rc
   version=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
   [[ -n $version ]] || fail "no version = '...' line in build.gradle"
-  if [[ -n ${KUBE_BUILD_LOG:-} ]]; then
+  if (( ! build )); then
+    log "image build skipped (--no-build): loading the host's ezeebit images"
+  elif [[ -n ${KUBE_BUILD_LOG:-} ]]; then
     ./gradlew bootBuildImageAll > "$KUBE_BUILD_LOG" 2>&1; rc=$?
     log "bootBuildImageAll exit=$rc, $(awk 'END {print NR}' "$KUBE_BUILD_LOG") lines of output in ${KUBE_BUILD_LOG#"$ROOT"/}"
+    (( rc == 0 )) || fail "bootBuildImageAll exited $rc"
   else
     ./gradlew bootBuildImageAll; rc=$?
+    (( rc == 0 )) || fail "bootBuildImageAll exited $rc"
   fi
-  (( rc == 0 )) || fail "bootBuildImageAll exited $rc"
+  for svc in "${SERVICES[@]}"; do
+    out=$(docker image inspect --format '{{.Id}}' "ezeebit/$svc:$version" 2>&1); rc=$?
+    (( rc == 0 )) || fail "ezeebit/$svc:$version is not in the host's Docker (inspect exited $rc): build it with ./gradlew bootBuildImageAll, or run up without --no-build"
+  done
   for svc in "${SERVICES[@]}"; do
     kind load docker-image --name "$CLUSTER" "ezeebit/$svc:$version"; rc=$?
     (( rc == 0 )) || fail "kind load of ezeebit/$svc:$version exited $rc"
@@ -213,7 +222,7 @@ cmd_up() {
     (( rc == 0 )) || fail "kind create cluster exited $rc"
   fi
   # The images serve only the app stage, so a data or obs bring-up never pays for a build.
-  if (( build )) && [[ " ${stages[*]} " == *" app "* ]]; then build_and_load; else log "image build skipped"; fi
+  if [[ " ${stages[*]} " == *" app "* ]]; then build_and_load "$build"; else log "app stage not selected: no ezeebit image built or loaded"; fi
   preload_images
 
   apply_overlay ezeebit.io/stage=namespaces

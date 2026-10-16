@@ -4,8 +4,9 @@ Ezeebit backend take-home. The chosen tasks are **Task 1** (hold a merchant's mo
 currencies) and **Task 2** (convert one currency into another), and **both are built and tested**.
 A double-entry ledger takes internal deposits and serves balances and a statement; conversion-svc
 quotes a firm price from the exchange-rate service and converts at exactly that price through one
-ledger transaction. Five Spring Boot services route through one gateway, and each domain service
-owns its own PostgreSQL database. conversion-svc reaches the ledger over gRPC Remote Procedure Call
+ledger transaction. Five Spring Boot services: two business services (ledger-svc, conversion-svc), the only ones
+the gateway routes to; gateway-svc, the edge; and config-svc and eureka-svc, the control plane
+(configuration and discovery). Each business service owns its own PostgreSQL database. conversion-svc reaches the ledger over gRPC Remote Procedure Call
 (gRPC), with retries, circuit breakers and a Kafka dead-letter topic. The exchange-rate service is assumed to exist; locally a WireMock
 container stands in for it. Design, trade-offs, scope, known gaps and artificial intelligence (AI) usage notes are in
 [SOLUTION.md](SOLUTION.md).

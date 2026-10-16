@@ -10,11 +10,15 @@ drawn from memory.
 ```
 ezeebit-wallet/
 ├── services/        the five Spring Boot services, one Gradle project each (below)
-├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, this layout, evidence/ (security logs), fleet/ (the fleet diagram and its verification logs), superpowers/ (design specs and plans)
+├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, this layout, k8s.md (the kind fleet), evidence/ (security logs), fleet/ (the fleet diagram and its verification logs), superpowers/ (design specs and plans)
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
 ├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml
 ├── docker/          local backing services: the Postgres init script, WireMock rate feed, and the Grafana LGTM image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OpenTelemetry Protocol (OTLP) settings and the logback appender, compiled into every service's main source set
+├── persistence/     AdvisoryLockService, Liquibase's lock on a PostgreSQL advisory lock, compiled into ledger-svc and conversion-svc (below)
+├── discovery/       DeregisterBeforeDrain, leave Eureka before the graceful drain, compiled into gateway-svc, ledger-svc and conversion-svc (below)
+├── k8s/             the fleet on a local kind cluster: kube.sh, manifests, chaos monkey, sweep and build gates (below; docs/k8s.md)
+├── scripts/         env-guard.sh: the one lease that keeps fleet.sh and k8s/kube.sh from running together (below)
 ├── architecture/    the dependency-injection budget gate (DependencyBudgetTest), compiled into every service's test source set
 ├── contracts/       ledger/v1/conversion_postings.proto: the one gRPC Remote Procedure Call (gRPC) contract, compiled by ledger-svc and conversion-svc (checkSingleProto fails on a second copy)
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
@@ -242,45 +246,45 @@ service.sweep       -> common.metrics(1), config.properties(1), data.model(1), d
 
 ## gateway-svc
 
-15 classes in 10 packages. Routing itself is configuration (`served/gateway-svc.yml`); the code is
-the rate limiter and the error envelope.
+18 classes in 10 packages. Routing itself is configuration (`served/gateway-svc.yml`); the code is
+the rate limiter, the error envelope and the `RetryUnsent` route filter.
 
 ```text
 io.ezeebit.gateway   GatewayApplication
 ├── api/
 │   ├── advice/      EdgeRefusalAdvice, ProblemFactory, UpstreamUnavailableAdvice
-│   └── filter/      MerchantPath, RateLimitFilter (MerchantPath classifies the path for the limiter)
+│   └── filter/      MerchantPath, RateLimitFilter, UnsentRetryFilterFunctions (MerchantPath classifies the path for the limiter; UnsentRetryFilterFunctions is the RetryUnsent route filter and the one definition of "never sent")
 ├── service/         MerchantBuckets (one Redis bucket per merchant, shared by replicas)
 ├── scheduler/       StorePingScheduler (Redis store ping)
 ├── domain/          Admission, LimitOutcome
 ├── exception/       EdgeRefusalException, ErrorCode (web layer only; ErrorCode keeps its status)
 ├── common/
-│   └── metrics/     RateLimitMetrics
-└── config/          RateLimitConfig
+│   └── metrics/     RateLimitMetrics, UpstreamResendMetrics
+└── config/          RateLimitConfig, RouteFilterConfig
     └── properties/  RateLimitProperties (served limits)
 ```
 
 Dependencies (`from -> to(import lines)`):
 
 ```text
-api.advice     -> exception(3)
-api.filter     -> common.metrics(1), domain(2), exception(2), service(1)
+api.advice     -> api.filter(1), exception(3)
+api.filter     -> common.metrics(2), domain(2), exception(2), service(1)
 common.metrics -> domain(2)
-config         -> api.filter(1), common.metrics(1), config.properties(1), scheduler(1), service(1)
+config         -> api.filter(2), common.metrics(2), config.properties(1), scheduler(1), service(1)
 scheduler      -> service(1)
 service        -> config.properties(1), domain(1)
 ```
 
 | Package | One job | Key classes |
 |---|---|---|
-| `api.filter` | classify the request path, charge or refuse the merchant's bucket | `RateLimitFilter`, `MerchantPath` |
-| `api.advice` | render edge refusals and upstream failures as RFC 9457 | `EdgeRefusalAdvice`, `UpstreamUnavailableAdvice`, `ProblemFactory` |
+| `api.filter` | servlet and route filters: classify the request path and charge or refuse the merchant's bucket; resend a request that was never sent | `RateLimitFilter`, `MerchantPath`, `UnsentRetryFilterFunctions` |
+| `api.advice` | render edge refusals and upstream failures as RFC 9457; `UpstreamUnavailableAdvice` reads the filter's `neverSent` so a 503 and a resend mean the same thing | `EdgeRefusalAdvice`, `UpstreamUnavailableAdvice`, `ProblemFactory` |
 | `service` | one Redis bucket per merchant, shared by every replica | `MerchantBuckets` |
 | `scheduler` | report whether Redis answers | `StorePingScheduler` |
 | `domain` | the limiter's decisions | `Admission`, `LimitOutcome` |
 | `exception` | the refusal and its code | `EdgeRefusalException`, `ErrorCode` |
-| `common.metrics` | rate-limit counters and the limiter decision span | `RateLimitMetrics` |
-| `config`, `config.properties` | limiter wiring; served limits | `RateLimitConfig`; `RateLimitProperties` |
+| `common.metrics` | rate-limit counters and the limiter decision span; the resend counter | `RateLimitMetrics`, `UpstreamResendMetrics` |
+| `config`, `config.properties` | limiter wiring and the route filter's registration with its zero-registered counter; served limits | `RateLimitConfig`, `RouteFilterConfig`; `RateLimitProperties` |
 
 `ErrorCode` here still carries its HTTP status. Only the web layer (`api.filter`, `api.advice`)
 throws or reads it and `domain` does not import `exception`, so the status never reaches a rule; a
@@ -290,6 +294,51 @@ separate table would add a class and remove no dependency.
 
 One application class each: `ConfigApplication` (Config Server over `served/*.yml`) and
 `EurekaApplication` (registry).
+
+## Shared source directories: persistence/ and discovery/
+
+Each holds one class and the file that registers it, compiled into the services that need it
+(`build.gradle:84-94`) the way `observability/` is compiled into all five, not published as a library. Both are tested once, by ledger-svc
+(`build.gradle:337`).
+
+```text
+persistence/src/main/java/io/ezeebit/persistence   AdvisoryLockService (Liquibase's lock as a PostgreSQL session advisory lock, freed when its connection dies)
+persistence/src/main/resources/META-INF/services   liquibase.lockservice.LockService (registers it with Liquibase)
+discovery/src/main/java/io/ezeebit/discovery       DeregisterBeforeDrain (sets the instance DOWN on ContextClosedEvent, then serves 10 s before the drain)
+discovery/src/main/resources/META-INF              spring.factories (registers the listener)
+```
+
+| Directory | Compiled into | Tests |
+|---|---|---|
+| `persistence/` | ledger-svc, conversion-svc (the two with a database) | `services/ledger-svc/src/acceptanceTest/.../AdvisoryLockIT` |
+| `discovery/` | gateway-svc, ledger-svc, conversion-svc (the three Eureka clients) | `services/ledger-svc/src/test/java/io/ezeebit/discovery/DeregisterBeforeDrainTest` |
+
+## k8s/ and scripts/
+
+The kind fleet ([docs/k8s.md](k8s.md)). Bash, not Java, so it has no package graph; the gates and
+the stubbed suites are its tests.
+
+```text
+k8s/
+├── kube.sh                up | down | status | chaos on|off|run|status | sweep
+├── kind-cluster.yaml      the ezeebit cluster: node image, pod and service ranges, host ports 8080 and 3000
+├── lib/common.sh          cluster, context, node and run-directory names; kctl, log, fail
+├── base/
+│   ├── namespaces/        ezeebit-data, ezeebit-app, ezeebit-obs, ezeebit-chaos
+│   ├── data/              postgres, redis, kafka (with the kafka-topics Job)
+│   ├── obs/               lgtm
+│   ├── app/               config-svc, eureka-svc, ledger-svc, conversion-svc, gateway-svc, wiremock, hpa, pdb
+│   ├── metrics-server/    the pinned upstream manifest
+│   ├── policy/            default-deny, data, obs, app, chaos (NetworkPolicies)
+│   └── chaos/             rbac, cronjob
+├── overlays/local/        the one overlay: every base, labelled part-of ezeebit
+├── chaos/                 monkey.sh (the draw and the kill, shared by the CronJob and the sweep); test/ (stubbed kubectl)
+├── sweep/                 lib.sh; parity, money, replicas, policy, chaos, outage, monitoring
+└── gates/                 fleet-separation, image-parity, replicas, pool-budget; manifests.sh (the manifest reader two of them source)
+scripts/
+├── env-guard.sh           acquire | release | state: the one lease both fleets take
+└── test/                  env-guard-test.sh and its stubbed docker, ps and lsof
+```
 
 ## Cohesion and coupling, before and after
 
@@ -486,6 +535,8 @@ service rewrite.
 | a migration | a new numbered changeset in `src/main/resources/db/changelog/2026/10/` (or a new month folder), included from `db.changelog-2026-10.xml` (a new month folder gets its own file, included from `db.changelog-master.xml`) | never edit an applied changeset |
 | configuration a service reads | `config/properties/*Properties` bound from `config-svc/.../served/<service>.yml` | the served file is where the values live; config-svc serves it to every replica |
 | a scheduled job | a trigger in `scheduler/` that only calls a service class | it must be safe on every replica at once |
+| code several services need, that is not business code | a top-level source directory like `persistence/` or `discovery/`, wired into exactly the services that need it by a `configure([...])` block in `build.gradle` | the JaCoCo exclusion in `build.gradle` for every service but the one that tests it (Sonar already indexes such a directory in ledger-svc only) |
+| a Kubernetes workload or setting | `k8s/base/<area>/`, labelled with the `ezeebit.io/stage` it starts in | its NetworkPolicy edges in `k8s/base/policy/` (every namespace denies by default); a third-party image identical to `compose.yaml`'s (`image-parity` gate); `docs/k8s.md` |
 | a collaborator to a bean that already has 3 | a new class for the step that needs it (split by job, or extract a cohesive collaborator) | `DependencyBudgetTest` fails the build at 4; never a holder object, a context lookup or field injection |
 
 ## Measuring it
@@ -495,10 +546,14 @@ every package-to-package import edge with its count; the trees and dependency li
 same numbers (a package count includes the root package holding the application class). An import of
 a generated class from `contracts/` counts as one edge to `contracts`. For the
 refactor BEFORE and AFTER, run it in a checkout of `4e1af9a` and `19bc692`; for the
-dependency-injection BEFORE, `103e5cf`. Last run on 2026-10-16 at `e1f1682` for all three
-services: the counts, trees and edges above describe the main code at that commit. Since the previous
-run (2026-10-14 at `719f084`) only conversion-svc's class count changed, 96 to 97, when `0cdc830` added
-`KafkaConfig`; it imports nothing from `io.ezeebit`, so no edge moved.
+dependency-injection BEFORE, `103e5cf`. Last run on 2026-10-16 at `e7aed35` for all three
+services: the counts, trees and edges above describe the main code at that commit. Between `e1f1682`
+and `e7aed35` only gateway-svc changed, 15 to 18 classes (`UnsentRetryFilterFunctions`,
+`UpstreamResendMetrics`, `RouteFilterConfig`), adding the edge `api.advice -> api.filter(1)` and one
+import line each to `api.filter -> common.metrics`, `config -> api.filter` and
+`config -> common.metrics`. Between the 2026-10-14 run at `719f084` and `e1f1682`, only
+conversion-svc's class count changed, 96 to 97, when `0cdc830` added `KafkaConfig`; it imports nothing
+from `io.ezeebit`, so no edge moved.
 
 ```sh
 for s in ledger conversion gateway; do

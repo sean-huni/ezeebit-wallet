@@ -1,0 +1,92 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+  namespace: ezeebit-data
+  labels:
+    ezeebit.io/stage: data
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: postgres}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-app}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/name, operator: In, values: [ledger-svc, conversion-svc]}
+      ports:
+        - {protocol: TCP, port: 5432}
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+  namespace: ezeebit-data
+  labels:
+    ezeebit.io/stage: data
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: redis}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-app}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: gateway-svc}
+      ports:
+        - {protocol: TCP, port: 6379}
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka
+  namespace: ezeebit-data
+  labels:
+    ezeebit.io/stage: data
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: kafka}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-app}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: conversion-svc}
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: kafka-topics}
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: kafka}
+      ports:
+        - {protocol: TCP, port: 9092}
+  egress:
+    # Its advertised listener is its own Service: a connection to itself leaves the pod and is judged like any other.
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: kafka}
+      ports:
+        - {protocol: TCP, port: 9092}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-topics
+  namespace: ezeebit-data
+  labels:
+    ezeebit.io/stage: data
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: kafka-topics}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: kafka}
+      ports:
+        - {protocol: TCP, port: 9092}

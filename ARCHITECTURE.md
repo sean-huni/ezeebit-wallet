@@ -168,14 +168,18 @@ network policy or mutual Transport Layer Security (mTLS). `/internal/**` and led
 service-to-service, plaintext, bound to loopback locally, and need a network policy or mTLS in production
 ([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)). `[!CONVENTION-OVERRIDE]` Least
 privilege (https://owasp.org/Top10/A01_2021-Broken_Access_Control/) wants the gRPC port to admit
-only conversion-svc; on Kubernetes that is mTLS or a mesh plus a NetworkPolicy naming conversion-svc
-as its one client. Not built here, because locally loopback is the control.
+only conversion-svc. The kind fleet has the NetworkPolicy half: from other pods, ledger-svc admits only
+conversion-svc on 9081 and only gateway-svc on 8081 ([docs/k8s.md](docs/k8s.md#network-policy)); a
+connection from inside a ledger pod to its own address (the sweep's deposit) is routed over the pod's
+loopback interface, so no policy applies to it (measured on a live bring-up on 2026-10-16:
+`ip route get <pod IP>` inside the pod answers `local <pod IP> dev lo`; [docs/k8s.md](docs/k8s.md)). mTLS or a mesh is not
+built, because locally loopback is the control.
 
 **Upstream failures map to 503 or 504.** `UpstreamUnavailableAdvice` turns each failure shape into
 a Request for Comments (RFC) 9457 problem detail with a stable `code` and internationalised (i18n) text that names no service:
 
-- no registered instance, or a refused connection: **503 `UPSTREAM_UNAVAILABLE`**, the request never
-  reached the service;
+- no registered instance, or a connect that was refused or timed out (`spring.http.clients.connect-timeout`
+  1 s) on every attempt: **503 `UPSTREAM_UNAVAILABLE`**, the request never reached the service;
 - any other upstream input/output (I/O) failure (connection reset, or no answer within the 10 s proxy read timeout,
   `spring.http.clients.read-timeout`): **504 `UPSTREAM_OUTCOME_UNKNOWN`**, because the request may
   have been processed. The text tells the caller to check the resource's state before retrying.
@@ -184,9 +188,26 @@ Without the advice all three reached the client as 500, which reads as a gateway
 branches are tested in `UpstreamFailureIT`; the 504 one against an upstream that accepts the
 connection and never answers.
 
+**Resend only what was never sent.** A replica killed without deregistering stays in the registry
+for seconds, so the two merchant routes carry `RetryUnsent=3` (`api/filter/UnsentRetryFilterFunctions`):
+when the connect was refused or timed out, the request is sent again, choosing an instance again, up
+to 3 attempts. Nothing is resent once a byte may have reached a service, because a read timeout or
+a reset may mean the request was applied. The advice and the filter share one definition of "never
+sent" (`UnsentRetryFilterFunctions.neverSent`: a `ConnectException` or the Apache client's
+`ConnectTimeoutException` in the cause chain), so a request the gateway resends is exactly one it
+would otherwise answer 503. Each resend is counted in `ezeebit_gateway_upstream_resend_total{route}`,
+registered at zero per route (`RouteFilterConfig`, `UpstreamResendMetrics`). `DeadInstanceRetryIT`
+proves a refused or black-holed instance is skipped with every POST arriving once, and that a request
+that reached an instance is never repeated.
+
 **Registry timings.** Eureka's response cache and the clients' registry fetch are 5 s (default
 30 s), and the gateway's load-balancer cache is off; with defaults a fresh fleet could not route for
-up to a minute.
+up to a minute. Clients renew their lease every 5 s with a 15 s expiry (default 30 s and 90 s), and
+the server evicts every 5 s with self-preservation off, because self-preservation reads one lost pod
+of a five-service fleet as a network partition and stops evicting. eureka-core 2.0.6 counts the expiry twice for a lease that was renewed,
+so a SIGKILLed instance leaves the registry about 30 s after its last renewal. An instance stopped on
+purpose is set DOWN at once: `DeregisterBeforeDrain` (`discovery/`) does it when its context starts to
+close, then keeps serving 10 s, the server cache plus the client fetch, before the graceful drain.
 
 **Database per service.** `docker/postgres/initdb/01-databases.sql` creates role `ledger` owning
 database `ledger` and role `conversion` owning database `conversion`, and revokes `CONNECT` from
@@ -198,6 +219,29 @@ Grafana, Tempo and Mimir (LGTM) container, which runs Grafana, Prometheus, Loki,
 and an OpenTelemetry collector. Levels such as "how many conversions are overdue" are read from the database on each
 export, never held in a replica's heap, so every replica reports the same number. Dashboards,
 alerts and rehearsal timings: [docs/observability.md](docs/observability.md).
+
+### On Kubernetes
+
+`k8s/kube.sh` runs the same topology on one local kind cluster, `ezeebit`, from the same images and
+configuration names ([docs/k8s.md](docs/k8s.md)). PostgreSQL, Redis and Kafka run in `ezeebit-data`;
+the five services and WireMock in `ezeebit-app`; lgtm in `ezeebit-obs`; the chaos monkey in
+`ezeebit-chaos`. gateway-svc runs 2 replicas under an autoscaler bounded at 4, ledger-svc and
+conversion-svc 2 bounded at 3; config-svc and eureka-svc stay at 1 with no autoscaler. Only the gateway
+(127.0.0.1:8080) and Grafana (127.0.0.1:3000) reach the host, every namespace denies by default, and
+each service binds its pod address (`SERVER_ADDRESS` from the downward API), which the Eureka clients
+register. One lease (`scripts/env-guard.sh`) keeps this fleet and `fleet.sh` from running at the same time.
+
+Running two replicas under kills, rolling updates and scale-in needed six decisions
+([docs/k8s.md](docs/k8s.md#replica-fixes-r1-to-r6) has the files and tests):
+
+| # | At two or more replicas | Decision |
+|---|---|---|
+| R1 | a killed pod stays registered and keeps being chosen | 5 s/15 s leases, 5 s eviction, no self-preservation; the gateway resends only a request that was never sent (above) |
+| R2 | a pod stopped on purpose is still registered while it drains | deregister first on `ContextClosedEvent`, serve 10 s, then drain; a 5 s `preStop` and a 40 s grace |
+| R3 | a SIGKILLed migrator leaves Liquibase's lock row set for every later pod | `persistence/AdvisoryLockService`: the lock is a PostgreSQL session advisory lock that dies with its connection |
+| R4 | `SERVER_ADDRESS` is both bind and registered address, loopback by default | the pod IP from the downward API; the default stays for the laptop |
+| R5 | breaker and retry state is per replica | accepted, `[!REPLICA-LOCAL]` in `served/conversion-svc.yml` (section 5) |
+| R6 | config-svc and eureka-svc are single-instance (Eureka here is not peer-aware) | 1 replica and no autoscaler, enforced by a build gate; the sweep's parity check also reads it live, with no committed run yet |
 
 ## 4. Ledger design (Task 1)
 
@@ -560,6 +604,9 @@ spec's description.
 | Dependency fails | Behaviour | Tested |
 |---|---|---|
 | A domain service down, unregistered or refusing | gateway 503 `UPSTREAM_UNAVAILABLE` | yes |
+| One replica killed, still registered | the merchant routes resend a request whose connect was refused or timed out, choosing an instance again, up to 3 attempts; nothing that was sent is resent | yes: `DeadInstanceRetryIT` (refused and black-holed instances, every POST once). The kind sweep's chaos check covers it on a cluster, with no committed run yet ([docs/k8s.md](docs/k8s.md#the-sweep)) |
+| A replica stopped on purpose (rolling update, scale-in) | it leaves Eureka first and serves 10 s more, then drains | yes: `DeregisterBeforeDrainTest` (deregisters before any lifecycle bean stops) |
+| A migrating replica SIGKILLed | its advisory lock ends with its connection; the next pod migrates | yes: `AdvisoryLockIT` (a stale lock row does not block, two migrators serialise, a terminated holder's lock is released) |
 | Upstream resets, or silent for 10 s | gateway 504 `UPSTREAM_OUTCOME_UNKNOWN` | yes |
 | Redis down, unreachable, stalled, or away at the gateway's boot | merchant routes 503 `RATE_LIMITER_UNAVAILABLE` within the 250 ms timeout, nothing forwarded; health stays UP; admitted again once Redis answers; RateLimiterStoreDown pages | yes: stopped mid-run, paused, absent at boot; recovery within 2.5 s after a late start and after a kill and restart (red with a 10 s connect back-off, and with Lettuce's default reconnect delay) |
 | Many concurrent requests for one merchant | compare-and-swap losers past `max-retries` are 429 contention, never 503 | yes: one key through two gateways |
@@ -583,7 +630,8 @@ All five services live in one repository with one Gradle build root, which depar
 that builds and runs with one command. The cost is contained: the services share no business code,
 database or runtime, and each ships as its own jar. The only shared code is `observability/` (a
 logback-to-OpenTelemetry bridge and its config), compiled into each jar rather than published as a
-library, `architecture/`, the dependency-injection budget gate compiled into each service's
+library, `persistence/` (the Liquibase advisory lock, compiled into ledger-svc and conversion-svc),
+`discovery/` (deregister before the drain, compiled into the three Eureka clients), `architecture/`, the dependency-injection budget gate compiled into each service's
 `test` task only, and `contracts/`, the one `.proto` file both conversion-svc and ledger-svc compile. Splitting into one repository per service later is mechanical.
 
 The rest of 12-factor is followed: config from the environment with committed working defaults (a

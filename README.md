@@ -27,13 +27,14 @@ Walkthrough video: link to be added.
 | [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
+| [docs/k8s.md](docs/k8s.md) | The same fleet on a local kind cluster: `k8s/kube.sh`, the guard that keeps it and `fleet.sh` apart, replicas and autoscaling, the replica fixes, network policy, the chaos monkey, and the sweep with what it checks and what it cannot show |
 | [docs/fleet/verification/](docs/fleet/verification/) | The `fleet.sh` sweep test (every outcome of `up`, `down` and `status`) and its last run log |
-| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html) | The fleet diagram, the one source of truth: every service and container as built, the gRPC call from conversion to ledger, Kafka dead letters, telemetry to LGTM and alerts to Slack |
+| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html) | The diagram of the compose fleet (`fleet.sh`; it does not show the kind fleet), the one source of truth for it: every service and container as built, the gRPC call from conversion to ledger, Kafka dead letters, telemetry to LGTM and alerts to Slack |
 | [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
 
 **This README**
 
-[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Databases, schemas and tables](#databases-schemas-and-tables) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [The `.env` file](#the-env-file-keep-every-run-on-the-same-settings) · [Troubleshooting](#troubleshooting)
+[Find your way around](#find-your-way-around) · [Prerequisites](#prerequisites) · [Build and test](#build-and-test) · [Run the fleet](#run-the-fleet) · [Run on Kubernetes](#run-on-kubernetes) · [Demo: deposit, quote, convert, read back](#demo-deposit-quote-convert-read-back) · [API reference](#api-reference) · [Services](#services) · [Databases, schemas and tables](#databases-schemas-and-tables) · [Repository layout](#repository-layout) · [Gateway routes](#gateway-routes) · [Configuration](#configuration) · [The `.env` file](#the-env-file-keep-every-run-on-the-same-settings) · [Troubleshooting](#troubleshooting)
 
 ## Find your way around
 
@@ -184,6 +185,32 @@ instances from the registry on a 5 s cycle. Wait about 12 s after ledger-svc reg
 first conversion, for the same reason: conversion-svc finds ledger's gRPC port in its own copy of the
 registry. To stop:
 `docker compose stop lgtm; kill $(cat .fleet/*.pid); docker compose down --remove-orphans` (lgtm first, so a deliberate stop never pages); add `--volumes` to release the data volumes as `purge` does.
+These manual steps do not take the environment lease that `fleet.sh up` takes (below).
+
+## Run on Kubernetes
+
+The same fleet runs on a local [kind](https://kind.sigs.k8s.io/) cluster, with gateway-svc, ledger-svc and
+conversion-svc at 2 replicas under autoscalers and a chaos monkey that ships paused. It needs Docker, kind and
+kubectl, and only 127.0.0.1:8080 and 127.0.0.1:3000 on the host. Everything else is in
+[docs/k8s.md](docs/k8s.md).
+
+```sh
+./k8s/kube.sh up             # take the guard's lease, create the cluster, build and load the images, deploy, wait until every workload is Ready
+./k8s/kube.sh status         # pods per namespace and the autoscalers
+./k8s/kube.sh chaos on|off|run|status
+./k8s/kube.sh down           # delete the cluster, and its data with it
+./k8s/kube.sh sweep          # clean tree only: build, then from no cluster to a deleted one, every check logged under docs/k8s/verification/
+```
+
+`kube.sh` reads only the shell's environment, never `.env`. For a release sweep to assert Slack delivery,
+run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that shell first and never print it;
+without it the sweep logs that delivery was not asserted.
+
+**Only one fleet runs at a time.** `fleet.sh up` and `kube.sh up` both take one lease through
+`scripts/env-guard.sh`, and each refuses while any part of the other still runs, naming what it found and the
+command that stops it. `kube.sh up` also refuses when something outside both fleets holds 127.0.0.1:8080 or
+127.0.0.1:3000, and names that holder as foreign
+([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)).
 
 ## Demo: deposit, quote, convert, read back
 
@@ -364,7 +391,11 @@ ezeebit-wallet/
 ├── docker/wiremock/mappings/   the assumed exchange-rate service: one rate per supported pair
 ├── docker/postgres/initdb/01-databases.sql   role + database per service, CONNECT revoked from PUBLIC
 ├── observability/          OTLP settings, logback appender wiring; compiled into every service
+├── persistence/            AdvisoryLockService: Liquibase's lock on a PostgreSQL advisory lock; compiled into ledger-svc and conversion-svc
+├── discovery/              DeregisterBeforeDrain: leave Eureka before the graceful drain; compiled into gateway, ledger and conversion
 ├── fleet.sh                up | status | down | purge; its sweep test is docs/fleet/verification/
+├── k8s/                    kube.sh (up | down | status | chaos | sweep), kind-cluster.yaml, base/ and overlays/local/ manifests, chaos/, sweep/, gates/; see docs/k8s.md
+├── scripts/                env-guard.sh: the one lease that keeps fleet.sh and kube.sh from running together, and its stubbed test
 └── services/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry
@@ -389,9 +420,13 @@ client-sent `X-Ezeebit-Gateway` header with its own secret, and ledger-svc and c
 their public routes with **403 `GATEWAY_REQUIRED`** without it. That header is defence in depth, not
 authentication ([ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology)).
 
-An upstream that is down or refuses the connection answers **503 `UPSTREAM_UNAVAILABLE`**; one that
-resets or gives no answer within 10 s answers **504 `UPSTREAM_OUTCOME_UNKNOWN`**, because the
-request may have been processed. Problem details name no service.
+The two merchant routes resend a request, choosing an instance again, only when the connection was
+refused or timed out connecting (1 s connect timeout), never after any byte was sent, up to 3 attempts
+(`RetryUnsent=3`); each resend is counted in `ezeebit_gateway_upstream_resend_total{route}`. A request
+that was never sent, because no instance is registered or every attempt failed to connect, answers
+**503 `UPSTREAM_UNAVAILABLE`**; one that resets or gives no answer within 10 s answers
+**504 `UPSTREAM_OUTCOME_UNKNOWN`** and is not resent, because the request may have been processed.
+Problem details name no service.
 
 ### Rate limiting
 
@@ -516,6 +551,7 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | `up` says `port 6379 (redis) is held by ...` | `REDIS_PORT=6390 ./fleet.sh up` (or set it in `.env`); the gateway follows it |
 | `status` says `redis MISMATCH`, `published on 6390, but the environment now says 6379` | The fleet was started with a setting this shell lacks. Put it in `.env` ([The `.env` file](#the-env-file-keep-every-run-on-the-same-settings)), or run `REDIS_PORT=6390 ./fleet.sh status` |
 | `up` says `port 8081 (ledger-svc) is held by process ...` | A JVM from an earlier run, or another program, holds a service port: stop it (the line gives its process id) |
+| `up` says `[env-guard] refused compose: the k8s fleet ... still runs: kind node ezeebit-control-plane is running` | The kind fleet is up, or its node is only stopped: `./k8s/kube.sh down`, then `./fleet.sh up`. The reverse refusal names compose containers or fleet JVMs (`./fleet.sh down`), or a foreign holder of 8080 or 3000 (stop that process) ([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)) |
 | `up` says `fleet still not healthy after one bounce` | The table above that line names each failing row and why. The stack is left running for diagnosis; `./fleet.sh down` when done |
 | `down` says `fleet NOT fully down` | The lines below it name the port holder or container that survived; stop it before the next `up` |
 | Every merchant call answers 503 `RATE_LIMITER_UNAVAILABLE` | Redis is not running: `docker compose up -d --wait redis` |
@@ -541,7 +577,8 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 Run state (pids and logs) lives in `.fleet/`, which is gitignored.
 
 **Security gap on Kubernetes.** ledger-svc's gRPC port, like `/internal/**`, is plaintext and
-unauthenticated, protected locally only by binding to loopback; on Kubernetes it needs mutual
-Transport Layer Security (mTLS) or a service mesh plus a NetworkPolicy that admits conversion-svc as
-its only client, which is not built here
+unauthenticated, protected locally only by binding to loopback. On the kind fleet a NetworkPolicy admits
+conversion-svc as the gRPC port's only client and gateway-svc as the only client of 8081
+([docs/k8s.md](docs/k8s.md#network-policy)), but mutual Transport Layer Security (mTLS) or a service mesh
+is not built
 ([SOLUTION.md section 7](SOLUTION.md#7-known-gaps-and-unfinished-work)).

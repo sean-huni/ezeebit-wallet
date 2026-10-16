@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/name: redis
+spec:
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+    spec:
+      containers:
+        - name: redis
+          image: 'redis:8.10.2-alpine3.23@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0'
+          command: ['sh', '-c', 'exec redis-server --requirepass "$REDIS_PASSWORD" --save "" --appendonly no']
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: {secretKeyRef: {name: redis, key: REDIS_PASSWORD}}
+          ports:
+            - {name: redis, containerPort: 6379}
+          readinessProbe:
+            # The reply itself: redis-cli prints an auth error on stdout and still exits 0.
+            exec:
+              command: ['sh', '-c', '[ "$(redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping)" = PONG ]']
+            periodSeconds: 2
+            timeoutSeconds: 3
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "2", memory: 256Mi}

@@ -1,0 +1,51 @@
+# Connection invariant: (3 ledger + 3 conversion) x 10 pooled connections + 10 headroom = 70 <= max_connections 100.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway-svc
+  labels:
+    app.kubernetes.io/name: gateway-svc
+    ezeebit.io/stage: app
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: gateway-svc}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ledger-svc
+  labels:
+    app.kubernetes.io/name: ledger-svc
+    ezeebit.io/stage: app
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: ledger-svc}
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: conversion-svc
+  labels:
+    app.kubernetes.io/name: conversion-svc
+    ezeebit.io/stage: app
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: conversion-svc}
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}

@@ -26,9 +26,9 @@ Walkthrough video: link to be added.
 | [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
-| [docs/k8s.md](docs/k8s.md) | The same fleet on a local kind cluster: `k8s/kube.sh`, the guard that keeps it and `fleet.sh` apart, replicas and autoscaling, the replica fixes, network policy, the chaos monkey, and the sweep with what it proves and does not |
+| [docs/k8s.md](docs/k8s.md) | The same fleet on a local kind cluster: `k8s/kube.sh`, the guard that keeps it and `fleet.sh` apart, replicas and autoscaling, the replica fixes, network policy, the chaos monkey, and the sweep with what it checks and what it cannot show |
 | [docs/fleet/verification/](docs/fleet/verification/) | The `fleet.sh` sweep test (every outcome of `up`, `down` and `status`) and its last run log |
-| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html) | The fleet diagram, the one source of truth: every service and container as built, the gRPC call from conversion to ledger, Kafka dead letters, telemetry to LGTM and alerts to Slack |
+| [docs/fleet/fleet-architecture.html](docs/fleet/fleet-architecture.html) | The diagram of the compose fleet (`fleet.sh`; it does not show the kind fleet), the one source of truth for it: every service and container as built, the gRPC call from conversion to ledger, Kafka dead letters, telemetry to LGTM and alerts to Slack |
 | [docs/openapi/](docs/openapi/) | OpenAPI snapshots: [ledger-svc](docs/openapi/ledger-svc.json), [ledger-svc internal](docs/openapi/ledger-svc-internal.json), [conversion-svc](docs/openapi/conversion-svc.json) |
 
 **This README**
@@ -194,7 +194,7 @@ kubectl, and only 127.0.0.1:8080 and 127.0.0.1:3000 on the host. Everything else
 [docs/k8s.md](docs/k8s.md).
 
 ```sh
-./k8s/kube.sh up             # build and load the images, create the cluster, deploy, wait until every workload is Ready
+./k8s/kube.sh up             # take the guard's lease, create the cluster, build and load the images, deploy, wait until every workload is Ready
 ./k8s/kube.sh status         # pods per namespace and the autoscalers
 ./k8s/kube.sh chaos on|off|run|status
 ./k8s/kube.sh down           # delete the cluster, and its data with it
@@ -413,8 +413,8 @@ client-sent `X-Ezeebit-Gateway` header with its own secret, and ledger-svc and c
 their public routes with **403 `GATEWAY_REQUIRED`** without it. That header is defence in depth, not
 authentication ([ARCHITECTURE.md section 3](ARCHITECTURE.md#3-runtime-topology)).
 
-The two merchant routes resend a request to another instance only when the connection was refused or
-timed out connecting (1 s connect timeout), never after any byte was sent, up to 3 attempts
+The two merchant routes resend a request, choosing an instance again, only when the connection was
+refused or timed out connecting (1 s connect timeout), never after any byte was sent, up to 3 attempts
 (`RetryUnsent=3`); each resend is counted in `ezeebit_gateway_upstream_resend_total{route}`. A request
 that was never sent, because no instance is registered or every attempt failed to connect, answers
 **503 `UPSTREAM_UNAVAILABLE`**; one that resets or gives no answer within 10 s answers

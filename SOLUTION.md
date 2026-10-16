@@ -210,9 +210,10 @@ This is the single list; the other documents link here.
 **Security and deployment**
 
 - `/internal/**` and ledger-svc's gRPC port (9081) have no authentication and the gRPC channel is
-  plaintext. Locally every service binds loopback; production needs a network policy or mTLS before
-  these endpoints are deployable. On Kubernetes the gRPC port needs mTLS or a service mesh plus a
-  NetworkPolicy naming conversion-svc as its only client. The gateway proof header covers neither.
+  plaintext. Under `fleet.sh` every service binds loopback and there is no network policy. On the kind
+  fleet ledger-svc's NetworkPolicy admits only conversion-svc on 9081 and only gateway-svc on 8081
+  (`k8s/base/policy/app.yaml`, [docs/k8s.md](docs/k8s.md#network-policy)); neither fleet has mTLS or a
+  service mesh, which production still needs. The gateway proof header covers neither endpoint.
 - Kafka runs as one broker with replication 1. A dead letter Kafka does not take is counted and
   paged (DeadLetterPublishFailing) and stays in conversion-svc's log only; nothing consumes the topic
   by design, so it is a record, not a queue.
@@ -232,7 +233,8 @@ This is the single list; the other documents link here.
   authentication a caller can spread load over many merchant ids; a limit keyed on the verified
   caller needs the token the brief puts out of scope. Only the shape of the key is bounded: a universally unique identifier (UUID).
 - One Postgres container hosts both databases: logically separate, one shared failure domain.
-- config-svc and eureka-svc run as single instances.
+- config-svc and eureka-svc run as single instances (on the kind fleet too, held at 1 replica with
+  no autoscaler by the `replicas` build gate).
 - CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no
   check run or status exists on `origin/dev` (checked 2026-10-16; [docs/ci.md](docs/ci.md)).
 - Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
@@ -271,6 +273,27 @@ This is the single list; the other documents link here.
   Gradle build or the CircleCI pipeline.
 - KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
   the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.
+
+**Kubernetes (the kind fleet, [docs/k8s.md](docs/k8s.md))**
+
+- The sweep (`./k8s/kube.sh sweep`) has not yet had a committed run: what it checks is written down,
+  what it found is not ([docs/k8s.md](docs/k8s.md#the-sweep)).
+- One node, one environment (`local`), no service mesh, no secret store (Secrets come from the
+  caller's environment), no registry push; the images are arm64 on Apple Silicon, and an amd64 cloud
+  cluster would need `linux/amd64` builds.
+- Slack delivery through lgtm's narrowed egress (any public address on 443) has not been proven by a
+  run with a webhook.
+- A connect that fails with `NoRouteToHostException` is not one of the two "never sent" exceptions,
+  so the gateway answers 504 and does not resend it.
+- `ezeebit_gateway_upstream_resend_total` is exported but no dashboard panel or alert reads it.
+- On the first bring-up a service pod can restart until config-svc is Ready: the config import is
+  not optional and `up` applies config-svc together with the services that import from it.
+- The chaos namespace's API-server NetworkPolicy was observed once during development to decide
+  nothing on kindnet; no committed log shows it either way. RBAC is the control on what the monkey
+  can do.
+- A force-killed instance stays in Eureka about 30 s after its last renewal, because eureka-core
+  2.0.6 counts the 15 s lease twice; the gateway's resend covers merchants meanwhile, at about the
+  1 s connect timeout per request while a dead pod's address swallows connects.
 
 **Not built**
 

@@ -36,7 +36,7 @@ probe() {
   esac
 }
 
-# Denied: wiremock has no egress at all (spec 4). Allowed, the positive control: ledger-svc owns a postgres edge.
+# Denied: wiremock has no egress beyond DNS (spec 4). Allowed, the positive control: ledger-svc owns a postgres edge.
 probe wiremock closed
 probe ledger-svc open
 

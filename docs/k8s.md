@@ -66,7 +66,11 @@ waited on in that order). Step by step
    each stage, 300 s each. The table is printed and kept in `.kube-fleet/last-up.txt`; any workload
    not Ready fails `up`.
 
-`up` on a running cluster re-applies everything and changes only what differs. Grafana is at
+`up` on a running cluster re-applies everything and changes only what differs. A rebuilt image under
+the same tag is loaded but not rolled out, because the pod template does not change
+(`imagePullPolicy: Never`, same `ezeebit/<svc>:<version>`): run
+`kubectl --context kind-ezeebit -n ezeebit-app rollout restart deployment/<svc>`, or `down` then `up`.
+Grafana is at
 http://127.0.0.1:3000 and the gateway at http://127.0.0.1:8080, on the same routes as under
 `fleet.sh`. A deposit has no host path: `/internal/**` is never routed, and ledger-svc
 binds its pod address, so the sweep's `deposit` helper (`k8s/sweep/lib.sh:89-103`) posts it from an
@@ -76,8 +80,9 @@ Data lives in PersistentVolumeClaims inside the kind node. `down` deletes the cl
 every row, dead letter and metric with it; there is no data-keeping stop.
 
 `kind create cluster` writes the `kind-ezeebit` context into `$KUBECONFIG` or `~/.kube/config` (its
-`--kubeconfig` help says so) and makes it the current context, which was observed while building this
-branch. Nothing here relies on that: every call passes `--context kind-ezeebit`
+`--kubeconfig` help says so) and makes it the current context: kind v0.32.0's kubeconfig merge does
+`existing.CurrentContext = kind.CurrentContext`
+([merge.go](https://github.com/kubernetes-sigs/kind/blob/v0.32.0/pkg/cluster/internal/kubeconfig/internal/kubeconfig/merge.go)). Nothing here relies on that: every call passes `--context kind-ezeebit`
 (`k8s/lib/common.sh:9`). Switch back with `kubectl config use-context <yours>`.
 
 ## One fleet at a time: the environment guard
@@ -209,21 +214,21 @@ needs `linux/amd64` images, which nothing here builds.
 What breaks at two or more replicas under kills, rolling updates and scale-in, and what was built for
 it.
 
-| # | Defect | Fix as built | Proven by |
+| # | Defect | Fix as built | Tests, and the sweep check that covers it |
 |---|---|---|---|
-| R1 | A pod that dies without deregistering stays in Eureka (default lease 90 s, longer under self-preservation), so routes keep choosing it | Clients renew every 5 s with a 15 s lease (`services/config-svc/src/main/resources/served/application.yml:13-14`); the server evicts every 5 s, self-preservation off (`services/eureka-svc/src/main/resources/application.yml:20-21`). The gateway's merchant routes resend a request **only when the connect was refused or timed out** (1 s connect timeout), never after bytes were sent (`RetryUnsent=3`, `served/gateway-svc.yml:34,46`) | `ServedRegistryTimingTest`, `EvictionSettingsTest`, `DeadInstanceRetryIT`, `UnsentRetryFilterFunctionsTest`; the sweep's chaos check |
+| R1 | A pod that dies without deregistering stays in Eureka (default lease 90 s, longer under self-preservation), so routes keep choosing it | Clients renew every 5 s with a 15 s lease (`services/config-svc/src/main/resources/served/application.yml:13-14`); the server evicts every 5 s, self-preservation off (`services/eureka-svc/src/main/resources/application.yml:20-21`). The gateway's merchant routes resend a request **only when the connect was refused or timed out** (1 s connect timeout), never after bytes were sent (`RetryUnsent=3`, `served/gateway-svc.yml:34,46`) | `ServedRegistryTimingTest`, `EvictionSettingsTest`, `DeadInstanceRetryIT`, `UnsentRetryFilterFunctionsTest`; on the cluster, the sweep's chaos check (no committed run yet, [The sweep](#the-sweep)) |
 | R2 | A pod stopped on purpose is still registered while it shuts down | Deregister first: `DeregisterBeforeDrain` (in `discovery/`, compiled into gateway, ledger and conversion) sets the instance DOWN on `ContextClosedEvent`, before any lifecycle bean stops, and keeps serving 10 s (5 s server response cache + 5 s client fetch); then the graceful drain | `DeregisterBeforeDrainTest` |
 | R3 | Liquibase's lock row outlives a SIGKILLed migrator and blocks every later pod | `AdvisoryLockService` (in `persistence/`, compiled into ledger and conversion): the lock is a PostgreSQL session advisory lock, released by the database when the connection dies | `AdvisoryLockIT` |
 | R4 | `SERVER_ADDRESS` is both the bind address and the registered address, defaulting to loopback | The manifests set it to the pod IP. No code change: the loopback default protects `/internal/**` on a laptop | manifests |
 | R5 | Resilience4j breaker and retry state is per replica | Accepted, marked `[!REPLICA-LOCAL]` with its verdict (`served/conversion-svc.yml:70-71`): a ledger outage opens every replica's breaker within its own window | ARCHITECTURE section 5 |
-| R6 | config-svc and eureka-svc are single-instance by design (Eureka here is not peer-aware) | replicas 1 and no HPA, enforced by the `replicas` gate and asserted live by the sweep's parity check | `k8s/gates/replicas.sh`, `k8s/sweep/parity.sh` |
+| R6 | config-svc and eureka-svc are single-instance by design (Eureka here is not peer-aware) | replicas 1 and no HPA, enforced by the `replicas` gate; the sweep's parity check also reads it live (no committed run yet) | `k8s/gates/replicas.sh`; `k8s/sweep/parity.sh` |
 
 **R1 in seconds.** A SIGKILLed pod leaves the server's registry about 30 s after its last renewal,
 not 15 s: eureka-core 2.0.6 counts the lease duration twice (`Lease.renew()` stores now + duration,
 and `isExpired` adds the duration again, as its own javadoc says). Eviction runs every 5 s, then the
 server's 5 s response cache and the callers' 5 s fetch apply. The RetryUnsent resend, not eviction,
-is what keeps merchants from seeing the dead pod; the sweep's chaos check records every merchant
-failure with its delay after the kill. With round-robin
+is what keeps merchants from seeing the dead pod; the sweep's chaos check is built to record every
+merchant failure with its delay after the kill, and has no committed run yet. With round-robin
 and one dead instance of two, every request after the first tries the dead one first
 (`DeadInstanceRetryIT`, its comment at the 19-or-20 assertion), so while a deleted pod's IP swallows
 connects, each request on that route pays about the 1 s connect timeout until the instance leaves
@@ -237,9 +242,12 @@ resent.
 ```
 0 s    preStop sleep 5 s: endpoint removal reaches kube-proxy (the gateway NodePort, ClusterIP callers)
 5 s    SIGTERM, ContextClosedEvent: DeregisterBeforeDrain sets the instance DOWN in Eureka, serves 10 s
-15 s   graceful shutdown: in-flight requests drain, at most 20 s per shutdown phase
-35 s   done, 5 s inside terminationGracePeriodSeconds 40
+15 s   graceful shutdown: in-flight requests drain
+35 s   done, if the drain is one 20 s phase: 5 s inside terminationGracePeriodSeconds 40
 ```
+
+`spring.lifecycle.timeout-per-shutdown-phase: 20s` bounds each shutdown phase, not the whole
+shutdown, so several slow phases could run past the 40 s grace and be killed.
 
 config-svc and eureka-svc are not in Eureka: their preStop is the same 5 s, then the graceful drain.
 
@@ -264,7 +272,8 @@ proves that ending the session frees it.
 Every namespace starts at deny-all, ingress and egress, plus DNS to `kube-dns` on 53
 (`k8s/base/policy/default-deny.yaml`); the deny-all lands with the namespaces, before any workload.
 Then only these edges are open (`k8s/base/policy/{app,data,obs,chaos}.yaml`, 20 NetworkPolicy
-objects in the rendered overlay):
+objects in the rendered overlay:
+`kubectl kustomize k8s/overlays/local | awk '$0 == "kind: NetworkPolicy" {n++} END {print n + 0}'`):
 
 | From | To | Port |
 |---|---|---|
@@ -281,7 +290,7 @@ objects in the rendered overlay):
 | lgtm | any public address (Slack) | 443 |
 | chaos-monkey pods | any address (the API server) | 443, 6443 |
 
-Nothing else: wiremock, postgres and redis have no egress at all, and OTLP gRPC 4317 is not open.
+Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP gRPC 4317 is not open.
 
 - **The NodePort rule is broad.** kindnet judges a NodePort packet before source NAT, from the kind
   network's gateway address, which differs per machine, so the rule admits any address except the
@@ -293,11 +302,25 @@ Nothing else: wiremock, postgres and redis have no egress at all, and OTLP gRPC 
 - **Kubelet probes need no rule on kindnet**, which accepts every packet from a root-owned socket on
   the node (`k8s/base/policy/app.yaml:1`). A different CNI would need probe-port rules; the symptom
   is probes failing, and pods never turning Ready, right after the policies are applied.
-- **The chaos namespace's API-server rule is inert on kindnet.** Measured while building this branch:
-  a pod in `ezeebit-chaos` reached the API server with the rule's ports removed, while the same
-  namespace could not reach a pod, Grafana or the kubelet. RBAC is the control on what the monkey may
-  do; the rule is kept for a CNI that enforces it.
-- The sweep's policy check proves enforcement with one denied and one allowed edge (below).
+- **The chaos namespace's API-server rule appears inert on kindnet.** Observed once during
+  development, with no committed log: a pod in `ezeebit-chaos` reached the API server with the rule's
+  ports removed, while the same namespace could not reach a pod, Grafana or the kubelet. RBAC is the
+  control on what the monkey may do either way; the rule is kept for a CNI that enforces it. To
+  reproduce on a running cluster (not run in exactly this form; the image is already on the node):
+
+  ```sh
+  kubectl --context kind-ezeebit -n ezeebit-chaos patch networkpolicy api-server --type json \
+    -p '[{"op":"replace","path":"/spec/egress/0/ports","value":[{"protocol":"TCP","port":1}]}]'
+  sleep 30   # let the CNI reprogram
+  kubectl --context kind-ezeebit -n ezeebit-chaos run api-probe --rm -i --restart=Never \
+    --image='alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00' -- \
+    sh -c 'kubectl get --raw /version; echo api_exit=$?; wget -T 5 -qO- http://lgtm.ezeebit-obs:3000/api/health; echo control_exit=$?'
+  kubectl --context kind-ezeebit apply -k k8s/overlays/local -l ezeebit.io/stage=namespaces   # restore
+  ```
+
+  `api_exit=0` with `control_exit` non-zero means the API server is reached while default-deny
+  still blocks everything else, so the rule decides nothing.
+- The sweep's policy check tests enforcement with one denied and one allowed edge (below).
 
 ## Chaos monkey
 
@@ -318,7 +341,9 @@ Nothing else: wiremock, postgres and redis have no egress at all, and OTLP gRPC 
   120 s, and its Job is deleted an hour after it finishes, which `chaos status` then says.
 - **The draw** (`k8s/chaos/monkey.sh`): a service is drawn uniformly over every Deployment and
   StatefulSet labelled `app.kubernetes.io/part-of=ezeebit` in `ezeebit-app` and `ezeebit-data`
-  (9 in the rendered overlay: the five services, wiremock, postgres, redis, kafka), then one Running
+  (9 in the rendered overlay: the five services, wiremock, postgres, redis, kafka;
+  `kubectl kustomize k8s/overlays/local | awk '/^kind:/ {k = $2} /^  namespace: ezeebit-(app|data)$/ && (k == "Deployment" || k == "StatefulSet") {n++} END {print n + 0}'`),
+  then one Running
   pod of it, force-deleted with grace 0. A single-replica service is therefore drawn as often as a
   scaled one, and killing postgres, kafka, redis, config-svc or eureka-svc is a real outage that can
   page. Each kill prints `KILL <ns>/<pod> service=<svc>`, then `KILLED <n>`.
@@ -362,13 +387,13 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 **The release evidence is the committed passing log** under `docs/k8s/verification/`. As of
 2026-10-16 at `e7aed35` no sweep log is committed.
 
-**What the sweep proves:** the fleet comes up from nothing on Kubernetes with the compose images; the
+**What a passing run would show** (none is committed yet): the fleet comes up from nothing on Kubernetes with the compose images; the
 money path works through the gateway; every replica of the three scaled services serves; the rate
 limit is one bucket across gateway pods; one denied and one allowed network edge behave; pod kills
 mid-traffic leave the two databases agreeing, with merchant failures bounded in time; an outage
 reaches Grafana alerting; monitoring survives all of it.
 
-**What it does not prove:** no service mesh or mutual TLS; no secret store (Secrets are created
+**What it cannot show, even passing:** no service mesh or mutual TLS; no secret store (Secrets are created
 from the environment); a single node, so no node loss, zone spread or anti-affinity; the arm64
 images of this machine, not the amd64 a cloud cluster would run; one environment (`local`), no
 registry push; Slack delivery only when `SLACK_WEBHOOK_URL` is set for the run; an HPA scaling out
@@ -393,17 +418,9 @@ Where the kind fleet deliberately differs from compose:
 
 ## Known limits
 
-- A service pod can restart during the first bring-up until config-svc is Ready: the config import
-  is not optional (`application.yml:9` of gateway-svc, ledger-svc and conversion-svc) and `up`
-  applies config-svc together with the services that import from it.
-- Slack delivery through lgtm's narrowed 443 egress is not yet proven by a run with a webhook.
-- `NoRouteToHostException` is neither of the two "never sent" exceptions, so a connect failing that
-  way answers 504 and is not resent.
-- `ezeebit_gateway_upstream_resend_total` has no panel or alert yet.
-- Single node; no mesh or secret store; one environment.
-- ledger-svc's gRPC port and `/internal/**` are plaintext and unauthenticated. The policies admit
-  only conversion-svc to 9081 and only gateway-svc to 8081, which the gateway never routes
-  `/internal/**` to; mutual TLS is not built.
+They are kept in one list with the rest of the project's gaps:
+[SOLUTION.md section 7](../SOLUTION.md#7-known-gaps-and-unfinished-work), under "Kubernetes" and
+"Security and deployment".
 
 ## Build gates
 

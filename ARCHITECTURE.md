@@ -238,7 +238,7 @@ Running two replicas under kills, rolling updates and scale-in needed six decisi
 | R3 | a SIGKILLed migrator leaves Liquibase's lock row set for every later pod | `persistence/AdvisoryLockService`: the lock is a PostgreSQL session advisory lock that dies with its connection |
 | R4 | `SERVER_ADDRESS` is both bind and registered address, loopback by default | the pod IP from the downward API; the default stays for the laptop |
 | R5 | breaker and retry state is per replica | accepted, `[!REPLICA-LOCAL]` in `served/conversion-svc.yml` (section 5) |
-| R6 | config-svc and eureka-svc are single-instance (Eureka here is not peer-aware) | 1 replica and no autoscaler, enforced by a build gate and asserted by the sweep |
+| R6 | config-svc and eureka-svc are single-instance (Eureka here is not peer-aware) | 1 replica and no autoscaler, enforced by a build gate; the sweep's parity check also reads it live, with no committed run yet |
 
 ## 4. Ledger design (Task 1)
 
@@ -601,7 +601,7 @@ spec's description.
 | Dependency fails | Behaviour | Tested |
 |---|---|---|
 | A domain service down, unregistered or refusing | gateway 503 `UPSTREAM_UNAVAILABLE` | yes |
-| One replica killed, still registered | the merchant routes resend a request whose connect was refused or timed out to another instance, up to 3 attempts; nothing that was sent is resent | yes: `DeadInstanceRetryIT` (refused and black-holed instances, every POST once); on kind, the sweep's chaos check |
+| One replica killed, still registered | the merchant routes resend a request whose connect was refused or timed out, choosing an instance again, up to 3 attempts; nothing that was sent is resent | yes: `DeadInstanceRetryIT` (refused and black-holed instances, every POST once). The kind sweep's chaos check covers it on a cluster, with no committed run yet ([docs/k8s.md](docs/k8s.md#the-sweep)) |
 | A replica stopped on purpose (rolling update, scale-in) | it leaves Eureka first and serves 10 s more, then drains | yes: `DeregisterBeforeDrainTest` (deregisters before any lifecycle bean stops) |
 | A migrating replica SIGKILLed | its advisory lock ends with its connection; the next pod migrates | yes: `AdvisoryLockIT` (a stale lock row does not block, two migrators serialise, a terminated holder's lock is released) |
 | Upstream resets, or silent for 10 s | gateway 504 `UPSTREAM_OUTCOME_UNKNOWN` | yes |

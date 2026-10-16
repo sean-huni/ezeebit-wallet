@@ -1,4 +1,4 @@
-# Stage namespaces until the chaos workloads have a stage of their own: the actor must never run without this fence.
+# Stage namespaces, not chaos: the fence lands before the actor exists, so the actor never runs without it.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Runs the fleet on a local kind cluster. Usage: k8s/kube.sh up [--no-build] [--only data,obs,app] | down | status
+# Runs the fleet on a local kind cluster.
+# Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status
 # Written for the bash 3.2 macOS ships: no ${x,,}, no mapfile, and empty arrays expanded with ${a[@]+...}.
 set -uo pipefail
 # shellcheck source=lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 cd "$ROOT" || exit 1
+# k8s/chaos/monkey.sh run from here names the cluster through this.
+export KCTL_CONTEXT=$CONTEXT
 
 SERVICES=(config-svc eureka-svc ledger-svc conversion-svc gateway-svc)
-STAGES=(data obs app)
+STAGES=(data obs app chaos)
 NAMESPACES=(ezeebit-data ezeebit-app ezeebit-obs ezeebit-chaos)
 OVERLAY=k8s/overlays/local
 TIMEOUT=300s
@@ -110,7 +113,8 @@ create_configmaps() {
   apply_generated lgtm-dashboards configmap lgtm-dashboards -n ezeebit-obs --from-file=docker/lgtm/dashboards
   apply_generated lgtm-alerting configmap lgtm-alerting -n ezeebit-obs --from-file=docker/lgtm/alerting
   apply_generated lgtm-alerting-promtool configmap lgtm-alerting-promtool -n ezeebit-obs --from-file=docker/lgtm/alerting/promtool
-  log "configmaps: postgres-initdb wiremock-mappings lgtm-root lgtm-dashboards lgtm-alerting lgtm-alerting-promtool"
+  apply_generated chaos-monkey configmap chaos-monkey -n ezeebit-chaos --from-file=monkey.sh=k8s/chaos/monkey.sh
+  log "configmaps: postgres-initdb wiremock-mappings lgtm-root lgtm-dashboards lgtm-alerting lgtm-alerting-promtool chaos-monkey"
 }
 
 apply_overlay() {
@@ -152,7 +156,7 @@ wait_stage() {
 }
 
 cmd_up() {
-  local build=1 only=data,obs,app stage selected rc
+  local build=1 only=data,obs,app,chaos stage selected rc
   local stages=()
   while (( $# )); do
     case $1 in
@@ -225,9 +229,83 @@ cmd_status() {
   (( rc == 0 )) || fail "get hpa exited $rc"
 }
 
+CHAOS_NS=ezeebit-chaos
+CHAOS_JOB_TIMEOUT=180
+
+chaos_suspend() {
+  local want=$1 got rc
+  kctl patch cronjob chaos-monkey -n "$CHAOS_NS" --type merge -p "{\"spec\":{\"suspend\":$want}}" > /dev/null; rc=$?
+  (( rc == 0 )) || fail "patching cronjob chaos-monkey exited $rc"
+  got=$(kctl get cronjob chaos-monkey -n "$CHAOS_NS" -o jsonpath='{.spec.suspend}'); rc=$?
+  (( rc == 0 )) || fail "reading cronjob chaos-monkey back exited $rc"
+  [[ $got == "$want" ]] || fail "suspend reads back '$got', wanted $want"
+  if [[ $want == false ]]; then log "chaos on: suspend=false, one kill every 10 minutes"; else log "chaos off: suspend=true"; fi
+}
+
+# Prints Complete or Failed once the Job has either condition; a pod that never starts ends at activeDeadlineSeconds.
+chaos_wait() {
+  local job=$1 waited=0 state rc
+  while (( waited < CHAOS_JOB_TIMEOUT )); do
+    state=$(kctl get job "$job" -n "$CHAOS_NS" \
+      -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}'); rc=$?
+    (( rc == 0 )) || fail "reading job $job exited $rc"
+    case " $state " in
+      *" Complete "*) printf 'Complete'; return 0 ;;
+      *" Failed "*) printf 'Failed'; return 0 ;;
+    esac
+    sleep 2; waited=$((waited + 2))
+  done
+  printf 'Timeout'
+}
+
+chaos_run() {
+  local job state rc
+  job="chaos-manual-$(date +%s)"
+  kctl create job "$job" --from=cronjob/chaos-monkey -n "$CHAOS_NS" > /dev/null; rc=$?
+  (( rc == 0 )) || fail "creating job $job exited $rc"
+  log "chaos run: job $job"
+  state=$(chaos_wait "$job") || exit 1
+  kctl logs "job/$job" -n "$CHAOS_NS"; rc=$?
+  (( rc == 0 )) || fail "logs of job $job exited $rc"
+  [[ $state == Complete ]] || fail "job $job ended $state"
+  log "chaos run: job $job Complete"
+}
+
+chaos_status() {
+  local line suspend last job state logs rc
+  line=$(kctl get cronjob chaos-monkey -n "$CHAOS_NS" -o jsonpath='{.spec.suspend} {.status.lastScheduleTime}'); rc=$?
+  (( rc == 0 )) || fail "reading cronjob chaos-monkey exited $rc"
+  read -r suspend last <<< "$line"
+  printf 'suspend=%s lastScheduleTime=%s\n' "$suspend" "${last:-never}"
+  job=$(kctl get jobs -n "$CHAOS_NS" --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); rc=$?
+  (( rc == 0 )) || fail "listing jobs in $CHAOS_NS exited $rc"
+  job=${job##*$'\n'}
+  if [[ -z $job ]]; then printf 'last job: none (finished jobs are deleted after an hour)\n'; return 0; fi
+  state=$(kctl get job "$job" -n "$CHAOS_NS" \
+    -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}'); rc=$?
+  (( rc == 0 )) || fail "reading job $job exited $rc"
+  printf 'last job: %s %s\n' "$job" "${state:-Running}"
+  logs=$(kctl logs "job/$job" -n "$CHAOS_NS" 2>&1); rc=$?
+  (( rc == 0 )) || { printf 'logs unavailable (exit %s): %s\n' "$rc" "$logs"; return 0; }
+  while read -r line; do [[ $line == KILL* ]] && printf '%s\n' "$line"; done <<< "$logs"
+}
+
+cmd_chaos() {
+  cluster_exists || fail "cluster $CLUSTER does not exist"
+  case ${1:-} in
+    on) chaos_suspend false ;;
+    off) chaos_suspend true ;;
+    run) chaos_run ;;
+    status) chaos_status ;;
+    *) printf 'usage: %s chaos on|off|run|status\n' "$0" >&2; exit 2 ;;
+  esac
+}
+
 case ${1:-} in
   up) shift; cmd_up "$@" ;;
   down) cmd_down ;;
   status) cmd_status ;;
-  *) printf 'usage: %s up [--no-build] [--only data,obs,app] | down | status\n' "$0" >&2; exit 2 ;;
+  chaos) shift; cmd_chaos "$@" ;;
+  *) printf 'usage: %s up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status\n' "$0" >&2; exit 2 ;;
 esac

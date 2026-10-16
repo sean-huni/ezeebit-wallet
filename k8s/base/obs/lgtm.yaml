@@ -87,6 +87,8 @@ spec:
           env:
             - name: SLACK_WEBHOOK_URL
               valueFrom: {secretKeyRef: {name: slack, key: url, optional: true}}
+            - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}
+            - {name: GF_ANALYTICS_CHECK_FOR_UPDATES, value: "false"}
           ports:
             - {name: grafana, containerPort: 3000}
             - {name: otlp-grpc, containerPort: 4317}

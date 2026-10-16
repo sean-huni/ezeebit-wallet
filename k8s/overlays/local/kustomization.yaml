@@ -11,3 +11,4 @@ resources:
   - ../../base/app
   - ../../base/metrics-server
   - ../../base/policy
+  - ../../base/chaos

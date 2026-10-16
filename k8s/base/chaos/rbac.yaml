@@ -1,0 +1,79 @@
+# Namespaced Roles in ezeebit-app and ezeebit-data only, never a ClusterRole: ezeebit-obs and Secrets stay unreachable.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-monkey
+  namespace: ezeebit-chaos
+  labels:
+    app.kubernetes.io/name: chaos-monkey
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chaos-monkey
+  namespace: ezeebit-app
+  labels:
+    app.kubernetes.io/name: chaos-monkey
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, delete]
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, patch]
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chaos-monkey
+  namespace: ezeebit-app
+  labels:
+    app.kubernetes.io/name: chaos-monkey
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chaos-monkey
+subjects:
+  - {kind: ServiceAccount, name: chaos-monkey, namespace: ezeebit-chaos}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chaos-monkey
+  namespace: ezeebit-data
+  labels:
+    app.kubernetes.io/name: chaos-monkey
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, delete]
+  # The draw lists both kinds; StatefulSets are never patched or scaled.
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, patch]
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chaos-monkey
+  namespace: ezeebit-data
+  labels:
+    app.kubernetes.io/name: chaos-monkey
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chaos-monkey
+subjects:
+  - {kind: ServiceAccount, name: chaos-monkey, namespace: ezeebit-chaos}

@@ -13,6 +13,9 @@ TAIL=30
 LOOPS=3
 # Unpaced, three loops drew 2712 rate-limit 429s and drove the HPAs up: traffic under the limit tests the kills.
 PACE=0.25
+MIN_WINDOW=20
+# Quote TTL 15s + posting grace 30s + max transaction time 30s + a 10s sweep, plus margin.
+PENDING_WAIT=120
 findings=()
 run=$(date +%s)
 traffic=$SWEEP_DIR/chaos-traffic
@@ -81,6 +84,14 @@ say "merchant failures (5xx or no answer): $failures"
 [[ -n $late ]] && printf '%s\n' "$late" | awk '{print "  " $0}'
 over=$(awk -v budget="$BUDGET_MS" '/before any kill/ {n++; next} {d = $0; sub(/.* \+/, "", d); sub(/ms.*/, "", d); if (d + 0 > budget) n++} END {print n + 0}' <<< "$late")
 (( over == 0 )) || findings+=("$over failure(s) later than ${BUDGET_MS}ms after a kill, or before any kill")
+# Each kill window [kill, kill + spacing) must carry traffic, or the kill tested nothing.
+for (( i = 0; i < ${#kills[@]}; i++ )); do
+  k=${kills[$i]} e=$(( kills[i] + SPACING * 1000 ))
+  w=$(awk -v a="$k" -v b="$e" '$1 >= a && $1 < b' <<< "$all")
+  n=$(awk 'NF {n++} END {print n + 0}' <<< "$w")
+  say "window ${VICTIMS[$i]} kill +${SPACING}s: $n requests; $(awk 'NF {c[$3]++} END {for (s in c) printf "%s x%d; ", s, c[s]}' <<< "$w") 4xx: $(awk 'NF && $3 ~ /^4/ {n++} END {print n + 0}' <<< "$w")"
+  (( n >= MIN_WINDOW )) || findings+=("only $n requests in the ${VICTIMS[$i]} kill window, want >= $MIN_WINDOW")
+done
 before_ok=$(awk -v t="$first_kill" '$1 < t && $2 == "convert" && $3 == 201 {n++} END {print n + 0}' <<< "$all")
 after_ok=$(awk -v t="$((last_kill + BUDGET_MS))" '$1 > t && $2 == "convert" && $3 == 201 {n++} END {print n + 0}' <<< "$all")
 say "conversions 201 before the first kill: $before_ok; after the last kill + ${BUDGET_MS}ms: $after_ok (want both > 0)"
@@ -94,19 +105,46 @@ for svc in "${VICTIMS[@]}"; do
   (( rc == 0 )) || findings+=("$svc did not recover: ready $ready")
 done
 
-# Duplicate audit over the whole store, keyed as the changelogs' unique identities are.
-row=$(psql_in ledger "SELECT count(*), count(DISTINCT (merchant_id, idempotency_key)) FROM journal WHERE type = 'CONVERSION'"); rc=$?
-say "ledger journal CONVERSION: count, distinct (merchant_id, idempotency_key) = ${row:-none} (psql exit $rc)"
-read -r c d <<< "$row"
-[[ $rc == 0 && $c =~ ^[0-9]+$ && $c -gt 0 && $c == "$d" ]] || findings+=("ledger CONVERSION postings '$row', want count = distinct > 0")
-row=$(psql_in conversion "SELECT count(*), count(DISTINCT (merchant_id, idempotency_key)) FROM conversion"); rc=$?
-say "conversion: count, distinct (merchant_id, idempotency_key) = ${row:-none} (psql exit $rc)"
-read -r c d <<< "$row"
-[[ $rc == 0 && $c =~ ^[0-9]+$ && $c -gt 0 && $c == "$d" ]] || findings+=("conversions '$row', want count = distinct > 0")
+# Cross-store reconciliation for this run's merchants. A unique key cannot show a duplicate, so the audit asks
+# whether the two stores agree: each COMPLETED conversion has exactly one POSTED CONVERSION journal keyed by its id
+# (ledger changelogs 003 and 005), and each such journal has a COMPLETED conversion. PENDING ones settle first.
+in_list="'$(printf '%s' "${merchants[*]}" | sed "s/ /','/g")'"
+waited=0 pending=''
+while (( waited <= PENDING_WAIT )); do
+  pending=$(psql_in conversion "SELECT count(*) FROM conversion WHERE status = 'PENDING' AND merchant_id IN ($in_list)"); rc=$?
+  [[ $rc == 0 && $pending == 0 ]] && break
+  sleep 5; waited=$((waited + 5))
+done
+say "PENDING conversions of this run: ${pending:-none} after ${waited}s (want 0 within ${PENDING_WAIT}s)"
+if [[ $pending != 0 ]]; then
+  left=$(psql_in conversion "SELECT id, deadline FROM conversion WHERE status = 'PENDING' AND merchant_id IN ($in_list)")
+  findings+=("unswept PENDING conversions: $(printf '%s' "$left" | tr '\n' ';')")
+fi
+completed=$(psql_in conversion "SELECT id FROM conversion WHERE status = 'COMPLETED' AND merchant_id IN ($in_list) ORDER BY id"); rc1=$?
+by_status=$(psql_in conversion "SELECT status, count(*) FROM conversion WHERE merchant_id IN ($in_list) GROUP BY status ORDER BY status"); rc2=$?
+posted=$(psql_in ledger "SELECT idempotency_key, count(*) FROM journal WHERE type = 'CONVERSION' AND status = 'POSTED' AND merchant_id IN ($in_list) GROUP BY idempotency_key ORDER BY idempotency_key"); rc3=$?
+by_journal=$(psql_in ledger "SELECT status, count(*) FROM journal WHERE type = 'CONVERSION' AND merchant_id IN ($in_list) GROUP BY status ORDER BY status"); rc4=$?
+if (( rc1 || rc2 || rc3 || rc4 )); then
+  findings+=("reconciliation reads exited $rc1/$rc2/$rc3/$rc4")
+else
+  n_completed=$(awk 'NF {n++} END {print n + 0}' <<< "$completed")
+  n_posted=$(awk 'NF {n++} END {print n + 0}' <<< "$posted")
+  multi=$(awk 'NF && $2 != 1 {printf "%s x%s; ", $1, $2}' <<< "$posted")
+  posted_ids=$(awk 'NF {print $1}' <<< "$posted")
+  no_journal=$(comm -23 <(printf '%s\n' "$completed" | awk NF) <(printf '%s\n' "$posted_ids" | awk NF) | awk 'NF {n++} END {print n + 0}')
+  no_conversion=$(comm -13 <(printf '%s\n' "$completed" | awk NF) <(printf '%s\n' "$posted_ids" | awk NF) | awk 'NF {n++} END {print n + 0}')
+  say "conversion-svc by status: $(printf '%s' "$by_status" | tr '\n' ';')"
+  say "ledger CONVERSION journals by status: $(printf '%s' "$by_journal" | tr '\n' ';')"
+  say "COMPLETED conversions: $n_completed; POSTED CONVERSION journals: $n_posted; COMPLETED without a journal: $no_journal; journals without a COMPLETED conversion: $no_conversion; journals posted more than once: ${multi:-none}"
+  (( n_completed > 0 )) || findings+=("no COMPLETED conversion to reconcile")
+  (( no_journal == 0 )) || findings+=("$no_journal COMPLETED conversion(s) have no POSTED journal")
+  (( no_conversion == 0 )) || findings+=("$no_conversion POSTED journal(s) have no COMPLETED conversion")
+  [[ -z $multi ]] || findings+=("conversions posted more than once: $multi")
+fi
 sent=$(awk '$2 == "convert" {n++} END {print n + 0}' <<< "$all")
 mine=$(psql_in conversion "SELECT count(*) FROM conversion WHERE idempotency_key LIKE 'chaos-$run-%'"); rc=$?
-created=$(awk '$2 == "convert" && $3 == 201 {n++} END {print n + 0}' <<< "$all")
-say "this run: $sent convert requests, $created answered 201, ${mine:-none} conversion rows (want 201s <= rows <= requests)"
+created=$(awk '$2 == "convert" && $3 ~ /^20[12]$/ {n++} END {print n + 0}' <<< "$all")
+say "this run: $sent convert requests, $created answered 201/202, ${mine:-none} conversion rows (want answered <= rows <= requests)"
 [[ $rc == 0 && $mine =~ ^[0-9]+$ ]] && (( created <= mine && mine <= sent )) || findings+=("rows '$mine' outside [$created, $sent]")
 
 verdict "$CHECK" ${findings[@]+"${findings[@]}"}

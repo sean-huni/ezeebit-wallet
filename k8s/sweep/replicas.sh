@@ -26,45 +26,56 @@ delta_by_pod() {
   done
 }
 
-# await_all_served <label> <selector> <svc...>: polls until every Ready pod of every svc shows a rise, or SETTLE.
-# Uses BEFORE_<svc> snapshots taken by the caller.
+# await_all_served <label> <selector> <svc...>: polls until every pod in the caller's snapshot shows a rise, or SETTLE.
+# Appends a finding for each snapshotted pod without a rise, and for any pod that joined or left mid-check: a pod set
+# that changed under the traffic proves nothing about the set that was asked about.
 await_all_served() {
-  local label=$1 sel=$2 svc waited=0 short rows pods after
+  local label=$1 sel=$2 svc waited=0 short rows pods now after before p failed
   shift 2
+  # A failed read is retried inside the window; only a window ending on a failed read fails.
   while :; do
-    short=0 rows=""
+    rows="" failed=0
     for svc in "$@"; do
-      pods=$(pods_of "$svc")
-      after=$(counts "$svc" "$sel") || return 1
-      eval "before=\$BEFORE_${svc//-/_}"
-      # shellcheck disable=SC2086,SC2154
+      eval "pods=\$PODS_${svc//-/_}; before=\$BEFORE_${svc//-/_}"
+      after=$(counts "$svc" "$sel") || { failed=1; break; }
+      # shellcheck disable=SC2086
       rows+=$(delta_by_pod "$svc" "$before" "$after" $pods | awk -v s="$svc" '{print s, $0}')$'\n'
     done
     short=$(awk 'NF && $5 <= 0 {n++} END {print n + 0}' <<< "$rows")
-    (( short == 0 || waited >= SETTLE )) && break
+    (( (failed == 0 && short == 0) || waited >= SETTLE )) && break
     sleep 5; waited=$((waited + 5))
   done
-  say "$label, per pod (service pod before after delta), read ${waited}s after the traffic:"
+  (( failed == 0 )) || return 1
+  say "$label, per snapshotted pod (service pod before after delta), read ${waited}s after the traffic:"
   printf '%s' "$rows" | awk 'NF {print "  " $0}'
-  SERVED_ROWS=$rows
+  while read -r svc p _ _ d; do
+    [[ -n ${svc:-} ]] || continue
+    awk -v d="$d" 'BEGIN {exit !(d > 0)}' || findings+=("$label: $svc pod $p recorded no request")
+  done <<< "$rows"
+  for svc in "$@"; do
+    eval "pods=\$PODS_${svc//-/_}"
+    now=$(pods_of "$svc")
+    for p in $pods; do [[ $'\n'$now$'\n' == *$'\n'"$p"$'\n'* ]] || findings+=("$label: $svc pod $p left mid-check"); done
+    for p in $now; do [[ $'\n'$pods$'\n' == *$'\n'"$p"$'\n'* ]] || findings+=("$label: $svc pod $p joined mid-check"); done
+  done
 }
 
+# snapshot <selector> <svc...>: the Ready pod set (at least 2) and its per-instance counters, before the traffic.
 snapshot() {
-  local sel=$1 svc v
+  local sel=$1 svc v pods n
   shift
   for svc in "$@"; do
+    pods=$(pods_of "$svc")
+    n=$(awk 'NF {n++} END {print n + 0}' <<< "$pods")
+    say "$svc Ready pods at the snapshot: $n ($(printf '%s' "$pods" | tr '\n' ' '))(want >= 2)"
+    (( n >= 2 )) || findings+=("$svc has $n Ready pods, want >= 2")
     # shellcheck disable=SC2034
     v=$(counts "$svc" "$sel") || return 1
-    eval "BEFORE_${svc//-/_}=\$v"
+    eval "BEFORE_${svc//-/_}=\$v; PODS_${svc//-/_}=\$pods"
   done
 }
 
 # 1. Every replica serves.
-for svc in "${SCALED[@]}"; do
-  n=$(pods_of "$svc" | awk 'NF {n++} END {print n + 0}')
-  say "$svc Ready pods: $n (want 2)"
-  [[ $n == 2 ]] || findings+=("$svc has $n Ready pods, want 2")
-done
 snapshot "" "${SCALED[@]}" || { verdict "$CHECK" "Prometheus did not answer the before snapshot"; exit 1; }
 bad=0 codes=""
 for (( i = 0; i < REQUESTS / 2; i++ )); do
@@ -77,9 +88,6 @@ done
 say "$REQUESTS requests (balances 200, quotes 201 wanted): $(printf '%s\n' $codes | sort | uniq -c | awk '{printf "%s x%s ", $2, $1}')"
 (( bad == 0 )) || findings+=("$bad of $REQUESTS requests answered other than 200/201")
 await_all_served "requests served" "" "${SCALED[@]}" || findings+=("Prometheus did not answer after the traffic")
-pods_served=$(awk 'NF && $5 > 0 {n++} END {print n + 0}' <<< "${SERVED_ROWS:-}")
-say "pods with a rise: $pods_served (want 6)"
-[[ $pods_served == 6 ]] || findings+=("$pods_served of 6 scaled pods served the $REQUESTS requests")
 
 # 2. One bucket across gateway pods. Twice the capacity: per-pod buckets would admit up to 2 x capacity, a shared
 # one capacity plus refill. The burst must outrun the refill or it cannot tell the two apart.
@@ -109,8 +117,6 @@ else
   (( admitted <= bound )) || findings+=("admitted $admitted > bound $bound: the gateway pods do not share a bucket")
   (( admitted > 0 )) || findings+=("burst admitted nothing")
   await_all_served "burst" "" gateway-svc || findings+=("Prometheus did not answer after the burst")
-  gw_served=$(awk 'NF && $5 > 0 {n++} END {print n + 0}' <<< "${SERVED_ROWS:-}")
-  [[ $gw_served == 2 ]] || findings+=("$gw_served of 2 gateway pods recorded the burst")
 fi
 
 # 3. Write through one conversion pod, read through both.
@@ -132,8 +138,6 @@ else
   say "reads of $CONVERSION_ID: $okreads of 10 answered 200 with that id"
   (( okreads == 10 )) || findings+=("$okreads of 10 reads returned the conversion")
   await_all_served "reads" "$read_sel" conversion-svc || findings+=("Prometheus did not answer after the reads")
-  rd_served=$(awk 'NF && $5 > 0 {n++} END {print n + 0}' <<< "${SERVED_ROWS:-}")
-  [[ $rd_served == 2 ]] || findings+=("$rd_served of 2 conversion pods served the reads")
 fi
 
 verdict "$CHECK" ${findings[@]+"${findings[@]}"}

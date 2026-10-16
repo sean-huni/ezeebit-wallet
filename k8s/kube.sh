@@ -337,45 +337,63 @@ cmd_chaos() {
 # Spec 6 order. Monitoring wraps the others: it records the lgtm pod at the start and compares at the end.
 SWEEP_CHECKS=(parity money replicas policy chaos outage)
 
+SWEEP_LOG=''
+SWEEP_FAILED=0
+SWEEP_UP=0
+SWEEP_DONE=0
+
+sweep_log() { printf '%s\n' "$*" | tee -a "$SWEEP_LOG"; }
+
+# Runs once on every exit path: down when up began (it releases the env lease), then the verdict line.
+sweep_finish() {
+  local rc=$? down_rc
+  trap - EXIT INT TERM
+  (( SWEEP_DONE )) && return
+  SWEEP_DONE=1
+  (( rc == 0 )) || SWEEP_FAILED=1
+  if (( SWEEP_UP )); then
+    ( cmd_down ) >> "$SWEEP_LOG" 2>&1; down_rc=$?
+    sweep_log "down exit=$down_rc"
+    (( down_rc == 0 )) || SWEEP_FAILED=1
+  fi
+  sweep_log "sweep exit=$SWEEP_FAILED"
+  exit "$SWEEP_FAILED"
+}
+
 cmd_sweep() {
-  local log failed=0 check rc out
-  log="$ROOT/docs/k8s/verification/$(date +%F)-sweep.log"
-  mkdir -p "$(dirname "$log")"
-  : > "$log"
-  sweep_log() { printf '%s\n' "$*" | tee -a "$log"; }
+  local check rc out
+  SWEEP_LOG="$ROOT/docs/k8s/verification/$(date +%F)-sweep.log"
+  mkdir -p "$(dirname "$SWEEP_LOG")"
+  : > "$SWEEP_LOG"
+  trap sweep_finish EXIT
+  trap 'SWEEP_FAILED=1; sweep_log "interrupted"; sweep_finish' INT TERM
   sweep_log "sweep started $(date -u +%FT%TZ) at $(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
   if cluster_exists; then
-    ( cmd_down ) >> "$log" 2>&1; rc=$?
+    ( cmd_down ) >> "$SWEEP_LOG" 2>&1; rc=$?
     sweep_log "pre-down exit=$rc"
-    (( rc == 0 )) || exit 1
+    (( rc == 0 )) || { SWEEP_FAILED=1; exit 1; }
   fi
-  ( cmd_up "$@" ) >> "$log" 2>&1; rc=$?
+  SWEEP_UP=1
+  ( cmd_up "$@" ) >> "$SWEEP_LOG" 2>&1; rc=$?
   sweep_log "up exit=$rc"
-  if (( rc == 0 )); then
-    out=$(bash k8s/sweep/monitoring.sh begin 2>&1); rc=$?
-    printf '%s\n' "$out" >> "$log"
-    sweep_log "monitoring-begin exit=$rc"
-    (( rc == 0 )) || failed=1
-    for check in "${SWEEP_CHECKS[@]}"; do
-      out=$(bash "k8s/sweep/$check.sh" 2>&1); rc=$?
-      printf '== %s\n%s\n' "$check" "$out" >> "$log"
-      sweep_log "$check exit=$rc"
-      (( rc == 0 )) || failed=1
-      out=$(bash k8s/sweep/monitoring.sh mark "after-$check" 2>&1); rc=$?
-      printf '%s\n' "$out" >> "$log"
-    done
-    out=$(bash k8s/sweep/monitoring.sh end 2>&1); rc=$?
-    printf '== monitoring\n%s\n' "$out" >> "$log"
-    sweep_log "monitoring exit=$rc"
-    (( rc == 0 )) || failed=1
-  else
-    failed=1
-  fi
-  ( cmd_down ) >> "$log" 2>&1; rc=$?
-  sweep_log "down exit=$rc"
-  (( rc == 0 )) || failed=1
-  sweep_log "sweep exit=$failed"
-  exit "$failed"
+  (( rc == 0 )) || { SWEEP_FAILED=1; exit 1; }
+  out=$(bash k8s/sweep/monitoring.sh begin 2>&1); rc=$?
+  printf '%s\n' "$out" >> "$SWEEP_LOG"
+  sweep_log "monitoring-begin exit=$rc"
+  (( rc == 0 )) || SWEEP_FAILED=1
+  for check in "${SWEEP_CHECKS[@]}"; do
+    out=$(bash "k8s/sweep/$check.sh" 2>&1); rc=$?
+    printf '== %s\n%s\n' "$check" "$out" >> "$SWEEP_LOG"
+    sweep_log "$check exit=$rc"
+    (( rc == 0 )) || SWEEP_FAILED=1
+    out=$(bash k8s/sweep/monitoring.sh mark "after-$check" 2>&1)
+    printf '%s\n' "$out" >> "$SWEEP_LOG"
+  done
+  out=$(bash k8s/sweep/monitoring.sh end 2>&1); rc=$?
+  printf '== monitoring\n%s\n' "$out" >> "$SWEEP_LOG"
+  sweep_log "monitoring exit=$rc"
+  (( rc == 0 )) || SWEEP_FAILED=1
+  exit "$SWEEP_FAILED"
 }
 
 case ${1:-} in

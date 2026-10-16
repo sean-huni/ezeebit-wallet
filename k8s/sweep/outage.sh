@@ -10,14 +10,23 @@ RULE=ConversionLedgerDeadLettered
 DEAD_LETTERS='sum(ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"})'
 DRIVE_WAIT=180
 ALERT_GRACE=120
+# The rule counts dead letters over 5m: a leftover firing clears within that plus a few evaluations.
+CLEAR_WAIT=360
 findings=()
 
-# "<state> <for seconds> <instance states>", "missing", or empty when Grafana did not answer.
+# "<rule state> <for seconds> <Alerting instances active at or after $1 epoch s>", "missing", or empty when Grafana
+# did not answer. Counting only instances that became active after the outage began keeps a firing left over from
+# an earlier check (for: 0s over a 5m increase) from passing this one.
 rule_state() {
   local out rc
   out=$(curl -s --max-time 10 "$GRAFANA/api/prometheus/grafana/api/v1/rules"); rc=$?
   (( rc == 0 )) || return 1
-  jq -r --arg r "$RULE" '[.data.groups[].rules[] | select(.name == $r)] | if length == 1 then .[0] | "\(.state) \(.duration // 0) \([.alerts[]?.state] | join(","))" else "missing" end' <<< "$out" 2>/dev/null
+  jq -r --arg r "$RULE" --argjson since "${1:-0}" '
+    def epoch: if test("(Z|[+]00:00)$") then .[0:19] + "Z" | fromdateiso8601 else -1 end;
+    [.data.groups[].rules[] | select(.name == $r)]
+    | if length == 1 then .[0]
+        | "\(.state) \(.duration // 0) \([.alerts[]? | select((.state | startswith("Alerting")) and ((.activeAt // "") | epoch) >= $since)] | length)"
+      else "missing" end' <<< "$out" 2>/dev/null
 }
 
 # Grafana's own notifier counter, summed over its slack series; empty when Grafana did not answer.
@@ -32,8 +41,11 @@ declared=$(kctl get deployment ledger-svc -n "$APP_NS" -o jsonpath='{.spec.repli
 say "ledger-svc declared replicas: ${declared:-none} (exit $rc)"
 [[ $rc == 0 && $declared =~ ^[1-9][0-9]*$ ]] || { verdict "$CHECK" "cannot read ledger-svc .spec.replicas ('$declared')"; exit 1; }
 
+restored=0
 restore() {
   local got rc
+  (( restored )) && return 0
+  restored=1
   kctl scale deployment ledger-svc -n "$APP_NS" --replicas="$declared" > /dev/null; rc=$?
   (( rc == 0 )) || findings+=("restoring ledger-svc to $declared exited $rc")
   kctl rollout status deployment/ledger-svc -n "$APP_NS" --timeout=240s > /dev/null; rc=$?
@@ -45,8 +57,19 @@ restore() {
 m=$(uuid)
 deposit "$m" 1000.00 || { verdict "$CHECK" "deposit: $DEPOSIT_OUT"; exit 1; }
 dl_before=$(prom_scalar "$DEAD_LETTERS") || { verdict "$CHECK" "Prometheus did not answer"; exit 1; }
-state0=$(rule_state)
-say "dead letters before: $dl_before; $RULE before: ${state0:-no answer}"
+# A firing instance keeps its first activeAt while it stays firing, so one left by an earlier dead letter would hide
+# this outage's: wait for it to clear (the rule's 5m increase window), or fail rather than pass on it.
+waited=0 t_clear=$(now_ms)
+while :; do
+  state0=$(rule_state 0)
+  [[ -n $state0 && $state0 != missing && ${state0##* } == 0 ]] && break
+  (( waited >= CLEAR_WAIT )) && break
+  sleep 10; waited=$(( ($(now_ms) - t_clear) / 1000 ))
+done
+say "dead letters before: $dl_before; $RULE before (state, for, Alerting instances): '${state0:-no answer}' after ${waited}s (want 0 Alerting within ${CLEAR_WAIT}s)"
+if [[ -z $state0 || $state0 == missing || ${state0##* } != 0 ]]; then
+  verdict "$CHECK" "$RULE was not clear before the outage: '${state0:-no answer}' after ${CLEAR_WAIT}s"; exit 1
+fi
 slack=absent
 kctl get secret slack -n ezeebit-obs > /dev/null 2>&1 && slack=present
 sent_before=''
@@ -54,6 +77,8 @@ if [[ $slack == present ]]; then sent_before=$(slack_sent) || findings+=("Grafan
 say "slack secret: $slack; notifications to slack before: ${sent_before:-n/a}"
 
 t0=$(now_ms)
+trap 'restore; exit 130' INT TERM
+trap 'restore' EXIT
 kctl scale deployment ledger-svc -n "$APP_NS" --replicas=0 > /dev/null; rc=$?
 say "t=$t0 scaled ledger-svc to 0 (exit $rc)"
 if (( rc != 0 )); then findings+=("scale to 0 exited $rc"); restore; verdict "$CHECK" "${findings[@]}"; exit 1; fi
@@ -76,12 +101,12 @@ duration=$(awk '{print $2}' <<< "$state0")
 [[ $duration =~ ^[0-9]+$ ]] || duration=0
 deadline=$((duration + ALERT_GRACE)) state='' waited=0
 while (( waited <= deadline )); do
-  state=$(rule_state)
-  [[ $state == firing* && $state == *Alerting* ]] && break
+  state=$(rule_state $((t0 / 1000)))
+  [[ $state == firing* && ${state##* } =~ ^[1-9][0-9]*$ ]] && break
   sleep 5; waited=$(( ($(now_ms) - t1) / 1000 ))
 done
-say "$RULE: '$state' ${waited}s after the dead letter (want firing with an Alerting instance within ${deadline}s = for ${duration}s + ${ALERT_GRACE}s)"
-[[ $state == firing* && $state == *Alerting* ]] || findings+=("$RULE did not reach Alerting within ${deadline}s: '$state'")
+say "$RULE: state, for, Alerting instances active since the scale-down = '$state' ${waited}s after the dead letter (want firing and >= 1 within ${deadline}s = for ${duration}s + ${ALERT_GRACE}s)"
+[[ $state == firing* && ${state##* } =~ ^[1-9][0-9]*$ ]] || findings+=("$RULE did not reach Alerting within ${deadline}s: '$state'")
 
 if [[ $slack == present ]]; then
   sent=$sent_before waited=0

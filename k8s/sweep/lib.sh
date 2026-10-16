@@ -18,18 +18,28 @@ now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
 uuid() { uuidgen | tr 'A-Z' 'a-z'; }
 say() { printf '%s\n' "$*"; }
 
-# prom <promql> [label]: prints "<label value> <sample>" per series. Exit 1 when Grafana or Prometheus did not answer.
+# prom <promql> [label]: prints "<label value> <sample>" per series. Up to 3 tries 2s apart: a freshly started Grafana
+# was seen answering {"message":"Unable to find datasource plugin"} for a moment. Exit 1 when no try got an answer.
 prom() {
-  local out rc
-  out=$(curl -s --max-time 10 -G "$PROM_QUERY" --data-urlencode "query=$1"); rc=$?
-  (( rc == 0 )) || { say "prom: curl exited $rc for: $1" >&2; return 1; }
-  out=$(jq -r --arg l "${2:-instance}" \
-    'if .status == "success" then .data.result[] | "\(.metric[$l] // "-") \(.value[1])" else error("status \(.status)") end' \
-    <<< "$out" 2>&1); rc=$?
-  (( rc == 0 )) || { say "prom: $out for: $1" >&2; return 1; }
-  printf '%s' "$out"
-  [[ -n $out ]] && printf '\n'
-  return 0
+  local out raw rc try
+  for try in 1 2 3; do
+    raw=$(curl -s --max-time 10 -G "$PROM_QUERY" --data-urlencode "query=$1"); rc=$?
+    if (( rc == 0 )); then
+      out=$(jq -r --arg l "${2:-instance}" \
+        'if .status == "success" then .data.result[] | "\(.metric[$l] // "-") \(.value[1])" else error("status \(.status)") end' \
+        <<< "$raw" 2>&1); rc=$?
+      if (( rc == 0 )); then
+        printf '%s' "$out"
+        [[ -n $out ]] && printf '\n'
+        return 0
+      fi
+      say "prom: try $try: $out for: $1; answer: ${raw:0:200}" >&2
+    else
+      say "prom: try $try: curl exited $rc for: $1" >&2
+    fi
+    (( try < 3 )) && sleep 2
+  done
+  return 1
 }
 
 # prom_scalar <promql>: one number, 0 when the query returned no series.

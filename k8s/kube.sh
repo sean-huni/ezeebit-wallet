@@ -18,14 +18,46 @@ cluster_exists() {
   (( rc == 0 )) && [[ $nodes == *"$NODE_CONTAINER"* ]]
 }
 
+fleet_ports() {
+  # Read from the files that own them, as the other fleet does, so a moved port cannot drift from a copy here.
+  local f port spec var def n=0
+  for f in services/*/src/main/resources/application.yml; do
+    port=$(sed -nE 's/.*\$\{SERVER_PORT:([0-9]+)\}.*/\1/p' "$f")
+    [[ $port =~ ^[0-9]+$ ]] || fail "no \${SERVER_PORT:<port>} in $f"
+    printf '%s\n' "$port"; n=$((n + 1))
+  done
+  (( n == ${#SERVICES[@]} )) || fail "found $n service application.yml files, expected ${#SERVICES[@]}"
+  port=$(sed -nE 's/.*\$\{LEDGER_GRPC_PORT:([0-9]+)\}.*/\1/p' services/ledger-svc/src/main/resources/application.yml)
+  port=${LEDGER_GRPC_PORT:-$port}
+  [[ $port =~ ^[0-9]+$ ]] || fail "no ledger gRPC port in services/ledger-svc/src/main/resources/application.yml"
+  printf '%s\n' "$port"
+  n=0
+  while read -r spec; do
+    if [[ $spec == \$\{*\} ]]; then
+      var=${spec#\$\{}; var=${var%%:-*}; def=${spec#*:-}; def=${def%\}}
+      port=${!var:-$def}
+    else
+      port=$spec
+    fi
+    [[ $port =~ ^[0-9]+$ ]] || fail "compose.yaml host port '$spec' does not resolve to a number"
+    printf '%s\n' "$port"; n=$((n + 1))
+  done < <(sed -nE "s/^[[:space:]]*- '127\.0\.0\.1:(.+):[0-9]+'\$/\1/p" compose.yaml)
+  (( n > 0 )) || fail "no published ports read from compose.yaml"
+}
+
 refuse_if_occupied() {
-  local port holder
+  local ports port holder held=()
   if compose_running; then fail "$(refusal_hint "compose containers of $ROOT are running")"; fi
-  for port in 8080 3000; do
+  ports=$(fleet_ports) || exit 1
+  ports=$(printf '%s\n' "$ports" | sort -un)
+  # shellcheck disable=SC2086 # one port per line, split on purpose
+  for port in $ports; do
     holder=$(port_holder "$port")
     [[ -z $holder || $holder == "container $NODE_CONTAINER" ]] && continue
-    fail "$(refusal_hint "$port is held by $holder")"
+    held+=("$port is held by $holder")
   done
+  (( ${#held[@]} == 0 )) || fail "$(refusal_hint "$(IFS=';'; printf '%s' "${held[*]}" | sed 's/;/; /g')")"
+  log "ports free: $(printf '%s' "$ports" | tr '\n' ' ')"
 }
 
 build_and_load() {
@@ -73,13 +105,14 @@ preload_images() {
 
 apply_generated() {
   # Server-side: no last-applied annotation, which caps an object at 256 KiB and would copy a secret's data.
+  # Process substitution, never <<<: bash 3.2 backs a here-string with a file in /private/var/tmp.
   local name=$1 yaml rc
   shift
   yaml=$(kctl create "$@" --dry-run=client -o yaml); rc=$?
   (( rc == 0 )) || fail "rendering $name exited $rc"
-  yaml=$(kctl label --local -f - -o yaml "app.kubernetes.io/name=$name" app.kubernetes.io/part-of=ezeebit <<< "$yaml"); rc=$?
+  yaml=$(kctl label --local -f <(printf '%s\n' "$yaml") -o yaml "app.kubernetes.io/name=$name" app.kubernetes.io/part-of=ezeebit); rc=$?
   (( rc == 0 )) || fail "labelling $name exited $rc"
-  kctl apply --server-side --field-manager=kube.sh -f - <<< "$yaml" > /dev/null; rc=$?
+  kctl apply --server-side --field-manager=kube.sh -f <(printf '%s\n' "$yaml") > /dev/null; rc=$?
   (( rc == 0 )) || fail "applying $name exited $rc"
 }
 

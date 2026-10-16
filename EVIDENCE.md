@@ -301,8 +301,8 @@ v13.2.3) posted `[FIRING:1] ServiceDown Ezeebit alerts ledger-svc (critical)` an
 gateway-svc at 10:28, then `[RESOLVED]` for both at 10:29, each with `alertname = ServiceDown` and
 `grafana_folder = Ezeebit alerts`. Captured in the logged-in Google Chrome session (Slack needs no
 separate sign-in there). To recapture: connect the Claude in Chrome extension to that browser and
-screenshot the channel URL above, or drive Chrome with Playwright using a profile that is already
-signed in to Slack.
+screenshot the channel URL above, or sign in to Slack once in a separate Chrome profile kept for
+automation and drive that with Playwright. Never point Playwright at the everyday Chrome profile.
 
 ### Ledger outage over gRPC (2026-10-14)
 

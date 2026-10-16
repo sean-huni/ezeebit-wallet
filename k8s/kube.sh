@@ -239,7 +239,12 @@ chaos_suspend() {
   got=$(kctl get cronjob chaos-monkey -n "$CHAOS_NS" -o jsonpath='{.spec.suspend}'); rc=$?
   (( rc == 0 )) || fail "reading cronjob chaos-monkey back exited $rc"
   [[ $got == "$want" ]] || fail "suspend reads back '$got', wanted $want"
-  if [[ $want == false ]]; then log "chaos on: suspend=false, one kill every 10 minutes"; else log "chaos off: suspend=true"; fi
+  if [[ $want == false ]]; then
+    log "chaos on: suspend=false, one kill at every :x0 minute"
+    log "chaos on: a :x0 slot passed under 30s ago fires now; the next 'kube.sh up' disarms it again"
+  else
+    log "chaos off: suspend=true"
+  fi
 }
 
 # Prints Complete or Failed once the Job has either condition; a pod that never starts ends at activeDeadlineSeconds.
@@ -265,9 +270,10 @@ chaos_run() {
   (( rc == 0 )) || fail "creating job $job exited $rc"
   log "chaos run: job $job"
   state=$(chaos_wait "$job") || exit 1
+  # A pod that never started has no log; the Job's end state is still the verdict.
   kctl logs "job/$job" -n "$CHAOS_NS"; rc=$?
-  (( rc == 0 )) || fail "logs of job $job exited $rc"
-  [[ $state == Complete ]] || fail "job $job ended $state"
+  [[ $state == Complete ]] || fail "job $job ended $state (logs exit $rc)"
+  (( rc == 0 )) || fail "job $job Complete but its logs exited $rc"
   log "chaos run: job $job Complete"
 }
 
@@ -288,7 +294,9 @@ chaos_status() {
   printf 'last job: %s %s\n' "$job" "${state:-Running}"
   logs=$(kctl logs "job/$job" -n "$CHAOS_NS" 2>&1); rc=$?
   (( rc == 0 )) || { printf 'logs unavailable (exit %s): %s\n' "$rc" "$logs"; return 0; }
-  while read -r line; do [[ $line == KILL* ]] && printf '%s\n' "$line"; done <<< "$logs"
+  printf 'kills:\n'
+  while read -r line; do [[ $line == "KILL "* ]] && printf '  %s\n' "$line"; done <<< "$logs"
+  while read -r line; do [[ $line == "KILLED "* ]] && printf 'total: %s\n' "${line#KILLED }"; done <<< "$logs"
 }
 
 cmd_chaos() {

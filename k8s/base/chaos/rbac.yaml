@@ -1,4 +1,5 @@
 # Namespaced Roles in ezeebit-app and ezeebit-data only, never a ClusterRole: ezeebit-obs and Secrets stay unreachable.
+# Read and delete only: patch on a Deployment edits a pod template, an indirect path to any Secret in the namespace.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -17,16 +18,10 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get, list, delete]
+    verbs: [list, delete]
   - apiGroups: [apps]
-    resources: [statefulsets]
+    resources: [deployments, statefulsets]
     verbs: [get, list]
-  - apiGroups: [apps]
-    resources: [deployments]
-    verbs: [get, list, patch]
-  - apiGroups: [apps]
-    resources: [deployments/scale]
-    verbs: [get, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -52,17 +47,10 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get, list, delete]
-  # The draw lists both kinds; StatefulSets are never patched or scaled.
+    verbs: [list, delete]
   - apiGroups: [apps]
-    resources: [statefulsets]
+    resources: [deployments, statefulsets]
     verbs: [get, list]
-  - apiGroups: [apps]
-    resources: [deployments]
-    verbs: [get, list, patch]
-  - apiGroups: [apps]
-    resources: [deployments/scale]
-    verbs: [get, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

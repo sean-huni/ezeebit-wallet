@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Test stub: answers only the four calls k8s/chaos/monkey.sh makes, with exactly its flags; anything else exits 125.
+# STUB_LIST_<APP|DATA>: Kind/name lines. STUB_LIST_FAIL: namespace whose list fails. STUB_PODS: "<svc> <pod>..." lines.
+# STUB_DELETE_NOTFOUND: pod whose delete answers NotFound. Calls go to STUB_LOG; a pod deleted there is not listed again.
+DELETED=$'\n'$(cat "${STUB_LOG:-/dev/null}" 2> /dev/null)$'\n'
+[[ -n ${STUB_LOG:-} ]] && printf '%s\n' "$*" >> "$STUB_LOG"
+bad() { printf 'kubectl stub: unexpected call: kubectl %s\n' "$*" >&2; exit 125; }
+[[ ${1:-} == --context && ${2:-} == kind-ezeebit ]] || bad "$@"
+shift 2
+LIST_FMT='jsonpath={range .items[*]}{.kind}/{.metadata.name}{"\n"}{end}'
+# shellcheck disable=SC2016
+SEL_FMT='go-template={{range $k, $v := .spec.selector.matchLabels}}{{$k}}={{$v}},{{end}}'
+POD_FMT='go-template={{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}'
+if [[ $# -eq 8 && $1 == get && $2 == deployments,statefulsets && $3 == -n && $5 == -l && $6 == app.kubernetes.io/part-of=ezeebit && $7 == -o && $8 == "$LIST_FMT" ]]; then
+  if [[ ${STUB_LIST_FAIL:-} == "$4" ]]; then
+    printf 'Error from server (Forbidden): deployments.apps is forbidden in namespace "%s"\n' "$4" >&2; exit 1
+  fi
+  case $4 in
+    ezeebit-app) [[ -n ${STUB_LIST_APP:-} ]] && printf '%s\n' "$STUB_LIST_APP" ;;
+    ezeebit-data) [[ -n ${STUB_LIST_DATA:-} ]] && printf '%s\n' "$STUB_LIST_DATA" ;;
+    *) bad get "$@" ;;
+  esac
+  exit 0
+fi
+if [[ $# -eq 7 && $1 == get && ($2 == Deployment || $2 == StatefulSet) && $4 == -n && $6 == -o && $7 == "$SEL_FMT" ]]; then
+  printf 'app.kubernetes.io/name=%s,' "$3"; exit 0
+fi
+if [[ $# -eq 9 && $1 == get && $2 == pods && $3 == -n && $5 == -l && $6 == app.kubernetes.io/name=* \
+  && $7 == --field-selector=status.phase=Running && $8 == -o && $9 == "$POD_FMT" ]]; then
+  svc=${6#app.kubernetes.io/name=}
+  while read -r -a row; do
+    [[ ${row[0]:-} == "$svc" ]] || continue
+    for pod in "${row[@]:1}"; do [[ $DELETED == *$'\n'"DELETED $pod"$'\n'* ]] || printf '%s\n' "$pod"; done
+  done <<< "${STUB_PODS:-}"
+  exit 0
+fi
+if [[ $# -eq 8 && $1 == delete && $2 == pod && $4 == -n && $6 == --grace-period=0 && $7 == --force && $8 == --wait=false ]]; then
+  if [[ ${STUB_DELETE_NOTFOUND:-} == "$3" ]]; then
+    printf 'Error from server (NotFound): pods "%s" not found\n' "$3" >&2; exit 1
+  fi
+  printf 'DELETED %s\n' "$3" >> "${STUB_LOG:-/dev/null}"
+  printf 'pod "%s" force deleted from %s namespace\n' "$3" "$5"; exit 0
+fi
+bad "$@"

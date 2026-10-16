@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kills pods of the fleet: draws a service uniformly, then one Running pod of it uniformly, once per victim.
 # Usage: monkey.sh [--victims N] [--service S] [--namespace ezeebit-app|ezeebit-data]
-# Prints `KILL <ns>/<pod> service=<svc>` per kill, then `KILLED <n>`. Exit 1 when n < N, 2 on a refused request.
+# Prints `KILL <ns>/<pod> service=<svc>` per kill, then `KILLED <n>`. Exit 1 when n < N; 2 on a refused request or an unlistable namespace.
 # The same file runs in the CronJob (service account, no context) and on the host (context kind-ezeebit).
 set -uo pipefail
 
@@ -32,18 +32,16 @@ done
 (( ${#namespaces[@]} )) || namespaces=("${ALLOWED[@]}")
 
 # A service is a Deployment or a StatefulSet: ezeebit-data holds both kinds (redis is a Deployment).
+# Any namespace that cannot be listed refuses the run: skipping it would narrow the draw and still report success.
 SERVICES=()
 for ns in "${namespaces[@]}"; do
-  names=$(k get deployments,statefulsets -n "$ns" -l "$PART_OF" \
-    -o jsonpath='{range .items[*]}{.kind}/{.metadata.name}{"\n"}{end}'); rc=$?
-  if (( rc != 0 )); then
-    printf 'monkey: listing services in %s exited %s\n' "$ns" "$rc" >&2
-    continue
-  fi
+  out=$(k get deployments,statefulsets -n "$ns" -l "$PART_OF" \
+    -o jsonpath='{range .items[*]}{.kind}/{.metadata.name}{"\n"}{end}' 2>&1); rc=$?
+  (( rc == 0 )) || refuse "listing services in $ns exited $rc: $out"
   while read -r name; do
-    [[ -n $name ]] || continue
+    [[ $name == Deployment/* || $name == StatefulSet/* ]] || continue
     [[ -z $only_service || ${name#*/} == "$only_service" ]] && SERVICES+=("$ns/$name")
-  done <<< "$names"
+  done <<< "$out"
 done
 (( ${#SERVICES[@]} )) || printf 'monkey: no service%s in %s\n' "${only_service:+ $only_service}" "${namespaces[*]}" >&2
 

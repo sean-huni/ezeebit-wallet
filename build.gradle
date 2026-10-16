@@ -540,8 +540,15 @@ def checkEnvGuard = tasks.register('checkEnvGuard', Exec) {
 	commandLine 'bash', 'scripts/test/env-guard-test.sh'
 }
 
+def checkChaosMonkey = tasks.register('checkChaosMonkey', Exec) {
+	group = 'verification'
+	description = 'Runs k8s/chaos/test/monkey-test.sh: the chaos draw against a stubbed kubectl, no cluster needed.'
+	inputs.files 'k8s/chaos/monkey.sh', 'k8s/chaos/test/monkey-test.sh', fileTree('k8s/chaos/test/stubs')
+	commandLine 'bash', 'k8s/chaos/test/monkey-test.sh'
+}
+
 tasks.named('check') {
-	dependsOn checkSecrets, checkDashboards, checkSingleProto, checkEnvGuard
+	dependsOn checkSecrets, checkDashboards, checkSingleProto, checkEnvGuard, checkChaosMonkey
 }
 
 tasks.register('checkSupplyChain', Exec) {

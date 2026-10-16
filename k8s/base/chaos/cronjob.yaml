@@ -1,4 +1,5 @@
 # Ships paused: `k8s/kube.sh chaos on` arms it, `chaos run` fires one Job now while the schedule stays off.
+# A later `kube.sh up` re-applies this file and so disarms it again (suspend back to true).
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -11,6 +12,7 @@ spec:
   suspend: true
   concurrencyPolicy: Forbid
   # Without a deadline, `chaos on` runs the slot missed while suspended at once: arming would kill immediately.
+  # Residual: arming within 30s after a :x0 slot still fires that slot.
   startingDeadlineSeconds: 30
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3

@@ -67,6 +67,8 @@ resilience4j:
         max-attempts: 2
         wait-duration: 200ms
         retry-exceptions: [org.springframework.web.client.ResourceAccessException]
+  # [!REPLICA-LOCAL] Each conversion replica's breaker counts its own calls to ledger-svc. Accepted: a ledger outage
+  # opens every replica's breaker within its own window, and dashboards read the state with max() across replicas.
   circuitbreaker:
     configs:
       ledger:

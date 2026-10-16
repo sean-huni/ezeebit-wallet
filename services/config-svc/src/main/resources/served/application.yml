@@ -2,6 +2,7 @@
 eureka:
   client:
     service-url:
+      # One registry and one config server by design: Eureka here is not peer-aware. k8s gates both at replicas 1.
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
     registry-fetch-interval-seconds: 5
   instance:

@@ -67,6 +67,30 @@ Each fix lands red first: a test that fails on the current code, then the fix.
 - Host ports: gateway 8080 and Grafana 3000 through kind `extraPortMappings` on 127.0.0.1. `up`
   refuses while `fleet.sh` holds them, and says which process holds the port.
 
+## 2a. Two fleets, no shared resources
+
+`fleet.sh` (host JVMs plus the compose project) and `k8s/kube.sh` (the kind cluster) are separate
+fleets that share only the images they read. Neither may create, change or stop anything of the
+other's:
+
+| Resource | fleet.sh owns | kube.sh owns |
+|---|---|---|
+| Control commands | `docker compose`, host JVM processes | `kind`, `kubectl --context kind-ezeebit` |
+| Run state on disk | `.fleet/` (gitignored) | `.kube-fleet/` (gitignored), nothing else |
+| Data | compose volumes `pgdata`, `kafkadata`, `lgtmdata` | PVCs inside the kind node; never a host bind mount |
+| Docker objects | the compose project's containers and network | the `ezeebit-control-plane` node container and the `kind` network |
+| Host ports | compose's published ports and the service ports | only 127.0.0.1:8080 and 127.0.0.1:3000, through the kind node |
+| Images | builds `ezeebit/<svc>:<version>` | reads the same tags and `kind load`s a copy; never retags or removes |
+
+- Mutual refusal: `kube.sh up` refuses while any compose container of this project runs or a
+  service port is held, and `fleet.sh up` already refuses a port held by anything but its own
+  compose project, which includes the kind node. Both name the holder.
+- A build gate keeps it that way: `k8s/**` contains no `docker compose`, `fleet.sh` or compose
+  volume name, and `fleet.sh` and `compose.yaml` contain no `kind`, `kubectl` or `.kube-fleet`
+  reference. Red-proofed by inserting one of each.
+- `kube.sh down` deletes the `ezeebit` cluster only, by name and context; it never runs a
+  `docker ... prune` or touches a container it did not create.
+
 ## 3. Workloads
 
 | Workload | Kind | Replicas | Autoscaler |

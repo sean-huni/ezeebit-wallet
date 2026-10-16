@@ -407,8 +407,9 @@ those two never match (measured 2026-10-16: config-svc manifest `sha256:e9e70024
 `sha256:9581ff0e...`). On Docker's classic store `.Descriptor` is absent and the check fails rather
 than compare unlike ids. Created reads 1980-01-01 on every Paketo image (the builder pins it for
 reproducible builds), so the digest is what ties a run to its build. Each step appends its output and
-a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-sweep.log` (that day's file is
-truncated at the start), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
+a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log` (truncated at
+the start; the sweep refuses to run when that file is already committed, and the 0.3.0 log predates
+the version in the name), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
 the cluster is deleted and the lease released on every exit path, Ctrl-C included.
 
 | Step | Script | What it asserts |
@@ -424,7 +425,16 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 | monitoring end | `k8s/sweep/monitoring.sh` | the lgtm pod uid and restart count unchanged; Grafana `/api/health` 200 at the start, after every check and at the end |
 | down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `builds/` (the build logs), the lease released |
 
-**The release evidence is the committed passing log**:
+**Release 0.3.1** (Paketo builder 0.0.197, virtual threads on): one run started 15:32:02Z on
+`rel-0.3.1` at `ba589da` with a clean tree, ending `sweep exit=0`
+([2026-10-16-0.3.1-sweep.log](k8s/verification/2026-10-16-0.3.1-sweep.log)): 3 kills, 1634 requests,
+4 merchant failures (two quote 504s, a convert 504 and a convert 503, 3.6 to 7.0 s after the
+conversion-svc kill, inside the 20 s budget), 814 COMPLETED conversions against 814 POSTED journals,
+none posted twice; the outage alert fired 5 s after the first dead letter. Slack delivery again not
+asserted (no webhook). That every pod serves on virtual threads is read from the pod logs in
+[2026-10-16-0.3.1-virtual-threads.md](k8s/verification/2026-10-16-0.3.1-virtual-threads.md).
+
+**Release 0.3.0, the first committed passing log**:
 [2026-10-16-sweep.log](k8s/verification/2026-10-16-sweep.log), one run started 13:51:01Z on
 `rel-0.3.0` at `86289c4` with a clean tree, ending `sweep exit=0` after `down exit=0`. It is the only
 sweep run on the release commit; no failed run preceded it. From that log: 3 kills, 1768 requests

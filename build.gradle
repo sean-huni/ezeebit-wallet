@@ -81,6 +81,12 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 	}
 }
 
+// One copy of the migration lock, compiled into the two services that own a database; see persistence/.
+configure([project(':services:ledger-svc'), project(':services:conversion-svc')]) {
+	sourceSets.main.java.srcDir rootProject.file('persistence/src/main/java')
+	sourceSets.main.resources.srcDir rootProject.file('persistence/src/main/resources')
+}
+
 // Three test tiers for the services listed here; a service opts in by being added to the list.
 //   test            unit tests in src/test: no Spring context, no Docker
 //   integrationTest JUnit tests in src/acceptanceTest: Spring Boot on Testcontainers (Postgres, Redis)
@@ -322,7 +328,13 @@ configure(services) {
 	// is left out: a check must never depend on a task that rewrites committed files.
 	def testTasks = tasks.withType(Test).matching { it.name != 'generateOpenApiSnapshots' }
 	// Generated contract classes from contracts/ are measured by nobody's tests, so they would only dilute the floors.
-	def measuredClasses = sourceSets.main.output.classesDirs.asFileTree.matching { exclude 'io/ezeebit/contracts/**' }
+	// persistence/ is tested once, by ledger-svc's AdvisoryLockIT; the other services that compile it do not measure it.
+	def measuredClasses = sourceSets.main.output.classesDirs.asFileTree.matching {
+		exclude 'io/ezeebit/contracts/**'
+		if (serviceName != 'ledger-svc') {
+			exclude 'io/ezeebit/persistence/**'
+		}
+	}
 	tasks.named('jacocoTestReport') {
 		dependsOn testTasks
 		classDirectories.setFrom(measuredClasses)
@@ -406,7 +418,7 @@ configure(services) {
 		dependsOn tasks.named('jacocoTestCoverageVerification'), checkCoverageFloors, checkSpotbugsReport
 	}
 
-	// observability/ is compiled into every service, but Sonar indexes a file once per project: ledger-svc owns it.
+	// observability/ and persistence/ are compiled into several services, but Sonar indexes a file once per project: ledger-svc owns them.
 	def sonarSources = sourceSets.main.java.srcDirs.findAll {
 		it.isDirectory() && (serviceName == 'ledger-svc' || it.toPath().startsWith(projectDir.toPath()))
 	}

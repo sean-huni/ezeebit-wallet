@@ -25,7 +25,7 @@ rule_state() {
     def epoch: if test("(Z|[+]00:00)$") then .[0:19] + "Z" | fromdateiso8601 else -1 end;
     [.data.groups[].rules[] | select(.name == $r)]
     | if length == 1 then .[0]
-        | "\(.state) \(.duration // 0) \([.alerts[]? | select((.state | startswith("Alerting")) and ((.activeAt // "") | epoch) >= $since)] | length)"
+        | "\(.state) \(.duration // 0) \([.alerts[]? | select(.state == "Alerting" and ((.activeAt // "") | epoch) >= $since)] | length)"
       else "missing" end' <<< "$out" 2>/dev/null
 }
 

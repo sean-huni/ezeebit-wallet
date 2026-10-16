@@ -131,8 +131,9 @@ else
   n_posted=$(awk 'NF {n++} END {print n + 0}' <<< "$posted")
   multi=$(awk 'NF && $2 != 1 {printf "%s x%s; ", $1, $2}' <<< "$posted")
   posted_ids=$(awk 'NF {print $1}' <<< "$posted")
-  no_journal=$(comm -23 <(printf '%s\n' "$completed" | awk NF) <(printf '%s\n' "$posted_ids" | awk NF) | awk 'NF {n++} END {print n + 0}')
-  no_conversion=$(comm -13 <(printf '%s\n' "$completed" | awk NF) <(printf '%s\n' "$posted_ids" | awk NF) | awk 'NF {n++} END {print n + 0}')
+  # comm needs both inputs in its own collation; SQL ORDER BY follows the database's, so both are re-sorted bytewise.
+  no_journal=$(LC_ALL=C comm -23 <(printf '%s\n' "$completed" | awk NF | LC_ALL=C sort) <(printf '%s\n' "$posted_ids" | awk NF | LC_ALL=C sort) | awk 'NF {n++} END {print n + 0}')
+  no_conversion=$(LC_ALL=C comm -13 <(printf '%s\n' "$completed" | awk NF | LC_ALL=C sort) <(printf '%s\n' "$posted_ids" | awk NF | LC_ALL=C sort) | awk 'NF {n++} END {print n + 0}')
   say "conversion-svc by status: $(printf '%s' "$by_status" | tr '\n' ';')"
   say "ledger CONVERSION journals by status: $(printf '%s' "$by_journal" | tr '\n' ';')"
   say "COMPLETED conversions: $n_completed; POSTED CONVERSION journals: $n_posted; COMPLETED without a journal: $no_journal; journals without a COMPLETED conversion: $no_conversion; journals posted more than once: ${multi:-none}"

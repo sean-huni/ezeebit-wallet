@@ -1,0 +1,19 @@
+# Stage namespaces until the chaos workloads have a stage of their own: the actor must never run without this fence.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-server
+  namespace: ezeebit-chaos
+  labels:
+    ezeebit.io/stage: namespaces
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    # An ipBlock cannot name a Service and the API server has no pod to select, so this is any address on 443 and
+    # 6443; RBAC is the control on what the actor may do there. kubernetes.default is 443, rewritten to the node's 6443.
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 443}
+        - {protocol: TCP, port: 6443}

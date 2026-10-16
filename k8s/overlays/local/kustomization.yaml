@@ -10,3 +10,4 @@ resources:
   - ../../base/obs
   - ../../base/app
   - ../../base/metrics-server
+  - ../../base/policy

@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# No namespace transformer: each policy names its own namespace. Each carries the stage of what it guards, so the
+# deny-all lands with the namespaces, before any workload starts, and an allow lands with the pods it opens.
+resources:
+  - default-deny.yaml
+  - data.yaml
+  - obs.yaml
+  - app.yaml
+  - chaos.yaml

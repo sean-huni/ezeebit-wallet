@@ -1,0 +1,240 @@
+# Kubelet probes need no rule: kindnet accepts every packet from a root-owned socket on the node.
+# Pods are selected by app.kubernetes.io/name, namespaces by kubernetes.io/metadata.name.
+# Each egress has its ingress twin in the callee's policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-svc
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: app
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: gateway-svc}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # The host, through the NodePort: kindnet judges it before SNAT, from the kind network gateway, which differs
+    # per machine. Any address but a pod; the host port binds 127.0.0.1.
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.244.0.0/16]
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: ledger-svc}
+      ports:
+        - {protocol: TCP, port: 8081}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: conversion-svc}
+      ports:
+        - {protocol: TCP, port: 8082}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-data}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: redis}
+      ports:
+        - {protocol: TCP, port: 6379}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: config-svc}
+      ports:
+        - {protocol: TCP, port: 8888}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: eureka-svc}
+      ports:
+        - {protocol: TCP, port: 8761}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-obs}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: lgtm}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ledger-svc
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: app
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: ledger-svc}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: gateway-svc}
+      ports:
+        - {protocol: TCP, port: 8081}
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: conversion-svc}
+      ports:
+        - {protocol: TCP, port: 9081}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-data}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: postgres}
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: config-svc}
+      ports:
+        - {protocol: TCP, port: 8888}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: eureka-svc}
+      ports:
+        - {protocol: TCP, port: 8761}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-obs}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: lgtm}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conversion-svc
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: app
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: conversion-svc}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: gateway-svc}
+      ports:
+        - {protocol: TCP, port: 8082}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: ledger-svc}
+      ports:
+        - {protocol: TCP, port: 9081}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: wiremock}
+      ports:
+        - {protocol: TCP, port: 8080}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-data}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: kafka}
+      ports:
+        - {protocol: TCP, port: 9092}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-data}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: postgres}
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: config-svc}
+      ports:
+        - {protocol: TCP, port: 8888}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: eureka-svc}
+      ports:
+        - {protocol: TCP, port: 8761}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-obs}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: lgtm}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: config-svc
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: app
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: config-svc}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/name, operator: In, values: [gateway-svc, ledger-svc, conversion-svc]}
+      ports:
+        - {protocol: TCP, port: 8888}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-obs}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: lgtm}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+# Standalone: its own peer is its pod IP, which never leaves the pod's network namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eureka-svc
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: app
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: eureka-svc}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/name, operator: In, values: [gateway-svc, ledger-svc, conversion-svc]}
+      ports:
+        - {protocol: TCP, port: 8761}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-obs}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: lgtm}
+      ports:
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wiremock
+  namespace: ezeebit-app
+  labels:
+    ezeebit.io/stage: data
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: wiremock}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: conversion-svc}
+      ports:
+        - {protocol: TCP, port: 8080}
+  egress: []

@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lgtm
+  namespace: ezeebit-obs
+  labels:
+    ezeebit.io/stage: obs
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: lgtm}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ezeebit-app}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/name, operator: In, values: [config-svc, eureka-svc, gateway-svc, ledger-svc, conversion-svc]}
+      ports:
+        - {protocol: TCP, port: 4318}
+    # The host, through the NodePort: kindnet judges it before SNAT, from the kind network gateway, which differs
+    # per machine. Any address but a pod; the host port binds 127.0.0.1.
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.244.0.0/16]
+      ports:
+        - {protocol: TCP, port: 3000}
+  egress:
+    # Slack delivery. An ipBlock cannot name hooks.slack.com, so this is any address outside the cluster on 443.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.244.0.0/16, 10.96.0.0/12]
+      ports:
+        - {protocol: TCP, port: 443}

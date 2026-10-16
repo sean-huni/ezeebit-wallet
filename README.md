@@ -199,7 +199,7 @@ kubectl, and only 127.0.0.1:8080 and 127.0.0.1:3000 on the host. Everything else
 ./k8s/kube.sh status         # pods per namespace and the autoscalers
 ./k8s/kube.sh chaos on|off|run|status
 ./k8s/kube.sh down           # delete the cluster, and its data with it
-./k8s/kube.sh sweep          # from no cluster to a deleted one, every check logged under docs/k8s/verification/
+./k8s/kube.sh sweep          # clean tree only: build, then from no cluster to a deleted one, every check logged under docs/k8s/verification/
 ```
 
 **Only one fleet runs at a time.** `fleet.sh up` and `kube.sh up` both take one lease through

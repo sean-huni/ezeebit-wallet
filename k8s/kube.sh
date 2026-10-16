@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the fleet on a local kind cluster.
-# Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep [--no-build]
+# Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep
 # Written for the bash 3.2 macOS ships: no ${x,,}, no mapfile, and empty arrays expanded with ${a[@]+...}.
 set -uo pipefail
 # shellcheck source=lib/common.sh
@@ -25,7 +25,12 @@ build_and_load() {
   local version svc rc
   version=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
   [[ -n $version ]] || fail "no version = '...' line in build.gradle"
-  ./gradlew bootBuildImageAll; rc=$?
+  if [[ -n ${KUBE_BUILD_LOG:-} ]]; then
+    ./gradlew bootBuildImageAll > "$KUBE_BUILD_LOG" 2>&1; rc=$?
+    log "bootBuildImageAll exit=$rc, $(awk 'END {print NR}' "$KUBE_BUILD_LOG") lines of output in ${KUBE_BUILD_LOG#"$ROOT"/}"
+  else
+    ./gradlew bootBuildImageAll; rc=$?
+  fi
   (( rc == 0 )) || fail "bootBuildImageAll exited $rc"
   for svc in "${SERVICES[@]}"; do
     kind load docker-image --name "$CLUSTER" "ezeebit/$svc:$version"; rc=$?
@@ -237,10 +242,14 @@ cmd_down() {
   else
     log "cluster $CLUSTER does not exist"
   fi
-  if [[ -d $RUN_DIR ]]; then rm -r -- "$RUN_DIR" || fail "could not remove $RUN_DIR"; fi
+  # sweep/ keeps the sweep's full build output, which the committed sweep log points at.
+  if [[ -d $RUN_DIR ]]; then
+    find "$RUN_DIR" -mindepth 1 -maxdepth 1 ! -name sweep -exec rm -r -- {} + || fail "could not clear $RUN_DIR"
+    rmdir "$RUN_DIR" 2> /dev/null
+  fi
   "$ROOT/scripts/env-guard.sh" release k8s; rc=$?
   (( rc == 0 )) || fail "env-guard release k8s exited $rc"
-  log "down: cluster $CLUSTER and $RUN_DIR removed"
+  log "down: cluster $CLUSTER and $RUN_DIR removed (except $RUN_DIR/sweep)"
 }
 
 cmd_status() {
@@ -363,23 +372,54 @@ sweep_finish() {
   exit "$SWEEP_FAILED"
 }
 
+# The id is the evidence of which build ran: Paketo pins every image's Created to 1980-01-01 for reproducibility.
+sweep_images() {
+  local version svc host node rc
+  version=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
+  for svc in "${SERVICES[@]}"; do
+    host=$(docker image inspect --format '{{.Id}} {{.Created}}' "ezeebit/$svc:$version" 2>&1); rc=$?
+    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: host inspect exited $rc: $host"; SWEEP_FAILED=1; continue; }
+    node=$(docker exec "$NODE_CONTAINER" crictl inspecti -o json "docker.io/ezeebit/$svc:$version" 2>&1); rc=$?
+    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: node crictl inspecti exited $rc"; SWEEP_FAILED=1; continue; }
+    node=$(jq -r '"\(.status.id) \(.info.imageSpec.created // "created-unknown")"' <<< "$node"); rc=$?
+    (( rc == 0 )) || { sweep_log "image ezeebit/$svc:$version: jq over crictl output exited $rc"; SWEEP_FAILED=1; continue; }
+    sweep_log "image ezeebit/$svc:$version node id=${node%% *} created=${node#* } (host id=${host%% *})"
+    [[ ${node%% *} == "${host%% *}" ]] || { sweep_log "image ezeebit/$svc:$version: node id differs from the host build"; SWEEP_FAILED=1; }
+  done
+}
+
 cmd_sweep() {
-  local check rc out
+  local check rc out sha branch dirty build_log
+  (( $# == 0 )) || fail "sweep takes no options: it always builds the images it tests"
+  out=$(git status --porcelain); rc=$?
+  (( rc == 0 )) || fail "git status exited $rc: cannot tell whether the tree is clean"
+  if [[ -n $out ]]; then
+    dirty=$(awk 'END {print NR}' <<< "$out")
+    fail "the working tree has $dirty uncommitted path(s): commit or stash them, a sweep log names one commit"
+  fi
+  sha=$(git rev-parse HEAD); rc=$?
+  (( rc == 0 )) || fail "git rev-parse HEAD exited $rc"
+  branch=$(git rev-parse --abbrev-ref HEAD); rc=$?
+  (( rc == 0 )) || fail "git rev-parse --abbrev-ref HEAD exited $rc"
   SWEEP_LOG="$ROOT/docs/k8s/verification/$(date +%F)-sweep.log"
   mkdir -p "$(dirname "$SWEEP_LOG")"
   : > "$SWEEP_LOG"
   trap sweep_finish EXIT
   trap 'SWEEP_FAILED=1; sweep_log "interrupted"; sweep_finish' INT TERM
-  sweep_log "sweep started $(date -u +%FT%TZ) at $(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
+  sweep_log "sweep started $(date -u +%FT%TZ) at commit $sha on branch $branch, working tree clean"
   if cluster_exists; then
     ( cmd_down ) >> "$SWEEP_LOG" 2>&1; rc=$?
     sweep_log "pre-down exit=$rc"
     (( rc == 0 )) || { SWEEP_FAILED=1; exit 1; }
   fi
   SWEEP_UP=1
-  ( cmd_up "$@" ) >> "$SWEEP_LOG" 2>&1; rc=$?
-  sweep_log "up exit=$rc"
+  # Gitignored and kept by down: the full build output stays on this machine, the log keeps its summary and path.
+  build_log="$RUN_DIR/sweep/$(date +%F)-build.log"
+  mkdir -p "$(dirname "$build_log")"
+  ( KUBE_BUILD_LOG=$build_log cmd_up ) >> "$SWEEP_LOG" 2>&1; rc=$?
+  sweep_log "up exit=$rc (image build output: ${build_log#"$ROOT"/})"
   (( rc == 0 )) || { SWEEP_FAILED=1; exit 1; }
+  sweep_images
   out=$(bash k8s/sweep/monitoring.sh begin 2>&1); rc=$?
   printf '%s\n' "$out" >> "$SWEEP_LOG"
   sweep_log "monitoring-begin exit=$rc"
@@ -405,5 +445,5 @@ case ${1:-} in
   down) cmd_down ;;
   status) cmd_status ;;
   chaos) shift; cmd_chaos "$@" ;;
-  *) printf 'usage: %s up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep [--no-build]\n' "$0" >&2; exit 2 ;;
+  *) printf 'usage: %s up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep\n' "$0" >&2; exit 2 ;;
 esac

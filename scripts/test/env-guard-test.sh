@@ -22,8 +22,8 @@ KIND_DOWN='ezeebit-control-plane|exited|||ezeebit|'
 PASS=0 TOTAL=0 RC='' ERR=''
 
 reset() {
-  rm -rf -- "$LEASE" "$SB/.fleet"
-  unset STUB_CONTAINERS STUB_DOCKER_DOWN STUB_LISTENERS STUB_PIDS
+  rm -rf -- "$LEASE" "$LEASE.reclaim" "$SB/.fleet"
+  unset STUB_CONTAINERS STUB_DOCKER_DOWN STUB_LISTENERS STUB_PIDS STUB_PS_FAIL STUB_LSOF_ERROR
 }
 
 guard() {
@@ -52,6 +52,8 @@ expect_true() {
 lease_owner_is() { [[ -f $LEASE/owner && $(cat "$LEASE/owner") == "$1" ]]; }
 # shellcheck disable=SC2329 # called through expect_true
 no_lease() { [[ ! -e $LEASE ]]; }
+# shellcheck disable=SC2329 # called through expect_true
+no_reclaim_lock() { [[ ! -e $LEASE.reclaim ]]; }
 
 dead_pid() {
   local p
@@ -88,6 +90,21 @@ STUB_PIDS="99902 /usr/bin/vim notes.txt"; export STUB_PIDS
 guard acquire k8s
 expect "a pid file naming a foreign process is not a fleet JVM" 0 "lease held by k8s"
 
+reset; sleep 30 & live=$!
+mkdir -p "$SB/.fleet"; printf '%s\n' "$live" > "$SB/.fleet/gateway-svc.pid"; STUB_PS_FAIL="$live"; export STUB_PS_FAIL
+guard acquire k8s
+kill "$live" 2> /dev/null; wait "$live" 2> /dev/null
+expect "ps failing on a live fleet pid fails closed" 2 "ps could not read live pid"
+expect_true "a blind JVM probe drops the lease it took" no_lease
+
+reset; mkdir -p "$SB/.fleet"; dead=$(dead_pid); printf '%s\n' "$dead" > "$SB/.fleet/gateway-svc.pid"; STUB_PS_FAIL="$dead"; export STUB_PS_FAIL
+guard acquire k8s
+expect "ps failing on a dead fleet pid is no JVM" 0 "lease held by k8s"
+
+reset; STUB_LSOF_ERROR=1; export STUB_LSOF_ERROR
+guard acquire k8s
+expect "lsof failing with stderr fails closed" 2 "lsof on port"
+
 reset; STUB_LISTENERS="8081=4242"; STUB_PIDS="4242 java -jar somewhere.jar"; export STUB_LISTENERS STUB_PIDS
 guard acquire k8s
 expect "k8s refused while a non-kind listener holds 8081" 1 "8081"
@@ -117,6 +134,13 @@ reset; fake_lease k8s "$(dead_pid)"
 guard acquire compose
 expect "a stale k8s lease is reclaimed by compose" 0 "stale"
 expect_true "the reclaimed lease names compose" lease_owner_is compose
+expect_true "a finished reclaim removes its lock" no_reclaim_lock
+
+reset; fake_lease k8s "$(dead_pid)"; mkdir "$LEASE.reclaim"
+guard acquire compose
+expect "a stale lease another acquire is reclaiming is left to it" 1 "another acquire is reclaiming"
+expect_true "the lease being reclaimed by another is untouched" lease_owner_is k8s
+expect_true "another acquire's reclaim lock is untouched" test -d "$LEASE.reclaim"
 
 reset; fake_lease k8s "$(dead_pid)"; STUB_CONTAINERS="$KIND_UP"; export STUB_CONTAINERS
 guard acquire compose
@@ -136,6 +160,7 @@ expect "the same owner acquiring again is idempotent" 0 "lease held by compose"
 reset; fake_lease nobody "$(dead_pid)"
 guard acquire compose
 expect "a lease held by an unknown owner fails closed" 2 "unknown owner"
+expect "the unknown-owner refusal says how to recover" 2 "rm -r $LEASE"
 
 reset; STUB_DOCKER_DOWN=1; export STUB_DOCKER_DOWN
 guard acquire k8s

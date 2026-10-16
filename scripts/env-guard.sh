@@ -5,10 +5,12 @@
 set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P) || exit 2
 LEASE=$ROOT/.env-lease
+RECLAIM_LOCK=$ROOT/.env-lease.reclaim
 FLEET_RUN=$ROOT/.fleet
 KIND_CLUSTER=ezeebit
 KIND_NODE=ezeebit-control-plane
-TOOK=0
+TOOK=0 LOCKED=0
+ERRF=''
 DOCKER='' KIND=absent OWNER='' HOLDER=''
 COMPOSE=() JVMS=() HELD=() PORTS=() BLOCKERS=()
 
@@ -23,6 +25,8 @@ on_exit() {
   local rc=$?
   # A lease this run took is dropped on any refusal, so a refused up never blocks the other fleet.
   (( rc != 0 && TOOK )) && rm -rf -- "$LEASE"
+  (( LOCKED )) && rmdir "$RECLAIM_LOCK" 2> /dev/null
+  [[ -n $ERRF ]] && rm -f -- "$ERRF"
   exit "$rc"
 }
 trap on_exit EXIT
@@ -49,7 +53,7 @@ scan_docker() {
 }
 
 scan_jvms() {
-  local f svc pid cmd
+  local f svc pid cmd rc
   JVMS=()
   for f in "$FLEET_RUN"/*.pid; do
     [[ -e $f ]] || continue
@@ -58,7 +62,11 @@ scan_jvms() {
     pid=$(cat "$f")
     [[ $pid =~ ^[0-9]+$ ]] || continue
     # A pid file outlives its process and the pid can be reused: only a JVM of this checkout's jars counts.
-    cmd=$(ps -o command= -p "$pid" 2> /dev/null)
+    cmd=$(ps -o command= -p "$pid" 2> /dev/null); rc=$?
+    if (( rc != 0 )) || [[ -z $cmd ]]; then
+      kill -0 "$pid" 2> /dev/null && blind "ps could not read live pid $pid of $f (exit $rc)"
+      continue
+    fi
     [[ $cmd == *"$ROOT/services/$svc/build/libs/"* ]] && JVMS+=("fleet JVM $svc (pid $pid)")
   done
 }
@@ -104,7 +112,7 @@ publishes() {
 }
 
 holder_of() {
-  local port=$1 name state project dir kind ports pid rc comm
+  local port=$1 name state project dir kind ports pid rc comm err
   HOLDER=
   # A published container port shows in lsof as the Docker backend, so containers are asked first.
   while IFS='|' read -r name state project dir kind ports; do
@@ -113,13 +121,16 @@ holder_of() {
     [[ $kind == "$KIND_CLUSTER" ]] || HOLDER="container $name"
     return 0
   done <<< "$DOCKER"
-  pid=$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2> /dev/null); rc=$?
+  [[ -n $ERRF ]] || ERRF=$(mktemp "${TMPDIR:-/tmp}/env-guard.XXXXXX") || blind "mktemp failed"
+  # lsof exits 1 both for no listener and for an error; only stderr tells them apart (-t implies -w, no warnings).
+  pid=$(lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2> "$ERRF"); rc=$?
+  err=$(cat "$ERRF")
   if (( rc == 0 )) && [[ -n $pid ]]; then
     pid=${pid%%$'\n'*}
     comm=$(ps -o comm= -p "$pid" 2> /dev/null)
     HOLDER="process $pid (${comm:-exited})"
-  elif (( rc != 1 )) || [[ -n $pid ]]; then
-    blind "lsof on port $port exited $rc"
+  elif (( rc != 1 )) || [[ -n $pid || -n $err ]]; then
+    blind "lsof on port $port exited $rc: ${err%%$'\n'*}"
   fi
 }
 
@@ -135,7 +146,6 @@ scan_ports() {
   done
 }
 
-# Fills BLOCKERS with whatever of fleet $1 still runs.
 scan_fleet() {
   BLOCKERS=()
   scan_docker
@@ -180,9 +190,10 @@ read_owner() {
     [[ -d $LEASE ]] || return 1
     sleep 0.1; tries=$((tries + 1))
   done
-  [[ -r $LEASE/owner ]] || blind "$LEASE has no readable owner"
+  [[ -r $LEASE/owner ]] || blind "$LEASE has no readable owner; if scripts/env-guard.sh state shows neither fleet running, rm -r $LEASE"
   OWNER=$(cat "$LEASE/owner")
-  [[ $OWNER == compose || $OWNER == k8s ]] || blind "$LEASE is held by unknown owner '$OWNER'"
+  [[ $OWNER == compose || $OWNER == k8s ]] ||
+    blind "$LEASE is held by unknown owner '$OWNER'; if scripts/env-guard.sh state shows neither fleet running, rm -r $LEASE"
 }
 
 # The process that took the lease, while it lives with the same start time, is an up still in progress.
@@ -197,16 +208,20 @@ holder_alive() {
 }
 
 reclaim() {
-  local me=$1 judged=$2 aside=$LEASE.stale.$$
-  # Renamed aside, then compared, so a lease another acquire took in between is put back rather than deleted.
-  mv "$LEASE" "$aside" 2> /dev/null || { say "refused $me: the lease changed hands while it was judged stale"; exit 1; }
-  if [[ $(cat "$aside/owner" "$aside/pid" "$aside/since" 2> /dev/null) != "$judged" ]]; then
-    mv "$aside" "$LEASE" 2> /dev/null || rm -rf -- "$aside"
+  local me=$1 judged=$2
+  # One reclaimer at a time, and the lease is re-judged under the lock, so a lease taken meanwhile is never deleted.
+  if ! mkdir "$RECLAIM_LOCK" 2> /dev/null; then
+    say "refused $me: another acquire is reclaiming the lease; if none is running, rmdir $RECLAIM_LOCK"
+    exit 1
+  fi
+  LOCKED=1
+  if [[ $(cat "$LEASE/owner" "$LEASE/pid" "$LEASE/since" 2> /dev/null) != "$judged" ]]; then
     say "refused $me: the lease changed hands while it was judged stale"
     exit 1
   fi
-  rm -rf -- "$aside"
+  rm -rf -- "$LEASE" || blind "could not remove the stale $LEASE"
   take_lease "$me" || { say "refused $me: a concurrent acquire took the lease"; exit 1; }
+  rmdir "$RECLAIM_LOCK" 2> /dev/null; LOCKED=0
 }
 
 acquire() {

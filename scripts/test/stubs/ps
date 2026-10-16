@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Test stub: STUB_PIDS holds "pid command line" rows; `ps -o command=|comm= -p <pid>` answers from them. Any other pid
-# goes to the real ps, so a lease holder's liveness is still measured on a real process.
-field='' pid=''
-while (( $# )); do
-  case $1 in
-    -o) field=$2; shift ;;
-    -p) pid=$2; shift ;;
-  esac
-  shift
+# Test stub: answers only `ps -o command=|comm=|lstart= -p <pid>`. STUB_PIDS holds "pid command line" rows; a pid in
+# STUB_PS_FAIL fails as ps does; any other pid goes to the real ps, so a lease holder is measured on a real process.
+if [[ $# -ne 4 || $1 != -o || $3 != -p || ! $4 =~ ^[0-9]+$ ]] || [[ $2 != command= && $2 != comm= && $2 != lstart= ]]; then
+  printf 'ps stub: unexpected call: ps %s\n' "$*" >&2
+  exit 125
+fi
+field=$2 pid=$4
+for p in ${STUB_PS_FAIL:-}; do
+  [[ $p == "$pid" ]] && { printf 'ps: sysctl failed\n' >&2; exit 1; }
 done
 while read -r p cmd; do
   [[ -n $p && $p == "$pid" ]] || continue
   case $field in
     command=) printf '%s\n' "$cmd" ;;
     comm=) printf '%s\n' "${cmd%% *}" ;;
-    *) printf 'ps stub: no field %s for a stubbed pid\n' "$field" >&2; exit 1 ;;
+    *) printf 'ps stub: no %s for a stubbed pid\n' "$field" >&2; exit 125 ;;
   esac
   exit 0
 done <<< "${STUB_PIDS:-}"

@@ -29,3 +29,4 @@ out/
 
 ### Environment lease (scripts/env-guard.sh): which fleet may run ###
 .env-lease/
+.env-lease.reclaim/

@@ -38,11 +38,27 @@ final class AdvisoryLockCalls {
 	}
 
 	boolean tryLock() throws LockException {
-		return keyed(TRY_LOCK);
+		try (PreparedStatement statement = connection().prepareStatement(TRY_LOCK)) {
+			return keyed(statement);
+		}
+		catch (SQLException failure) {
+			throw new LockException(failure);
+		}
+		finally {
+			rollback();
+		}
 	}
 
 	boolean unlock() throws LockException {
-		return keyed(UNLOCK);
+		try (PreparedStatement statement = connection().prepareStatement(UNLOCK)) {
+			return keyed(statement);
+		}
+		catch (SQLException failure) {
+			throw new LockException(failure);
+		}
+		finally {
+			rollback();
+		}
 	}
 
 	DatabaseChangeLogLock[] holders() throws LockException {
@@ -66,18 +82,10 @@ final class AdvisoryLockCalls {
 		}
 	}
 
-	private boolean keyed(final String sql) throws LockException {
-		try (PreparedStatement statement = connection().prepareStatement(sql)) {
-			statement.setLong(1, key);
-			try (ResultSet result = statement.executeQuery()) {
-				return result.next() && result.getBoolean(1);
-			}
-		}
-		catch (SQLException failure) {
-			throw new LockException(failure);
-		}
-		finally {
-			rollback();
+	private boolean keyed(final PreparedStatement statement) throws SQLException {
+		statement.setLong(1, key);
+		try (ResultSet result = statement.executeQuery()) {
+			return result.next() && result.getBoolean(1);
 		}
 	}
 

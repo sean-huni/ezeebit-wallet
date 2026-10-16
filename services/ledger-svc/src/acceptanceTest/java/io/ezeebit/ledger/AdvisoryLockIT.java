@@ -237,7 +237,8 @@ class AdvisoryLockIT {
 	}
 
 	private Connection connect(final String databaseName) throws SQLException {
-		String url = postgres.getJdbcUrl().replaceFirst("/%s(\\?|$)".formatted(postgres.getDatabaseName()), "/%s$1".formatted(databaseName));
+		String url = postgres.getJdbcUrl()
+				.replaceFirst("/%s(\\?|$)".formatted(postgres.getDatabaseName()), "/%s$1".formatted(databaseName));
 		return DriverManager.getConnection(url, postgres.getUsername(), postgres.getPassword());
 	}
 

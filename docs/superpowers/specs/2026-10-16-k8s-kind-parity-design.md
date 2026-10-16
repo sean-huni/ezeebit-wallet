@@ -58,7 +58,7 @@ Each fix lands red first: a test that fails on the current code, then the fix.
 - Images are the Paketo images from `./gradlew bootBuildImageAll` (`ezeebit/<svc>:<version>`),
   loaded with `kind load docker-image`, `imagePullPolicy: Never`. Third-party images use the same
   tags and digests as `compose.yaml`; a check fails the sweep when the two disagree.
-- Configuration uses the same variable names as `.env.example`. Secrets (database, Redis, gateway
+- Configuration uses the same variable names as the README configuration table and `compose.yaml` (there is no `.env.example`). Secrets (database, Redis, gateway
   shared secret, Slack webhook) are created by `kube.sh` from the caller's environment with
   committed local defaults, never from a committed file holding a real value.
 - Grafana provisioning comes from the same `docker/lgtm` files, loaded as ConfigMaps by `kube.sh`

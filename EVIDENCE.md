@@ -9,13 +9,15 @@ meant to show.
 Captured on 2026-10-13 at commit `d538b32` (`git rev-parse --short HEAD`), on one laptop, with
 uncommitted changes in the working tree (the refreshed images themselves). Times are South African
 Standard Time, 2 hours ahead of Coordinated Universal Time (UTC). The one exception is
-[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14), captured on 2026-10-14 at `3b92e9d`.
+[Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14), captured on 2026-10-14 at `3b92e9d`, and
+[Service discovery](#service-discovery-eureka-on-kind-2026-10-16), captured on 2026-10-16 at `8fd3c12`.
 
 How to reproduce each section:
 
 | Section | Command | Detail |
 |---|---|---|
 | Monitoring and observability | `REDIS_PORT=6390 ./fleet.sh up`, then `cd docs/observability/verification && npm install && node 2026-10-13-dashboards-playwright.mjs` | [docs/observability.md](docs/observability.md#verifying-the-dashboards-playwright); the run log is [2026-10-13-dashboards-playwright-run.log](docs/observability/verification/2026-10-13-dashboards-playwright-run.log). The suite made 12 of the 15 monitoring images. The other 3 come from two small Playwright scripts beside it, run the same way: `alerts-rule-list.png` and `alerts-state-history.png` from [2026-10-13-alert-pages-capture.mjs](docs/observability/verification/2026-10-13-alert-pages-capture.mjs) (opens each page, waits 7 s), and `traces-service-map.png` from [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs) (scrolls to the Service map, clicks its zoom-out button once) |
+| Service discovery | `./k8s/kube.sh up`, the socat bridge below, then `cd docs/observability/verification && node 2026-10-16-eureka-capture.mjs` | [2026-10-16-eureka-capture.mjs](docs/observability/verification/2026-10-16-eureka-capture.mjs) reads the registry table, fails unless it holds exactly gateway-svc, ledger-svc and conversion-svc at `UP (2)` each, and takes the image |
 | SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
@@ -23,6 +25,7 @@ How to reproduce each section:
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
 [Metrics](#metrics) · [Traces](#traces) · [Logs](#logs) · [Alerts](#alerts) ·
 [Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14)) ·
+[Service discovery](#service-discovery-eureka-on-kind-2026-10-16) ·
 [SAST](#static-application-security-testing-sast) · [SCA](#software-composition-analysis-sca) ·
 [What this evidence does not prove](#what-this-evidence-does-not-prove)
 
@@ -393,6 +396,39 @@ the page at t+27s never got an all-clear, and the rules re-fired once after reco
 cleared at t+589s). That run also found the dead-letter topic deleted by the bounce; it has since
 moved to the `kafkadata` volume. This outage's Slack messages were read from Grafana's notifier counter;
 the channel itself is pictured under [Alerts to Slack](#alerts-to-slack) from 2026-10-16.
+
+## Service discovery (Eureka on kind, 2026-10-16)
+
+The Spring Eureka dashboard of the kind fleet, at release `0.3.0` (`8fd3c12`), with every scaled
+service at 2 replicas:
+
+![Eureka: gateway-svc, ledger-svc and conversion-svc each UP (2)](docs/observability/evidence/2026-10-16-eureka-registry-kind.png)
+
+*Captured 16:03:27 SAST (14:03:27 UTC in the page's Current time).* Under "Instances currently
+registered with Eureka" there are three applications, CONVERSION-SVC, GATEWAY-SVC and LEDGER-SVC,
+each `UP (2)`. Each instance id is `<pod name>:<service>:<port>`, and the six pod names are the six
+pods `kubectl -n ezeebit-app get pods` listed at that moment, so every replica registered itself.
+config-svc and eureka-svc are not in the table: config-svc serves the Eureka settings and is not a
+Eureka client, and eureka-svc does not register with itself. The red banner is expected: self
+preservation is switched off on purpose, so that a killed replica leaves the registry in about 30 s
+([docs/k8s.md](docs/k8s.md)). The page shows an uptime of 00:02 because the fleet had just come up.
+
+How it was reached: eureka-svc binds its pod IP (so a killed pod's address is the one it registers),
+so `kubectl port-forward`, which dials the pod's loopback, is refused. A socat ephemeral container in
+the same pod bridges loopback to the pod IP; it shares the pod's network namespace, so no
+NetworkPolicy is involved:
+
+```bash
+P=$(kubectl -n ezeebit-app get pod -l app.kubernetes.io/name=eureka-svc -o name | head -1)
+IP=$(kubectl -n ezeebit-app get "$P" -o jsonpath='{.status.podIP}')
+kubectl -n ezeebit-app debug "$P" --image=alpine/socat:1.8.0.3 --container=bridge -- \
+  socat tcp-listen:18761,bind=127.0.0.1,fork,reuseaddr "tcp:$IP:8761"
+kubectl -n ezeebit-app port-forward "$P" 18761:18761
+```
+
+The run printed `registered applications: 3 (want 3)`, `UP=2 want 2 PASS` for each of the three, and
+`eureka capture PASS (0 mismatches)`, exit 0. Only a desktop width is captured: Eureka's own page is
+not responsive, and at 390 px it crops the Status column, so a phone image would hide the evidence.
 
 ## Static application security testing (SAST)
 

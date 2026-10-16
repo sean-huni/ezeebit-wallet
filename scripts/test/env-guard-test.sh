@@ -11,6 +11,7 @@ mkdir -p "$SB/scripts"
 cp "$REPO/scripts/env-guard.sh" "$SB/scripts/env-guard.sh" 2> /dev/null
 ln -s "$REPO/services" "$SB/services"
 ln -s "$REPO/compose.yaml" "$SB/compose.yaml"
+ln -s "$REPO/k8s" "$SB/k8s"
 G=$SB/scripts/env-guard.sh
 LEASE=$SB/.env-lease
 PROJECT=$(basename "$SB" | tr '[:upper:]' '[:lower:]')
@@ -54,6 +55,8 @@ lease_owner_is() { [[ -f $LEASE/owner && $(cat "$LEASE/owner") == "$1" ]]; }
 no_lease() { [[ ! -e $LEASE ]]; }
 # shellcheck disable=SC2329 # called through expect_true
 no_reclaim_lock() { [[ ! -e $LEASE.reclaim ]]; }
+# shellcheck disable=SC2329 # called through expect_true
+not_in_err() { [[ $ERR != *"$1"* ]]; }
 
 dead_pid() {
   local p
@@ -105,18 +108,40 @@ reset; STUB_LSOF_ERROR=1; export STUB_LSOF_ERROR
 guard acquire k8s
 expect "lsof failing with stderr fails closed" 2 "lsof on port"
 
-reset; STUB_LISTENERS="8081=4242"; STUB_PIDS="4242 java -jar somewhere.jar"; export STUB_LISTENERS STUB_PIDS
+reset; STUB_LISTENERS="8080=4242"; STUB_PIDS="4242 java -jar somewhere.jar"; export STUB_LISTENERS STUB_PIDS
 guard acquire k8s
-expect "k8s refused while a non-kind listener holds 8081" 1 "8081"
+expect "k8s refused while a foreign listener holds 8080" 1 "port 8080 is held by process 4242 (java)"
+expect "a foreign holder of 8080 is named foreign" 1 "not part of the compose fleet"
+expect_true "a foreign holder is never reported as the compose fleet running" not_in_err "the compose fleet still runs"
 
-reset; STUB_LISTENERS="9081=4243"; export STUB_LISTENERS
+reset; STUB_LISTENERS="3000=4245"; STUB_PIDS="4245 node server.js"; export STUB_LISTENERS STUB_PIDS
 guard acquire k8s
-expect "k8s refused while a listener holds ledger's gRPC port" 1 "9081"
+expect "k8s refused while a foreign listener holds 3000" 1 "port 3000 is held by process 4245 (node)"
 
-reset; STUB_CONTAINERS="otel|running|elsewhere|/elsewhere||127.0.0.1:4317-4318->4317-4318/tcp"
-STUB_LISTENERS="4318=67846"; STUB_PIDS="67846 com.docker.backend"; export STUB_CONTAINERS STUB_LISTENERS STUB_PIDS
+reset; STUB_LISTENERS="5432=4243 8081=4244 9081=4246"; export STUB_LISTENERS
 guard acquire k8s
-expect "a port inside a published range names its container, not the Docker backend" 1 "4318 is held by container otel"
+expect "foreign holders of ports kind does not bind do not block k8s" 0 "lease held by k8s"
+
+reset; STUB_CONTAINERS="otel|running|elsewhere|/elsewhere||127.0.0.1:2999-3001->2999-3001/tcp"
+STUB_LISTENERS="3000=67846"; STUB_PIDS="67846 com.docker.backend"; export STUB_CONTAINERS STUB_LISTENERS STUB_PIDS
+guard acquire k8s
+expect "a port inside a published range names its container, not the Docker backend" 1 "3000 is held by container otel"
+
+reset; STUB_CONTAINERS="gw|running|$PROJECT|/elsewhere|||127.0.0.1:8080->8080/tcp"; export STUB_CONTAINERS
+guard acquire k8s
+expect "a compose container on 8080 is the compose fleet" 1 "the compose fleet still runs: compose containers running: gw"
+expect_true "a compose container on 8080 is not named foreign" not_in_err "not part of the compose fleet"
+
+reset; mkdir -p "$SB/.fleet"; printf '99903\n' > "$SB/.fleet/gateway-svc.pid"
+STUB_PIDS="99903 java -jar $SB/services/gateway-svc/build/libs/gateway-svc-0.0.1.jar"; STUB_LISTENERS="8080=99903"; export STUB_PIDS STUB_LISTENERS
+guard acquire k8s
+expect "a fleet JVM on 8080 is the compose fleet" 1 "fleet JVM gateway-svc (pid 99903)"
+expect_true "a fleet JVM on 8080 is not named foreign" not_in_err "not part of the compose fleet"
+
+reset; fake_lease compose "$(dead_pid)"; STUB_LISTENERS="8080=4247"; STUB_PIDS="4247 nginx"; export STUB_LISTENERS STUB_PIDS
+guard acquire k8s
+expect "a foreign 8080 holder is not the stale compose lease still running" 1 "not part of the compose fleet"
+expect_true "a foreign holder does not keep a stale compose lease alive" not_in_err "holds the lease and still runs"
 
 reset; STUB_CONTAINERS="$KIND_UP"; export STUB_CONTAINERS
 guard acquire k8s

@@ -113,16 +113,20 @@ scripts/env-guard.sh state     # lease, compose, jvms, ports, kind: one line eac
 
 - **Exit codes** (`scripts/env-guard.sh:4`): 0 the lease is held (or released); 1 refused, with the
   blocker named on stderr; 2 could not look (Docker unreachable, an unreadable pid file, `lsof`
-  failing, a lease with no readable or an unknown owner). It fails closed: "could not look" is never
+  failing, an unreadable `k8s/kind-cluster.yaml`, a lease with no readable or an unknown owner). It fails closed: "could not look" is never
   "nothing runs".
 - **The lease** is the directory `.env-lease/`, taken with an atomic `mkdir`, holding the owner, the
   pid and start time of the process that called the guard, and when. The same owner acquiring again is
   idempotent.
-- **What blocks `acquire k8s`** (the compose fleet, `scripts/env-guard.sh:149-158`): a running
+- **What blocks `acquire k8s`** (the compose fleet, `scripts/env-guard.sh:145-159`): a running
   container of this compose project (by its project label, or its working-directory label naming
-  this checkout); a live JVM from `.fleet/*.pid` whose command line runs this checkout's jars; and any
-  listener on a fleet port that is not the kind node. The ports are each service's `SERVER_PORT`
-  default, the ledger gRPC port and every host port `compose.yaml` publishes, read from those files.
+  this checkout); and a live JVM from `.fleet/*.pid` whose command line runs this checkout's jars,
+  whether or not it listens on anything. Separately (`scripts/env-guard.sh:129-142`), a listener on a
+  port the kind node binds, the `hostPort`s in `k8s/kind-cluster.yaml` (127.0.0.1:8080 and
+  127.0.0.1:3000), that is neither a compose container nor a fleet JVM refuses the up as a **foreign
+  holder**, named with its container or its pid and process name, never as the compose fleet. A
+  listener on any other port (5432, 8081, ...) does not block `kube.sh up`; it is `fleet.sh`'s own
+  port preflight that cares about those.
 - **What blocks `acquire compose`** (the kind fleet): the node container labelled
   `io.x-k8s.kind.cluster=ezeebit`, running or stopped, because a stopped node rebinds its ports when
   Docker next starts.
@@ -133,7 +137,7 @@ scripts/env-guard.sh state     # lease, compose, jvms, ports, kind: one line eac
   under a second lock (`.env-lease.reclaim/`) so two reclaimers cannot both win. A lease whose
   holder still runs is never taken over.
 - **Running the guard by hand** records your interactive shell as the holder (the guard stores its
-  parent's pid, `scripts/env-guard.sh:177`). While that shell lives, the other fleet is refused with
+  parent's pid, `scripts/env-guard.sh:171`). While that shell lives, the other fleet is refused with
   `its up (pid <n>) is still running`. Release it with `scripts/env-guard.sh release <owner>`.
 - **Manual recovery.** If `state` shows neither fleet running and a refusal names a leftover
   `.env-lease` with no readable or an unknown owner, `rm -r .env-lease`. If a refusal says
@@ -437,5 +441,5 @@ On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` 
 | `checkK8s` / `app-image-version` | every `ezeebit/<svc>` image ref under `k8s/` is `ezeebit/<svc>:<version>` with `build.gradle`'s version, all five services named, no kustomize tag override | PASS, 5 refs (added in the final fix wave) |
 | `checkK8s` / `replicas` | config-svc and eureka-svc at 1 replica with no HPA; the scaled three at 2 under HPA 2-4, 2-3, 2-3 at 70% | PASS |
 | `checkK8s` / `pool-budget` | maxReplicas x pool per database service + 10 reserved <= `max_connections` | PASS, 30 + 30 + 10 = 70 of 100 |
-| `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 |
+| `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 at `e7aed35`; 48/48 after the final fix wave narrowed the k8s port scan |
 | `checkChaosMonkey` | the draw and its refusals against a stubbed kubectl | PASS 14/14 |

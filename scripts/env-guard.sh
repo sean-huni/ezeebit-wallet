@@ -11,8 +11,8 @@ KIND_CLUSTER=ezeebit
 KIND_NODE=ezeebit-control-plane
 TOOK=0 LOCKED=0
 ERRF=''
-DOCKER='' KIND=absent OWNER='' HOLDER=''
-COMPOSE=() JVMS=() HELD=() PORTS=() BLOCKERS=()
+DOCKER='' KIND=absent OWNER='' HOLDER='' HOLDER_ID=''
+COMPOSE=() JVMS=() JVM_PIDS=() HELD=() FOREIGN=() PORTS=() BLOCKERS=()
 
 say() { printf '[env-guard] %s\n' "$*" >&2; }
 
@@ -54,7 +54,7 @@ scan_docker() {
 
 scan_jvms() {
   local f svc pid cmd rc
-  JVMS=()
+  JVMS=() JVM_PIDS=()
   for f in "$FLEET_RUN"/*.pid; do
     [[ -e $f ]] || continue
     [[ -r $f ]] || blind "cannot read $f"
@@ -67,35 +67,20 @@ scan_jvms() {
       kill -0 "$pid" 2> /dev/null && blind "ps could not read live pid $pid of $f (exit $rc)"
       continue
     fi
-    [[ $cmd == *"$ROOT/services/$svc/build/libs/"* ]] && JVMS+=("fleet JVM $svc (pid $pid)")
+    [[ $cmd == *"$ROOT/services/$svc/build/libs/"* ]] && { JVMS+=("fleet JVM $svc (pid $pid)"); JVM_PIDS+=("$pid"); }
   done
 }
 
+# The kind node's host ports, the only ones a k8s up binds; the compose side's ports are fleet.sh's own preflight.
 read_ports() {
-  local f port spec var def n=0 yml=$ROOT/services/ledger-svc/src/main/resources/application.yml
+  local port n=0 cfg=$ROOT/k8s/kind-cluster.yaml
   PORTS=()
-  for f in "$ROOT"/services/*/src/main/resources/application.yml; do
-    [[ -f $f ]] || blind "no services/*/src/main/resources/application.yml under $ROOT"
-    port=$(sed -nE 's/.*\$\{SERVER_PORT:([0-9]+)\}.*/\1/p' "$f")
-    [[ $port =~ ^[0-9]+$ ]] || blind "no \${SERVER_PORT:<port>} in $f"
-    PORTS+=("$port")
-  done
-  port=$(sed -nE 's/.*\$\{LEDGER_GRPC_PORT:([0-9]+)\}.*/\1/p' "$yml")
-  port=${LEDGER_GRPC_PORT:-$port}
-  [[ $port =~ ^[0-9]+$ ]] || blind "no ledger gRPC port in $yml"
-  PORTS+=("$port")
-  [[ -r $ROOT/compose.yaml ]] || blind "cannot read $ROOT/compose.yaml"
-  while read -r spec; do
-    if [[ $spec == \$\{*\} ]]; then
-      var=${spec#\$\{}; var=${var%%:-*}; def=${spec#*:-}; def=${def%\}}
-      port=${!var:-$def}
-    else
-      port=$spec
-    fi
-    [[ $port =~ ^[0-9]+$ ]] || blind "compose.yaml host port '$spec' does not resolve to a number"
+  [[ -r $cfg ]] || blind "cannot read $cfg"
+  while read -r port; do
+    [[ $port =~ ^[0-9]+$ ]] || blind "hostPort '$port' in $cfg is not a number"
     PORTS+=("$port"); n=$((n + 1))
-  done < <(sed -nE "s/^[[:space:]]*- '127\.0\.0\.1:(.+):[0-9]+'\$/\1/p" "$ROOT/compose.yaml")
-  (( n > 0 )) || blind "no published ports read from compose.yaml"
+  done < <(sed -nE 's/.*hostPort:[[:space:]]*([^,}[:space:]]+).*/\1/p' "$cfg")
+  (( n > 0 )) || blind "no hostPort read from $cfg"
 }
 
 publishes() {
@@ -113,12 +98,12 @@ publishes() {
 
 holder_of() {
   local port=$1 name state project dir kind ports pid rc comm err
-  HOLDER=
+  HOLDER= HOLDER_ID=
   # A published container port shows in lsof as the Docker backend, so containers are asked first.
   while IFS='|' read -r name state project dir kind ports; do
     [[ $state == running ]] || continue
     publishes "$port" "$ports" || continue
-    [[ $kind == "$KIND_CLUSTER" ]] || HOLDER="container $name"
+    [[ $kind == "$KIND_CLUSTER" ]] || { HOLDER="container $name"; HOLDER_ID=$name; }
     return 0
   done <<< "$DOCKER"
   [[ -n $ERRF ]] || ERRF=$(mktemp "${TMPDIR:-/tmp}/env-guard.XXXXXX") || blind "mktemp failed"
@@ -128,33 +113,42 @@ holder_of() {
   if (( rc == 0 )) && [[ -n $pid ]]; then
     pid=${pid%%$'\n'*}
     comm=$(ps -o comm= -p "$pid" 2> /dev/null)
-    HOLDER="process $pid (${comm:-exited})"
+    HOLDER="process $pid (${comm:-exited})"; HOLDER_ID=$pid
   elif (( rc != 1 )) || [[ -n $pid || -n $err ]]; then
     blind "lsof on port $port exited $rc: ${err%%$'\n'*}"
   fi
 }
 
+in_list() {
+  local want=$1 x
+  shift
+  for x in "$@"; do [[ $x == "$want" ]] && return 0; done
+  return 1
+}
+
+# HELD: every holder of a kind port. FOREIGN: those that are neither a compose container nor a fleet JVM, already named.
 scan_ports() {
   local port seen=" "
-  HELD=()
+  HELD=() FOREIGN=()
   read_ports
   for port in "${PORTS[@]}"; do
     [[ $seen == *" $port "* ]] && continue
     seen+="$port "
     holder_of "$port"
-    [[ -n $HOLDER ]] && HELD+=("port $port is held by $HOLDER")
+    [[ -n $HOLDER ]] || continue
+    HELD+=("port $port is held by $HOLDER")
+    in_list "$HOLDER_ID" ${COMPOSE[@]+"${COMPOSE[@]}"} ${JVM_PIDS[@]+"${JVM_PIDS[@]}"} || FOREIGN+=("port $port is held by $HOLDER")
   done
 }
 
+# BLOCKERS: the fleet itself. FOREIGN (k8s side only): something else on a port the kind node needs.
 scan_fleet() {
-  BLOCKERS=()
+  BLOCKERS=() FOREIGN=()
   scan_docker
   if [[ $1 == compose ]]; then
     (( ${#COMPOSE[@]} )) && BLOCKERS+=("compose containers running: ${COMPOSE[*]}")
     scan_jvms
     BLOCKERS+=(${JVMS[@]+"${JVMS[@]}"})
-    scan_ports
-    BLOCKERS+=(${HELD[@]+"${HELD[@]}"})
   else
     case $KIND in
       running) BLOCKERS+=("kind node $KIND_NODE is running") ;;
@@ -247,10 +241,14 @@ acquire() {
     fi
   fi
   scan_fleet "$other"
+  [[ $me == k8s ]] && scan_ports
   if (( ${#BLOCKERS[@]} )); then
     say "refused $me: the $other fleet still runs: $(joined "${BLOCKERS[@]}"). Stop it first: $(stop_hint "$other")"
-    exit 1
   fi
+  if (( ${#FOREIGN[@]} )); then
+    say "refused $me: $(joined "${FOREIGN[@]}"), not part of the $other fleet; the kind node binds 127.0.0.1 on ports ${PORTS[*]}: stop that holder first"
+  fi
+  (( ${#BLOCKERS[@]} + ${#FOREIGN[@]} == 0 )) || exit 1
   say "lease held by $me"
 }
 

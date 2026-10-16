@@ -204,7 +204,9 @@ kubectl, and only 127.0.0.1:8080 and 127.0.0.1:3000 on the host. Everything else
 
 **Only one fleet runs at a time.** `fleet.sh up` and `kube.sh up` both take one lease through
 `scripts/env-guard.sh`, and each refuses while any part of the other still runs, naming what it found and the
-command that stops it ([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)).
+command that stops it. `kube.sh up` also refuses when something outside both fleets holds 127.0.0.1:8080 or
+127.0.0.1:3000, and names that holder as foreign
+([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)).
 
 ## Demo: deposit, quote, convert, read back
 
@@ -545,7 +547,7 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | `up` says `port 6379 (redis) is held by ...` | `REDIS_PORT=6390 ./fleet.sh up` (or set it in `.env`); the gateway follows it |
 | `status` says `redis MISMATCH`, `published on 6390, but the environment now says 6379` | The fleet was started with a setting this shell lacks. Put it in `.env` ([The `.env` file](#the-env-file-keep-every-run-on-the-same-settings)), or run `REDIS_PORT=6390 ./fleet.sh status` |
 | `up` says `port 8081 (ledger-svc) is held by process ...` | A JVM from an earlier run, or another program, holds a service port: stop it (the line gives its process id) |
-| `up` says `[env-guard] refused compose: the k8s fleet ... still runs: kind node ezeebit-control-plane is running` | The kind fleet is up, or its node is only stopped: `./k8s/kube.sh down`, then `./fleet.sh up`. The reverse refusal names compose containers, fleet JVMs or a held port; `./fleet.sh down` ([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)) |
+| `up` says `[env-guard] refused compose: the k8s fleet ... still runs: kind node ezeebit-control-plane is running` | The kind fleet is up, or its node is only stopped: `./k8s/kube.sh down`, then `./fleet.sh up`. The reverse refusal names compose containers or fleet JVMs (`./fleet.sh down`), or a foreign holder of 8080 or 3000 (stop that process) ([docs/k8s.md](docs/k8s.md#one-fleet-at-a-time-the-environment-guard)) |
 | `up` says `fleet still not healthy after one bounce` | The table above that line names each failing row and why. The stack is left running for diagnosis; `./fleet.sh down` when done |
 | `down` says `fleet NOT fully down` | The lines below it name the port holder or container that survived; stop it before the next `up` |
 | Every merchant call answers 503 `RATE_LIMITER_UNAVAILABLE` | Redis is not running: `docker compose up -d --wait redis` |

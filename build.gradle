@@ -536,7 +536,7 @@ def checkDashboards = tasks.register('checkDashboards', Exec) {
 def checkEnvGuard = tasks.register('checkEnvGuard', Exec) {
 	group = 'verification'
 	description = 'Runs scripts/test/env-guard-test.sh: the guard that keeps the host fleet and the kind fleet from running together.'
-	inputs.files 'scripts/env-guard.sh', 'scripts/test/env-guard-test.sh', fileTree('scripts/test/stubs')
+	inputs.files 'scripts/env-guard.sh', 'scripts/test/env-guard-test.sh', 'k8s/kind-cluster.yaml', fileTree('scripts/test/stubs')
 	commandLine 'bash', 'scripts/test/env-guard-test.sh'
 }
 

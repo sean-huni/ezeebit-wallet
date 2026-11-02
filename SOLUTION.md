@@ -204,6 +204,62 @@ In order:
    between the services; the channel itself is still plaintext.
 8. **Quote retention**, and a MySQL 8 run of the same suite to back the portability claim.
 
+### Planned for December 2026: highly available PostgreSQL on Kubernetes
+
+Scheduled, not started. It closes the "one Postgres container" gap in section 7, on the kind
+fleet only; `fleet.sh` (compose) keeps the single `postgres:18.6-alpine` for laptop runs.
+
+**The lesson that motivates it.** Scaling the services to 2 or more replicas scales their
+connections, not the database. Connections are already bounded and gated: on the kind fleet
+(measured 2026-11-02) `max_connections` is 100, 40 are in use at 2 pods per service, and full
+autoscale needs (3 + 3) x 10 + 10 = 70, which `k8s/gates/pool-budget.sh` enforces. Write contention
+stays narrow by design (row locks per merchant, platform accounts never locked). What does not
+scale is **availability**: one pod holds both databases, so its loss stops every deposit and
+conversion until Kubernetes restarts it.
+
+**Why CloudNativePG** (the operator) rather than a hand-built replica set or another database:
+
+- **Automatic failover with no lost commit**: a primary plus 2 replicas with a synchronous quorum of
+  1, so every commit is on two instances before the merchant gets a 201, and a dead primary is
+  replaced by promotion rather than a restart from disk.
+- **It keeps every SQL feature the money path depends on**: `SELECT ... FOR UPDATE`,
+  `SKIP LOCKED`, the composite foreign key, `CHECK (balance >= 0)`, `clock_timestamp()` for the
+  posting deadline and the session advisory lock behind Liquibase. It is still PostgreSQL 18.
+- **PgBouncer comes with it** (the `Pooler` resource), so connection multiplexing is one manifest,
+  not a separate deployment to operate.
+- **Kubernetes-native operations**: read-write and read-only Services, rolling minor upgrades with a
+  switchover, and backups to object storage when a cloud target exists.
+- **Rejected: CockroachDB.** It writes on every node and survives node loss with no failover step,
+  but it is Serializable only, so a busy merchant's concurrent conversions would abort with `40001`
+  and need retry loops instead of queueing on a row lock; every write pays a consensus round; the
+  session advisory lock needs replacing; and its licence changed to enterprise terms in late 2024.
+  It earns that cost only when writes must be accepted in several regions at once.
+
+**What changes:**
+
+| Today | December 2026 |
+|---|---|
+| `sts/postgres` in `ezeebit-data`, `postgres:18.6-alpine`, 1 pod | CloudNativePG `Cluster`, 3 instances (1 primary, 2 replicas), synchronous quorum 1, PostgreSQL 18 |
+| services connect to `postgres.ezeebit-data:5432` | services connect to the PgBouncer `Pooler` (transaction mode) via `DB_URL`; Liquibase connects straight to the `-rw` Service, because its advisory lock is session-level |
+| PgJDBC server-side prepared statements | `prepareThreshold=0` on the pooled URL (transaction pooling cannot keep them) |
+| `docker/postgres/initdb/01-databases.sql` creates both databases and roles | the `Cluster`'s bootstrap and managed roles create them, still one owner role per database |
+| image-parity gate: compose and cluster images identical | a named exception for the CloudNativePG images, as the chaos image and metrics-server already have |
+
+**Version policy** (a deliberate choice for a development and load-testing cluster, not
+production): no pinned versions. `kube.sh up` resolves the newest CloudNativePG release at run
+time, the Postgres image tracks the floating major tag `18`, and the Pooler uses the PgBouncer
+image the operator ships. Every `up` and sweep writes the resolved operator version and image
+digests into its log, so a passing run still names exactly what it tested.
+
+**Done means**, each proven on the kind fleet with a committed log:
+
+1. The existing sweep passes unchanged on the new database.
+2. A primary killed mid-traffic: a replica is promoted, every COMPLETED conversion has exactly one
+   POSTED journal (the sweep's reconciliation), and no acknowledged deposit is missing.
+3. A replica killed: writes continue (the quorum still holds) and the replica rejoins.
+4. Through PgBouncer, the pool-budget gate is re-derived against the pooler's server connections,
+   and a gate fails if any Liquibase datasource points at the pooler rather than the `-rw` Service.
+
 ## 7. Known gaps and unfinished work
 
 This is the single list; the other documents link here.
@@ -237,7 +293,15 @@ This is the single list; the other documents link here.
 - The rate-limit key is the merchant id from the path, which the client chooses. With no
   authentication a caller can spread load over many merchant ids; a limit keyed on the verified
   caller needs the token the brief puts out of scope. Only the shape of the key is bounded: a universally unique identifier (UUID).
-- One Postgres container hosts both databases: logically separate, one shared failure domain.
+- One Postgres container hosts both databases: logically separate, one shared failure domain, no
+  failover. Planned for December 2026: section 6, "Planned for December 2026".
+- On the kind fleet, a `kubectl port-forward` to Postgres logs in as any role, the `postgres`
+  superuser included, with any password. The forward arrives from `127.0.0.1` inside the pod, and
+  the image's `pg_hba.conf` trusts loopback (`host all all 127.0.0.1/32 trust`); measured
+  2026-11-02, a deliberately wrong password was accepted as `ledger`. Connections between pods are
+  unaffected (`host all all all scram-sha-256`). The only control is Kubernetes RBAC on who may
+  port-forward into `ezeebit-data`. The December 2026 CloudNativePG cluster manages `pg_hba` itself,
+  without a loopback trust rule.
 - config-svc and eureka-svc run as single instances (on the kind fleet too, held at 1 replica with
   no autoscaler by the `replicas` build gate).
 - CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no

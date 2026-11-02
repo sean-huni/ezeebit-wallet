@@ -34,6 +34,13 @@ Folder **Ezeebit** holds five provisioned, read-only dashboards. They are genera
 together. `./gradlew check` runs `checkDashboards` (`generate.py --check`), which fails naming any file that
 differs from what the script writes, so a hand edit to the JavaScript Object Notation (JSON) or a forgotten regeneration is red.
 
+Each dashboard carries four kinds of tag, so "Filter by tag" finds one board or one kind: `ezeebit` on all
+five (the cross-board link menu filters on it), its uid (`ezeebit-fleet`, `ezeebit-money`, `ezeebit-traces`,
+`ezeebit-logs`, `ezeebit-alerts`), its purpose (`health`, `business`, `tracing`, `logging`, `alerting`), and
+the datasources its panels query (`prometheus`, `loki`, `tempo`), which the generator reads off the panels.
+On kind, the lgtm pod copies the dashboards in at start, so a changed board needs
+`kubectl --context kind-ezeebit -n ezeebit-obs rollout restart deploy/lgtm`.
+
 | Dashboard | Shows | Variables |
 |---|---|---|
 | Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; the Ledger gRPC row (below); limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, garbage collection, warnings and errors | service, rate window |

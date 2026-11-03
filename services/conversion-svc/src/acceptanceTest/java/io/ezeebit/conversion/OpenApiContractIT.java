@@ -120,6 +120,16 @@ class OpenApiContractIT {
 		}
 	}
 
+	// OpenAPI patterns are ECMA-262: Swagger UI runs new RegExp(pattern) with no u flag and tests unanchored, so
+	// \p{..} reads as literal text and blocks every valid value. Only anchored patterns without property escapes pass.
+	@Test
+	void everyPublishedPatternMeansTheSameInABrowser() {
+		for (String group : GROUPS) {
+			assertThat(spec(group).findValues("pattern")).isNotEmpty().allSatisfy(pattern -> assertThat(pattern.asString())
+					.as(group).startsWith("^").endsWith("$").doesNotContain("\\p{", "\\P{"));
+		}
+	}
+
 	@Test
 	void everyErrorCodeIsPublishedByAnOperationOrAsARoutingAnswer() {
 		Set<ErrorCode> published = EnumSet.copyOf(OperationErrors.ROUTING);

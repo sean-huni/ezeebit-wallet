@@ -23,6 +23,6 @@ public record QuoteReq(
 		@Nullable @JsonDeserialize(using = StrictStringDeserializer.class)
 		@Pattern(regexp = DECIMAL, message = "{validation.amount.format}") String buyAmount) {
 
-	public static final String DECIMAL = "-?\\d{1,40}(\\.\\d{1,40})?";
+	public static final String DECIMAL = "^-?\\d{1,40}(\\.\\d{1,40})?$";
 
 }

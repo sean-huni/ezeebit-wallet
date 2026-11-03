@@ -10,6 +10,6 @@ public record ConversionReq(
 		@NotNull(message = "{validation.quoteId.required}") UUID quoteId) {
 
 	// Postgres text cannot hold NUL, and no key needs any control character.
-	public static final String NO_CONTROL_CHARACTERS = "\\P{Cc}*";
+	public static final String NO_CONTROL_CHARACTERS = "^[^\\u0000-\\u001F\\u007F-\\u009F]*$";
 
 }

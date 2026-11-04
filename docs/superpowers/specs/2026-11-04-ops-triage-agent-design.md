@@ -92,6 +92,9 @@ Each step writes its evidence to the ledger (7.3) before the next starts.
 6. **Code level.** The span's flame graph (project 1), or the failing line in the deployed commit.
 7. **Hypotheses.** At least two, each with its leads (the query or log that would confirm or kill it)
    and one discriminating probe whose outcome differs per hypothesis (`rules/_global/verification.md` §15).
+   Each hypothesis must face a REFUTING query, and must pass "cause precedes effect": its onset is
+   earlier than the symptom's, on clocks checked for skew. AWS DevOps Agent ruled a gateway out because
+   its slowdown began after the checkout latency did (L5).
 8. **Reproduce red** in a lower environment (7.5).
 9. **Fix red to green** on a branch (7.6), then the two reviewers (7.7).
 
@@ -108,6 +111,10 @@ Every claim is a record, in a JSON file per investigation:
 | `result` | the raw response, stored |
 | `artifact` | screenshot path or Grafana permalink, where a picture is the evidence |
 | `kind` | `positive` or `negative`; a negative names its positive control (below) |
+| `hypothesis_id` | the ONE hypothesis this query tests, and whether it `supports` or `refutes` it (prior art L6) |
+
+Queries aggregate server-side; raw results stay on disk and the model reads a digest, so a large
+response cannot crowd the evidence out of context (L15).
 
 The validator re-runs every `query` over its `window` and compares to `result`. A claim whose number
 does not reproduce is removed and the removal is logged. A negative claim ("no errors in gateway logs")
@@ -126,6 +133,15 @@ a negative whose control returns nothing must be rejected.
 | **Unknown** | no hypothesis survived | "Root cause unknown", with every ruled-out cause and the evidence ruling it out (Sean: allowed) |
 
 Only Confirmed is worded as fact.
+
+Every verdict also carries structured fields a script can grade (L2): `component`, `mechanism` (an enum
+from the playbook's failure-class catalogue, or `unseen` when nothing matches: never a forced fit, L9),
+`onset` (UTC), and `blind_spots` (each source the catalogue requires that could not be reached; any
+entry caps the verdict at Supported, L11). The post separates the root cause from contributing causes
+and from findings that are real but unconnected (L7).
+
+Expect Unknown and Supported to be common: the best model on the OpenRCA benchmark solved 11.34% of its
+335 failures (ICLR 2025, page 1). A streak of all-Confirmed verdicts is a signal to audit, not a success.
 
 ### 7.5 Reproduction: lower environments only
 
@@ -183,7 +199,12 @@ channel). A seeded injection is part of the proof (section 10).
 ### 7.10 One investigation per incident
 
 Investigations key on the alert group (Grafana's group key). A second alert in the same group joins the
-running investigation's thread. A per-day run cap stops an alert storm from spending without bound.
+running investigation's thread. A per-day run cap stops an alert storm from spending without bound, and
+each investigation has its own step and wall-clock budget; hitting it ends the run as Unknown or
+Supported with the budget named as a blind spot (L14).
+
+A missing credential or permission ends the step: the agent never asks for, borrows or elevates to
+broader access (L12; Azure SRE Agent requests on-behalf-of access, which is the shape avoided here).
 
 ## 8. The playbook (`docs/runbook/`)
 
@@ -195,6 +216,10 @@ For human engineers and agents alike:
 - worked examples rebuilt from the two real incidents Sean named: the dead-letter alert and the Swagger
   pattern mismatch;
 - environments and the reproduction allowlist.
+
+Catalogue entries are keyed by alert name, carry a `reviewed` date, and follow Goal, Workflow,
+Synthesize, Remediation (L8, HolmesGPT runbook catalogue; RCACopilot's per-alert handlers). Their first
+queries are machine-runnable, so the validator can execute the same lines an engineer copies.
 
 ## 9. Stages (automation is earned)
 
@@ -216,6 +241,19 @@ Each scenario is run with the truth known in advance, and the verdict graded aga
 5. **Chaos window**: a fault during a chaos Job. Expected: "injected, not a defect".
 6. **Validator red-proofs** of 7.3, and the PROD write refusal of 7.5.
 7. Each Slack post captured as a screenshot and read.
+
+Rules for the scenario set, from prior art:
+- **Unguessable** (L1, HolmesGPT anti-hallucination eval guide): every injected fault plants a unique
+  random token (in a log line, a label, a config value) that a correct verdict must cite, and resources
+  carry neutral names, so a verdict cannot be produced without looking.
+- **Graded by script, not by a model** (L2, OpenRCA `evaluate.py`): `component`, `mechanism` and `onset`
+  (within 60 s) compared to the known truth. A model judge may add a rationale, never the score.
+- **Several no-fault cases** (L3, AIOpsLab `noop` tasks), and the false-cause rate is reported.
+- **Masking red-proofed per source, events included** (L13: k8sgpt's README states its anonymisation
+  "does not currently apply to events"). The token map stays local so masked values can be restored.
+- **Human grading becomes ground truth** (L10): a reply in the thread marking the verdict right or
+  wrong is stored as a labelled case and joins this set. Only a human promotes a pattern into the
+  catalogue.
 
 ## 11. Review focus: what is most likely to bite
 
@@ -275,7 +313,35 @@ the daily cap.
 - **The fix's gate.** `./gradlew clean build` always; for a runtime fault, also the kind scenario that
   reproduced it, re-run and passing. Not the whole sweep every time.
 
-## 14. Left to the builder
+## 14. Prior art (surveyed 2026-11-04)
+
+GitHub figures from `gh api repos/<repo>` on 2026-11-04; cut: under 500 stars or no push in 90 days,
+except benchmarks backed by a paper. Lesson numbers (L1 to L15) are cited where each changed this doc.
+
+| Tool | Type | Stars, last push, licence | Investigates by | Source |
+|---|---|---|---|---|
+| HolmesGPT | OSS, CNCF sandbox | 3779, 2026-11-04, Apache-2.0 | agentic loop over toolsets, runbook catalogue, eval suite | github.com/HolmesGPT/holmesgpt |
+| k8sgpt | OSS | 8297, 2026-11-04, Apache-2.0 | fixed analysers find, LLM explains; optional anonymise | github.com/k8sgpt-ai/k8sgpt |
+| OpenSRE (Tracer) | OSS, alpha | 12701, 2026-11-04, Apache-2.0 | fetch, mask, test hypotheses, push fix PR; CI/CD focus | github.com/Tracer-Cloud/opensre |
+| Keep | OSS | 12489, 2026-11-04, MIT outside `ee/` | alert dedup and correlation; not RCA | github.com/keephq/keep |
+| OpenRCA | benchmark, ICLR 2025 | 450, 2026-10-22, MIT | 335 failures, 68 GB telemetry, scripted scoring | github.com/microsoft/OpenRCA |
+| AIOpsLab | benchmark framework | 1024, 2026-10-31, MIT | injected faults; detect, localise, analyse, mitigate; no-fault tasks | github.com/microsoft/AIOpsLab |
+| RCACopilot | paper, EuroSys 2024 | n/a | per-alert handlers, category from similar past incidents or "Unseen" | arxiv.org/abs/2305.15778 |
+| RCAgent | paper, CIKM 2024 | n/a | tool-using agent, self-consistency over action paths | arxiv.org/abs/2310.16340 |
+| Datadog Bits AI SRE | commercial | n/a | hypothesis tree, each query tied to one hypothesis, may end inconclusive | docs.datadoghq.com/bits_ai/bits_ai_sre/investigate_issues |
+| AWS DevOps Agent | commercial | n/a | competing hypotheses against counter-evidence; cause, root cause, unconnected | aws.amazon.com/blogs/devops (multi-agent RCA post) |
+| Azure SRE Agent | commercial | n/a | Review or Autonomous run modes | learn.microsoft.com/en-us/azure/sre-agent/run-modes |
+| Grafana Assistant / Sift | commercial | n/a | hypotheses with cited panels, "Was this the cause?" feedback | grafana.com/docs/grafana-cloud/machine-learning |
+| PagerDuty SRE Agent | commercial | n/a | alert, runbook and memory; names what it lacks | pagerduty.com/eng/context-over-cleverness-building-pagerdutys-sre-agent |
+
+What none of them was found to do, and this design does: re-run every cited number with a deterministic
+validator; require a positive control behind a negative; reserve "root cause" for reproduced, fixed and
+twice-reviewed faults; mark chaos windows; enforce the fix-branch prefix by credential.
+
+Not verified: incident.io (secondary sources only); whether Sift's analyses are statistical or LLM;
+HolmesGPT's published accuracy (its benchmark results file lists 1 test).
+
+## 15. Left to the builder
 
 The ledger's exact JSON schema, the validator's language (Python, per the stack defaults), the post's
 exact Slack blocks, the daily cap's value, and how the skill discovers the alert's Slack `ts`.

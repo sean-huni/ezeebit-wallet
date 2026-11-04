@@ -59,6 +59,11 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		// TestObservationRegistry: business spans are asserted on the observation, without an exporter.
 		testImplementation 'io.micrometer:micrometer-observation-test'
 		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+		constraints {
+			implementation("com.google.guava:guava:${guavaVersion}") {
+				because 'CVE-2026-102554: grpc-java and the Eureka server bring 33.6.0 and 33.0.0; drop when both bring 33.7.2 or newer'
+			}
+		}
 	}
 
 	tasks.withType(Test).configureEach {

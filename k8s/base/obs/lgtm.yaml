@@ -61,7 +61,7 @@ spec:
         # A ConfigMap holds one flat directory; this rebuilds the docker/lgtm tree from one ConfigMap per directory,
         # so a new dashboard file needs no manifest change.
         - name: tree
-          image: 'grafana/otel-lgtm:0.36.0'
+          image: 'grafana/otel-lgtm:0.39.0'
           command:
             - sh
             - -c
@@ -82,7 +82,7 @@ spec:
             - {name: cm-promtool, mountPath: /src/promtool, readOnly: true}
       containers:
         - name: lgtm
-          image: 'grafana/otel-lgtm:0.36.0'
+          image: 'grafana/otel-lgtm:0.39.0'
           command: ['/ezeebit/start.sh']
           env:
             - name: SLACK_WEBHOOK_URL

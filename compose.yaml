@@ -77,7 +77,7 @@ services:
   lgtm:
     # Grafana, Prometheus, Tempo, Loki and an OTLP collector in one container. Local only:
     # Grafana runs with anonymous Admin access.
-    image: 'grafana/otel-lgtm:0.36.0'
+    image: 'grafana/otel-lgtm:0.39.0'
     entrypoint: ['/ezeebit/start.sh']
     environment:
       - 'SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}'

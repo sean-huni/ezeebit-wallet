@@ -53,7 +53,7 @@ migration belongs.
 | Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 9092 (Kafka), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888, 9081 (ledger-svc's gRPC port). Kafka's internal listener 29092 is not published, so it needs no free host port |
 
 No Gradle install is needed: the repository ships the Gradle 9.8.1 wrapper. Stack: Java 25, Spring
-Boot 4.1.1, Spring Cloud 2025.1.3.
+Boot 4.1.2, Spring Cloud 2025.1.3.
 
 ## Build and test
 

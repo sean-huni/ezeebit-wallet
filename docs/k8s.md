@@ -170,7 +170,7 @@ scripts/env-guard.sh state     # lease, compose, jvms, ports, kind: one line eac
 | `ezeebit-app` | gateway-svc | Deployment | 2 | 2 to 4 at 70% CPU of request | app |
 | `ezeebit-app` | ledger-svc | Deployment | 2 | 2 to 3 at 70% CPU of request | app |
 | `ezeebit-app` | conversion-svc | Deployment | 2 | 2 to 3 at 70% CPU of request | app |
-| `ezeebit-obs` | lgtm (`grafana/otel-lgtm:0.36.0`) | Deployment + 2Gi PVC, `Recreate` | 1 | none | obs |
+| `ezeebit-obs` | lgtm (`grafana/otel-lgtm:0.39.0`) | Deployment + 2Gi PVC, `Recreate` | 1 | none | obs |
 | `ezeebit-chaos` | chaos-monkey | CronJob, `suspend: true` | n/a | none | chaos |
 | `kube-system` | metrics-server v0.9.0 | Deployment | 1 | none | app |
 

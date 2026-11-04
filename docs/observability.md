@@ -5,7 +5,7 @@ Back to [README](../README.md). This is beyond the brief; see
 
 ## The stack
 
-`compose.yaml` runs `grafana/otel-lgtm:0.36.0`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an
+`compose.yaml` runs `grafana/otel-lgtm:0.39.0`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an
 OpenTelemetry collector in one container (the image keeps the Loki, Grafana, Tempo and Mimir (LGTM) name; Prometheus stands where Mimir would). Metrics, traces and logs persist in the `lgtmdata` volume.
 Grafana's own database is on tmpfs and resets on every start by design: dashboards, alert rules and
 the contact point re-provision from files in `docker/lgtm/`, and no stale alert state survives a

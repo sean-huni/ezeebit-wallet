@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # measure.sh <startMs> <endMs> <label>: per job over the window, server p95 (non-actuator), request count, mean
-# process_cpu_usage, CPU-seconds, profiler-running series and the JVMs seen. Fails closed: a query that does not
+# process_cpu_usage, CPU-seconds and the JVMs seen. Fails closed: a query that does not
 # answer HTTP 200 with status "success" and at least one series ends the run with exit=1.
 set -uo pipefail
 P=${GRAFANA_URL:-http://127.0.0.1:3000}/api/datasources/proxy/uid/prometheus/api/v1/query

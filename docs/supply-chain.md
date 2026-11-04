@@ -97,7 +97,12 @@ Since 2026-10-15 conversion-svc also pins lz4-java 1.11.4 (`lz4JavaVersion` in `
 a dependency constraint in its `build.gradle`) for CVE-2026-106451. It is a transitive override of
 kafka-clients 4.2.2 (which brings lz4 1.11.2), not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 
-One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images.
+Two SERVICE findings remain and do not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images;
+and `opentelemetry-api` 1.62.0, CVE-2026-118259, MEDIUM, fixed in 1.67.0, in 5 of the 5 images (supply-chain run of
+2026-11-05, `docs/k8s/verification/2026-11-05-profiling-gates-supplychain.log`). The second arrives through
+`spring-boot-starter-opentelemetry` at Boot's managed `opentelemetry.version` (1.62.0 in Boot 4.1.1 and 4.1.2), so it
+predates the profiling branch. It is parked for Sean and not bumped: `otelLogbackAppenderVersion` in
+`gradle.properties` must match Boot's opentelemetry-api.
 The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers)
 belong to the builder and run-image pins. trivy has no compose checks, so the misconfiguration stage
 recognises none of the files it reads and reports zero checks rather than a clean bill.

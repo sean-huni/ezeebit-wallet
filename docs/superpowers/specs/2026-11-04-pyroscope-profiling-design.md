@@ -257,6 +257,12 @@ Claude's rulings:
   profiling. Still over budget after all three: stop and report with the numbers.
 - **Unrelated working-tree changes** (`services/ledger-svc/.../002-account.xml`, `docs/question/`)
   are Sean's and stay out of every commit on this branch: commit with explicit pathspecs.
+  - **Superseded by Sean's ruling of 2026-11-05.** The ledger 2026/10 changeset reformat (all six files
+    under `services/ledger-svc/src/main/resources/db/changelog/2026/10/`, `002-account.xml` among them) was
+    committed on this branch in `e997664`, after the Liquibase 5.0.4 v9 checksums of all 16 changesets were
+    verified unchanged against `5d11dfd`, with a positive control
+    (`docs/evidence/liquibase/2026-11-05-ledger-checksums/run.md`). `docs/question/` moved to the
+    `feat-presentation` branch, and `presentation.md` stays out through the local exclude.
 
 ## 12. Left to the builder
 

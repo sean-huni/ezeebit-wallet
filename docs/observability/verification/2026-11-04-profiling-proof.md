@@ -320,9 +320,22 @@ override set here was removed afterwards.
 - Run 1 of the click-through: its screenshots were overwritten; only its logged datasource traffic remains.
 - The slowest-trace selection in `2026-11-04-span-to-profile.mjs`: changed after both 10 ms runs, not yet run.
 - The fail-closed phase and measure scripts against a real cluster: red-proofed with stubs (empty HPA read, jq
-  failure on the event read) and read-only measure runs, but no full overhead arm has run on them.
+  failure on the event read) and read-only measure runs, but no full overhead arm has run on them. The stub
+  red-proof harness (scratch copy, stub `kubectl`, `jq` and `node`) was not retained; its recorded output is in the
+  Task 7 report (`.superpowers/sdd/2026-11-04-pyroscope-profiling/task-7-report.md`, local and gitignored), not in
+  this repository.
+- ProfilingFailing firing in Grafana: its expression is proven by `promtool` only
+  (`2026-11-04-profiling-promtool.log`); the rule has never been seen firing in the running Grafana.
+- "Open in Profiles Drilldown", rendered beside "Profiles for this span": its target was never checked.
+- The JDK 25 native-access warning (`java.lang.System::load has been called by
+  io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module`): a future JDK that denies native access
+  by default stops the profiler from loading. The service keeps running, so only
+  `ezeebit_profiling_failures_total` and ProfilingFailing (and ProfilesAbsent) would show it.
+- The Task 4 tests (`SpanProfileLinkTest`: `aLinkThatCannotLoadDegradesToNoOp`, `aLinkThatCannotLoadIsCounted`)
+  were not red-proofed by mutation.
 - Identity on compose at 2 replicas: compose runs one JVM per service.
 - Until the fix round the kind images were the host's `ezeebit/*:0.3.2` from Task 6's final build; the fix round
-  rebuilt them from `b2d53e6`. The working tree also carries an uncommitted, unrelated change to
-  `services/ledger-svc/src/main/resources/db/changelog/2026/10/002-account.xml`, which the compose jars built by
-  `./fleet.sh up` and the fix-round images included.
+  rebuilt them from `b2d53e6`. The compose jars built by `./fleet.sh up` and the fix-round images included the
+  then-uncommitted reformat of `services/ledger-svc/src/main/resources/db/changelog/2026/10/002-account.xml`.
+  It is now committed, with the rest of the ledger 2026/10 reformat, in `e997664`; its checksums are unchanged
+  (`docs/evidence/liquibase/2026-11-05-ledger-checksums/run.md`).

@@ -13,7 +13,7 @@ spec:
     - {name: otlp-http, port: 4318, targetPort: 4318}
     - {name: pyroscope, port: 4040, targetPort: 4040}
 ---
-# Grafana alone reaches the host (kind maps node 30300 to 127.0.0.1:3000); OTLP stays inside the cluster.
+# Grafana alone reaches the host (kind maps node 30300 to 127.0.0.1:3000); OTLP and Pyroscope stay inside the cluster.
 apiVersion: v1
 kind: Service
 metadata:

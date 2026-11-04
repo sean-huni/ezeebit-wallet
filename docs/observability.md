@@ -115,7 +115,7 @@ Every log line written inside a request carries `trace_id` and `span_id` as Loki
 
 Every service is profiled continuously by the Pyroscope Java SDK, started from the shared `observability`
 module: config-svc, eureka-svc, gateway-svc, ledger-svc and conversion-svc. Each sends wall-clock time,
-allocation (every 512 KB allocated) and lock contention (locks held 10 ms or longer, so lock series appear only
+allocation (every 512 KB allocated) and lock contention (lock waits of 10 ms or longer, so lock series appear only
 under contention) to Pyroscope inside the lgtm container. `PYROSCOPE_URL` names the server
 (default `http://localhost:4040`; `http://lgtm.ezeebit-obs:4040` on kind). `PYROSCOPE_INTERVAL` sets the
 sampling interval (default `10ms`). It stays at 10 ms: that costs at most 12 millicores per JVM on kind, inside the
@@ -134,7 +134,9 @@ A span opens its profile through Grafana's own link, and only a service's SERVER
 `io.pyroscope:otel` span processor tags that span with `pyroscope.profile.id`, and a child span such as
 `quote` or `http get` has no link. On a SERVER span, "Profiles for this span" (in the span's Links menu)
 opens the span plus 60 s each side, filtered by that profile id, as a wall-clock flame graph; the span detail
-also draws the same filtered graph inline. Proof on kind:
+also draws the same filtered graph inline, over the span plus 30 s each side (Grafana's span flame graph in
+otel-lgtm 0.39.0; the link's 60 s is read off the logged request range in
+`docs/observability/verification/2026-11-04-span-to-profile-runs.log`). Proof on kind:
 `docs/observability/verification/2026-11-04-span-profile-capture.mjs`.
 
 Read that graph with care. The services run on virtual threads, and the profiler's span tag sits on the
@@ -208,7 +210,7 @@ every rule carries a `runbook` annotation.
 | DeadLetterPublishFailing (critical) | any increase of `ezeebit_conversion_ledger_deadletter_publish_failed_total` in the last 5 min, same arm: a dead letter exists only in conversion-svc's log | at once; one alert per op |
 | KafkaAbsent (critical) | `max by (job) (last_over_time(kafka_producer_connection_count{job="conversion-svc"}[30s])) == bool 0`: conversion-svc's producer has no broker connection | after 60 s |
 | ProfilingFailing (warning) | `ezeebit_profiling_failures_total` by service and cause. A start, thrown or `link-*` failure is counted once and its series lives as long as the JVM, so `max by (job, cause) (last_over_time(...[1m])) > 0` pages for as long as that JVM runs. More than 5 `push` or `push_dropped` failures in 5 min by `increase()`: a series born with the outage needs about 60 to 70 s of failed pushes, and a 1 to 2 push blip while lgtm restarts or a lifetime count first seen by a fresh Prometheus does not page | after 1 min; one alert per service and cause |
-| ProfilesAbsent (warning) | per JVM that exported `jvm_threads_live` in the last minute, counted per service: no `ezeebit_profiling_running` series (profiling disabled or not loaded), the gauge at 0, or `time() - ezeebit_profiling_last_push_seconds` over 120 s (12 upload intervals). Range windows throughout, because a pushed series gets no staleness marker. Pyroscope's own ingest metrics carry only a tenant label, nothing scrapes them and its datasource cannot alert, hence the JVM-side gauges. Gap: a profile Pyroscope accepts and then drops is not seen (the Pyroscope delivery query covers it) | after 1 min; one alert per service, valued at its JVM count |
+| ProfilesAbsent (warning) | per JVM that exported `jvm_threads_live` in the last minute, counted per service: no `ezeebit_profiling_running` series (profiling disabled or not loaded), the gauge at 0, or `time() - ezeebit_profiling_last_push_seconds` over 120 s (12 upload intervals). Range windows throughout, because a pushed series gets no staleness marker. Pyroscope's own ingest metrics carry only a tenant label, nothing scrapes them and its datasource cannot alert, hence the JVM-side gauges. Gap: a profile Pyroscope accepts and then drops is not seen (the Pyroscope delivery query covers it). It pages once on the first rollout from an image that predates the gauges, because each old JVM exported `jvm_threads_live` with no `ezeebit_profiling_running` series, and stays in the 1 min window after it is replaced | after 1 min; one alert per service, valued at its JVM count |
 
 **KafkaAbsent's blind spot.** Spring creates the Kafka producer at the first dead letter, so until
 conversion-svc has dead-lettered once since it started there is no producer series and the rule has

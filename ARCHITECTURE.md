@@ -91,7 +91,7 @@ which is beyond the brief (section 3, "Rate limiting").
      eureka-svc :8761  (service registry)
    ledger, conversion and gateway fetch config from config-svc and register with eureka-svc on boot.
 
-   observability: lgtm :3000 Grafana, :4317/:4318 OTLP (grafana/otel-lgtm:0.39.0)
+   observability: lgtm :3000 Grafana, :4317/:4318 OTLP, :4040 Pyroscope (grafana/otel-lgtm:0.39.0)
 ```
 
 The arrows between services are HTTP except one: conversion-svc calls ledger-svc over gRPC Remote

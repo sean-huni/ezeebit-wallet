@@ -39,12 +39,12 @@ service. Tool versions are pinned in `gradle.properties` (SpotBugs Gradle plugin
 |---|---|---|
 | SpotBugs 4.10.5 with Find Security Bugs 1.14.0 (`spotbugsMain`) | compiled main classes, effort max, confidence low | any finding not in `config/spotbugs/exclude.xml` |
 | `checkSpotbugsReport` (runs on every build, even when `spotbugsMain` is up to date) | the SpotBugs Extensible Markup Language (XML) report and task settings | the report is absent or empty; it does not list Find Security Bugs with `enabled="true"`; it records an analysis error or missing class; no class was analysed; any SpotBugs task sets `visitors` or `omitVisitors`, or passes `-visitors`, `-omitVisitors` or `-chooseVisitors` |
-| Checkstyle 14.3.0 (`checkstyleMain`, `checkstyleTest`, `checkstyleAcceptanceTest`) | every Java source set, against `config/checkstyle/checkstyle.xml` (tabs, static imports first, `}` alone before `catch`/`else`; main code may not catch `Exception`, `RuntimeException`, `Error` or `Throwable`, except gateway-svc's `RateLimitFilter`, the limiter's fail-closed line; tests may not catch `Error` or `Throwable`) | any violation (`maxWarnings` and `maxErrors` are 0) |
+| Checkstyle 14.3.0 (`checkstyleMain`, `checkstyleTest`, `checkstyleAcceptanceTest`) | every Java source set, against `config/checkstyle/checkstyle.xml` (tabs, static imports first, `}` alone before `catch`/`else`; main code may not catch `Exception`, `RuntimeException`, `Error` or `Throwable`, except the six files each suppression in that file names with its reason: gateway-svc's `RateLimitFilter` (the limiter's fail-closed line), `DiscoveryNameResolver` (a gRPC name resolver must answer UNAVAILABLE, never throw), `LedgerGuard` and `KafkaDeadLetterPublisher` (a dead-letter sink must never change the failed call's outcome), and `ProfilerStarter` and `SpanProfileLink` (the profiler fails open and counts the failure); tests may not catch `Error` or `Throwable`) | any violation (`maxWarnings` and `maxErrors` are 0) |
 | JaCoCo 0.8.15 (`jacocoTestCoverageVerification`) | one report per service, merged over every test tier it runs | line or branch coverage falls below the service's floor in `coverageFloors` |
 | `checkCoverageFloors` | the same report | a floor sits more than 5 points below the measured value (`coverageBand`; raise it to the value the message prints), a floor sits above it, a measured counter has no floor, a declared floor has nothing to measure, or the report measured no lines |
 
 Floors in `coverageFloors` today (line / branch): ledger-svc 0.93 / 0.87, conversion-svc 0.92 / 0.84,
-gateway-svc 0.95 / 0.97, config-svc and eureka-svc 0.88 / 0.97.
+gateway-svc 0.95 / 0.97, config-svc and eureka-svc 0.90 / 0.97 (`coverageFloors` in the root `build.gradle` is the authority).
 
 Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/exclude.xml`. Reports land in
 `services/<svc>/build/reports/{spotbugs,checkstyle,jacoco}/`.

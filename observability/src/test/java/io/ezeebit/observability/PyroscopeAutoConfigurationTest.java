@@ -30,7 +30,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void startsTheProfilerWhenEnabled() {
-		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		RecordingLauncher launcher = new RecordingLauncher(false, true, null);
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context).hasNotFailed();
 			assertThat(launcher.launched).hasSize(1);
@@ -42,7 +42,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void doesNotStartWhenDisabled() {
-		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		RecordingLauncher launcher = new RecordingLauncher(false, true, null);
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=false").run(context -> {
 			assertThat(context).doesNotHaveBean(ProfilerStarter.class);
 			assertThat(launcher.launched).isEmpty();
@@ -51,7 +51,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void nativeLoadFailureDoesNotFailTheContext() {
-		RecordingLauncher launcher = new RecordingLauncher(false, new UnsatisfiedLinkError("no libasyncProfiler"));
+		RecordingLauncher launcher = new RecordingLauncher(false, true, new UnsatisfiedLinkError("no libasyncProfiler"));
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context.getStartupFailure()).isNull();
 			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "UnsatisfiedLinkError").count())
@@ -62,7 +62,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void runtimeFailureDoesNotFailTheContext() {
-		RecordingLauncher launcher = new RecordingLauncher(false, new IllegalStateException("collector refused"));
+		RecordingLauncher launcher = new RecordingLauncher(false, true, new IllegalStateException("collector refused"));
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context.getStartupFailure()).isNull();
 			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "IllegalStateException").count())
@@ -72,7 +72,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void closingTheContextStopsTheProfilerItStarted() {
-		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		RecordingLauncher launcher = new RecordingLauncher(false, true, null);
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true")
 				.run(context -> assertThat(launcher.stops).isZero());
 		assertThat(launcher.stops).isEqualTo(1);
@@ -80,7 +80,7 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void aProfilerAlreadyRunningIsNotStartedAgainNorStopped() {
-		RecordingLauncher launcher = new RecordingLauncher(true, null);
+		RecordingLauncher launcher = new RecordingLauncher(true, true, null);
 		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context).hasNotFailed();
 			assertThat(launcher.launched).isEmpty();
@@ -89,9 +89,22 @@ class PyroscopeAutoConfigurationTest {
 		assertThat(launcher.stops).isZero();
 	}
 
+	@Test
+	void aLaunchThatReturnsWithoutRunningIsCountedAndNotStopped() {
+		RecordingLauncher launcher = new RecordingLauncher(false, false, null);
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
+			assertThat(context.getStartupFailure()).isNull();
+			assertThat(launcher.launched).hasSize(1);
+			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "start").count()).isEqualTo(1.0);
+		});
+		assertThat(launcher.stops).isZero();
+	}
+
 	private static final class RecordingLauncher implements ProfilerLauncher {
 
 		private final boolean alreadyRunning;
+
+		private final boolean comesUp;
 
 		private final Throwable failure;
 
@@ -99,14 +112,15 @@ class PyroscopeAutoConfigurationTest {
 
 		private int stops;
 
-		RecordingLauncher(final boolean alreadyRunning, final Throwable failure) {
+		RecordingLauncher(final boolean alreadyRunning, final boolean comesUp, final Throwable failure) {
 			this.alreadyRunning = alreadyRunning;
+			this.comesUp = comesUp;
 			this.failure = failure;
 		}
 
 		@Override
 		public boolean running() {
-			return alreadyRunning;
+			return alreadyRunning || comesUp && !launched.isEmpty();
 		}
 
 		@Override

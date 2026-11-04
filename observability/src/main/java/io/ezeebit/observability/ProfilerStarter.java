@@ -6,7 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 
-// Fail-open: a start failure (missing native library, bad setting) is logged once and counted, never thrown.
+// Fail-open: a start failure is logged once and counted, never thrown. The SDK swallows some start failures and
+// returns normally, so a launch is only a start when the profiler then reports running (cause=start if not).
 // Push failures after a start are counted by PyroscopeLogBridge. Only the context that started it stops it.
 public final class ProfilerStarter implements SmartInitializingSingleton, DisposableBean {
 
@@ -35,13 +36,19 @@ public final class ProfilerStarter implements SmartInitializingSingleton, Dispos
 		}
 		try {
 			launcher.launch(properties);
-			started = true;
 		}
 		catch (RuntimeException | LinkageError failure) {
 			String cause = failure.getClass().getSimpleName();
 			LOG.warn("Profiler did not start: {}", cause);
 			registry.counter("ezeebit.profiling.failures", "cause", cause).increment();
+			return;
 		}
+		if (!launcher.running()) {
+			LOG.warn("Profiler did not start: the agent returned without running");
+			registry.counter("ezeebit.profiling.failures", "cause", "start").increment();
+			return;
+		}
+		started = true;
 	}
 
 	@Override

@@ -141,7 +141,7 @@ entry caps the verdict at Supported, L11). The post separates the root cause fro
 and from findings that are real but unconnected (L7).
 
 Expect Unknown and Supported to be common: the best model on the OpenRCA benchmark solved 11.34% of its
-335 failures (ICLR 2025, page 1). A streak of all-Confirmed verdicts is a signal to audit, not a success.
+335 failures (ICLR 2025, page 1). A streak of all-Confirmed verdicts is a signal to audit, not a success (L4).
 
 ### 7.5 Reproduction: lower environments only
 

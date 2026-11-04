@@ -38,10 +38,10 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]outbound[\\/]deadletter[\\/]KafkaDeadLetterPublisher\.java$"/>
 	</module>
-	<!-- The profiler fails open: any start failure, of any runtime type, must be counted and never stop the service. -->
+	<!-- The profiler and its span link fail open: any start or native-load failure is counted, never stops the service. -->
 	<module name="SuppressionSingleFilter">
 		<property name="id" value="illegalCatchMain"/>
-		<property name="files" value="[\\/]observability[\\/]ProfilerStarter\.java$"/>
+		<property name="files" value="[\\/]observability[\\/](ProfilerStarter|PyroscopeAutoConfiguration)\.java$"/>
 	</module>
 
 	<module name="NewlineAtEndOfFile"/>

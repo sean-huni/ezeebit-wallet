@@ -8,6 +8,7 @@ import java.util.List;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -98,6 +99,24 @@ class PyroscopeAutoConfigurationTest {
 			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "start").count()).isEqualTo(1.0);
 		});
 		assertThat(launcher.stops).isZero();
+	}
+
+	@Test
+	void registersTheSpanProfileLinkWhenEnabled() {
+		runner(new RecordingLauncher(false, true, null)).withPropertyValues("ezeebit.profiling.enabled=true")
+				.run(context -> assertThat(context).hasSingleBean(SpanProcessor.class));
+	}
+
+	@Test
+	void aLinkThatCannotLoadIsCountedAndDegradesToNoOp() {
+		SpanProcessor processor = PyroscopeAutoConfiguration.spanProcessor(() -> {
+			throw new UnsatisfiedLinkError("no libasyncProfiler");
+		}, registry);
+
+		assertThat(processor.isStartRequired()).isFalse();
+		assertThat(processor.isEndRequired()).isFalse();
+		assertThat(registry.counter("ezeebit.profiling.failures", "cause", "link-UnsatisfiedLinkError").count())
+				.isEqualTo(1.0);
 	}
 
 	private static final class RecordingLauncher implements ProfilerLauncher {

@@ -87,7 +87,8 @@ Bump sites for `otel-lgtm` (grep `otel-lgtm:0\.` before and after; want one tag 
 `compose.yaml`, `k8s/base/obs/lgtm.yaml` (2 sites), `ARCHITECTURE.md`, `docs/observability.md`,
 `docs/k8s.md`. `docker/lgtm/test-rules.sh` reads the tag from `compose.yaml`. Committed sweep logs and
 `EVIDENCE.md`'s record of a past run describe history and are not edited. Boot's single site is
-`gradle.properties`.
+`gradle.properties`. The Boot bump also dropped the tomcat, jackson and freemarker overrides (Boot 4.1.2
+manages those versions) and moved `protoc` to `4.36.2` and `protoc-gen-grpc-java` to `1.84.1`.
 
 The bumps land FIRST, as their own commit with their own green gates, so a regression from a new
 image or Boot is never confused with one from profiling. Re-check every row above on the day the plan
@@ -129,10 +130,16 @@ It is registered as a `SpanProcessor` bean so Boot's OpenTelemetry SDK auto-conf
 Tempo's datasource gains `tracesToProfiles` (`datasourceUid: pyroscope`, tag `service.name` to
 `service_name`, the chosen `profileTypeId`).
 
-Builder must verify, and record in the doc, before relying on it:
-- that Boot 4.1.2 picks up a `SpanProcessor` bean, and
-- which spans carry the link. The processor may tag only the service-local ROOT span, in which case
-  clicking a child span lands on its root span's profile. That is acceptable if documented.
+**Ruled 2026-11-04 by the spike** (`docs/observability/verification/2026-11-04-profiling-spike.md`):
+- Boot 4.1.2 adds the `SpanProcessor` bean to its SDK and keeps its own exporter; the processor writes
+  `pyroscope.profile.id` (read from the 2.1.4 jar) on each service's SERVER span only (`rootSpanOnly`).
+- **`LINK_MODE=window`.** The span filter does not work under virtual threads: the tracing context is per
+  carrier, so the filtered graph showed 97% carrier idle time, more time than the spans lasted, and no frame
+  of the slow call. Clicking a span opens that service's flame graph for the span's window, no span filter.
+- The window is padded to at least one upload interval (10 s) each side: the exact sub-second window returned
+  no samples, unfiltered included. The graph is the service's work in that padded window, and says so.
+- The processor stays registered (it costs one call per root span and keeps the attribute for a later fix);
+  its native-load failure degrades to a no-op processor counted on `ezeebit.profiling.failures`.
 
 ### 7.4 Network
 
@@ -151,6 +158,12 @@ I/O use no CPU, so a CPU profile can make a slow span look empty.
 Decided by measurement, not here: the proof (section 8) injects one CPU-bound and one blocking slow path,
 and the event that shows BOTH by name in the clicked flame graph wins. If neither shows both, ship
 wall-clock and say so.
+
+**Ruled 2026-11-04: `EVENT=wall`.** With an 800 ms WireMock delay on the rate call, neither event showed the
+wait: `RateCall.get` was 10 ms (one sample, before the park) under both, against 11 to 14 s of injected delay,
+while `io.ezeebit` frames appeared under both. Neither shows both, so wall ships. A parked virtual thread is on
+no OS thread, so no async-profiler event sees it: the trace answers "where did the time go", the profile
+answers "what was the JVM doing in that window". Evidence: the spike file named in 7.3.
 
 ### 7.6 Dashboard and alert
 

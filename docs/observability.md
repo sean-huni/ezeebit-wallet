@@ -117,7 +117,10 @@ Every service is profiled continuously by the Pyroscope Java SDK, started from t
 module: config-svc, eureka-svc, gateway-svc, ledger-svc and conversion-svc. Each sends wall-clock time,
 allocation (every 512 KB allocated) and lock contention (locks held 10 ms or longer, so lock series appear only
 under contention) to Pyroscope inside the lgtm container. `PYROSCOPE_URL` names the server
-(default `http://localhost:4040`; `http://lgtm.ezeebit-obs:4040` on kind). Profiles arrive in chunks of
+(default `http://localhost:4040`; `http://lgtm.ezeebit-obs:4040` on kind). `PYROSCOPE_INTERVAL` sets the
+sampling interval (default `10ms`). It stays at 10 ms: that costs at most 12 millicores per JVM on kind, inside the
+budget of 5% of the pod's CPU limit, and at 50 ms the quote path's frame showed in the dashboard row in only 1 of 2
+runs. Evidence: `docs/observability/verification/2026-11-04-profiling-proof.md`. Profiles arrive in chunks of
 about 10 s. Tests run with `ezeebit.profiling.enabled=false`. A failed start or push is counted on
 `ezeebit.profiling.failures` and never stops the service. Two gauges exist only while profiling is enabled:
 `ezeebit.profiling.running` (1 while the profiler runs) and `ezeebit.profiling.last.push` (epoch seconds of the

@@ -193,8 +193,10 @@ answers "what was the JVM doing in that window". Evidence: the spike file named 
 4. Click-through, Playwright: drive traffic that hits an injected slow method, open its trace in Tempo,
    click the span, follow "Profiles for this span", and assert the injected method's name in the flame
    graph. Screenshot, read the image, and assert from the datasource request, not only the pixels.
-5. Overhead: p95 latency and CPU with profiling on and off over the same traffic. My call for the budget:
-   at most +5% CPU and +5% p95. Numbers committed as evidence.
+5. Overhead: p95 latency and CPU with profiling on and off over the same traffic. Budget (Sean,
+   2026-11-04): at most +5% p95, and added CPU at most 5% of the pod CPU limit (100 millicores at limit 2).
+   The relative CPU delta is reported beside it but does not gate: on a near-idle baseline it is a ratio of
+   small numbers (idle config-svc read +57% for 2 to 3 millicores). Numbers committed as evidence.
 6. Gates: `./gradlew clean build`, `checkSupplyChain`, and the kind sweep stay green.
 7. A written statement of what is still unproven.
 

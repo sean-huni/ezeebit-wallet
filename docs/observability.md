@@ -37,13 +37,13 @@ differs from what the script writes, so a hand edit to the JavaScript Object Not
 Each dashboard carries four kinds of tag, so "Filter by tag" finds one board or one kind: `ezeebit` on all
 five (the cross-board link menu filters on it), its uid (`ezeebit-fleet`, `ezeebit-money`, `ezeebit-traces`,
 `ezeebit-logs`, `ezeebit-alerts`), its purpose (`health`, `business`, `tracing`, `logging`, `alerting`), and
-the datasources its panels query (`prometheus`, `loki`, `tempo`), which the generator reads off the panels.
+the datasources its panels query (`prometheus`, `loki`, `tempo`, `grafana-pyroscope-datasource`), which the generator reads off the panels.
 On kind, the lgtm pod copies the dashboards in at start, so a changed board needs
 `kubectl --context kind-ezeebit -n ezeebit-obs rollout restart deploy/lgtm`.
 
 | Dashboard | Shows | Variables |
 |---|---|---|
-| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; the Ledger gRPC row (below); limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; heap, garbage collection, warnings and errors | service, rate window |
+| Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; the Ledger gRPC row (below); limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; profiler failures and a wall-clock flame graph per selected service (collapsed row, one panel repeated over the Service box); heap, garbage collection, warnings and errors | service, rate window |
 | Money | deposits by currency and outcome; quotes by pair, refusals by reason and rule; rate-feed calls; conversion requests by pair and outcome; settled outcomes; ledger postings; overdue PENDING; sweeper actions; p95 of each business step | currency, pair, outcome, rate window |
 | Traces | a trace by ID (in a collapsed row: a trace panel with no ID is an error), merchant requests, traces with an error or a 5xx, slow merchant requests, business spans with their attributes, the service map, span rates | service, trace ID, min duration, rate window |
 | Logs | lines per service and level, the lines, warnings and errors | service, level, search, trace ID |
@@ -198,6 +198,7 @@ every rule carries a `runbook` annotation.
 | ConversionLedgerDeadLettered (warning) | any dead letter in the last 5 min, per `op` and `reason`, counted with the born-in-window arm (the counter is born with the first dead letter, which `increase()` cannot see) | at once (`for: 0s`); one alert per op and reason |
 | DeadLetterPublishFailing (critical) | any increase of `ezeebit_conversion_ledger_deadletter_publish_failed_total` in the last 5 min, same arm: a dead letter exists only in conversion-svc's log | at once; one alert per op |
 | KafkaAbsent (critical) | `max by (job) (last_over_time(kafka_producer_connection_count{job="conversion-svc"}[30s])) == bool 0`: conversion-svc's producer has no broker connection | after 60 s |
+| ProfilingFailing (warning) | `ezeebit_profiling_failures_total` by service and cause: any start (or thrown) failure in the last 5 min with the born-in-window arm, or more than 5 push failures in 5 min by `increase()`, so a 1 to 2 push blip while lgtm restarts and a lifetime count first seen by a fresh Prometheus do not page. The SDK-side counter because Pyroscope's ingest metrics carry only a tenant label, nothing scrapes them, and its datasource cannot alert. Blind spot: a profiler that never runs and never fails | after 1 min; one alert per service and cause |
 
 **KafkaAbsent's blind spot.** Spring creates the Kafka producer at the first dead letter, so until
 conversion-svc has dead-lettered once since it started there is no producer series and the rule has
@@ -205,17 +206,17 @@ nothing to read. An `absent_over_time()` arm would page every healthy fleet, so 
 that is down before the first dead letter pages nothing; the `kafka` row of `./fleet.sh status` is the
 check then, and the first dead letter that cannot be sent pages DeadLetterPublishFailing.
 
-No data is OK for all twelve, by design: no refusal series means no refusals, and a service that exports
+No data is OK for all thirteen, by design: no refusal series means no refusals, and a service that exports
 nothing is ServiceDown's to page, so one silent service never pages twice. An evaluation error is
 Error, never OK.
 
 **The rules are unit-tested.** `docker/lgtm/test-rules.sh` runs `promtool test rules` from the pinned
 lgtm image over `alerting/promtool/rules.yml`, the generated Prometheus-format mirror of the Grafana rules
 (same expressions, thresholds and holds; Grafana's `noDataState` is not mirrored). The cases are in
-`alerting/promtool/tests.yml` and cover 8 of the 12 rules: ServiceDown, RateFeedRefusing,
+`alerting/promtool/tests.yml` and cover 9 of the 13 rules: ServiceDown, RateFeedRefusing,
 LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken, ConversionLedgerDeadLettered,
-DeadLetterPublishFailing and KafkaAbsent (its 60 s hold is evaluated inside a broker blip and after
-it). Red-proof: rewriting LedgerInvariantBroken as `sum(increase(X[5m]))` fails
+DeadLetterPublishFailing, KafkaAbsent (its 60 s hold is evaluated inside a broker blip and after
+it) and ProfilingFailing. Red-proof: rewriting LedgerInvariantBroken as `sum(increase(X[5m]))` fails
 both of its firing cases (the third, a no-alert case, still passes), because `increase()` cannot see a counter born inside the window
 (`docs/observability/verification/2026-10-13-promtool-red.log`).
 

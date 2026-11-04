@@ -64,7 +64,7 @@
     {
       "type": "alertlist",
       "title": "Every rule, every state",
-      "description": "All 12 rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
+      "description": "All 13 rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
       "options": {
         "viewMode": "list",
         "showInstances": false,
@@ -1005,6 +1005,79 @@
         "h": 7
       },
       "id": 15
+    },
+    {
+      "type": "timeseries",
+      "title": "ProfilingFailing",
+      "description": "{{ $labels.job }}: profiling failed (cause {{ $labels.cause }}), so its profiles, or for link-* its span-to-profile links, are missing. Holds 1m before firing. Runbook: Logs for {{ $labels.job }}, search 'io.pyroscope' or 'Profiler did not start'; push means lgtm:4040 does not answer (check the lgtm pod and the 4040 NetworkPolicy edge). Empty: the expression returns no series, which this rule treats as OK.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} - ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} unless ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} offset 5m)) or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~\"push|push_dropped\"}[5m])) > 5)",
+          "legendFormat": "{{job}} {{cause}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {
+              "mode": "line"
+            },
+            "axisSoftMax": 1
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 8,
+        "h": 7
+      },
+      "id": 16
     }
   ]
 }

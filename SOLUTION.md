@@ -272,9 +272,9 @@ This is the single list; the other documents link here.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
 - RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
-  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 8 of the 12 rules (ServiceDown,
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 9 of the 13 rules (ServiceDown,
   RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken,
-  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent) and is run by hand, not by the
+  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent, ProfilingFailing) and is run by hand, not by the
   Gradle build or the CircleCI pipeline.
 - KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
   the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.

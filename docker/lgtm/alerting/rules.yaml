@@ -429,3 +429,40 @@ groups:
           runbook: 'docker compose ps kafka and docker compose logs kafka; restart with docker compose up -d --wait kafka. Blind spot: the producer starts at the first dead letter, so a broker down while conversion-svc has not dead-lettered since it started pages nothing; ./fleet.sh status (kafka row) is the check then.'
           __dashboardUid__: ezeebit-alerts
           __panelId__: '15'
+      - uid: ezeebit-profiling-failing
+        title: ProfilingFailing
+        condition: B
+        # The SDK-side counter, not a profiles-received series: Pyroscope's ingest metrics carry only a tenant label
+        # and nothing scrapes them, and its datasource cannot alert (plugin.json alerting false), checked 2026-11-04.
+        # A start (or thrown) failure is born with its one count: series-born arm. Push failures: increase() above 5
+        # in 5m (over 30s failing), so an lgtm-restart blip and a lifetime count first seen by a fresh Prometheus
+        # do not page. Blind spot: a profiler that never runs and never fails; ServiceDown covers a dead JVM.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 360, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~"push|push_dropped"} - ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~"push|push_dropped"} unless ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m))
+                or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push|push_dropped"}[5m])) > 5)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # No profiling failure since the services started returns no series: nothing to report.
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.job }}: profiling failed (cause {{ $labels.cause }}), so its profiles, or for link-* its span-to-profile links, are missing'
+          runbook: 'Logs for {{ $labels.job }}, search ''io.pyroscope'' or ''Profiler did not start''; push means lgtm:4040 does not answer (check the lgtm pod and the 4040 NetworkPolicy edge).'
+          __dashboardUid__: ezeebit-alerts
+          __panelId__: '16'

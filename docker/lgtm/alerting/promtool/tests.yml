@@ -169,3 +169,32 @@ tests:
       - eval_time: 4m
         alertname: KafkaAbsent
         exp_alerts: []
+
+  # ProfilingFailing: a profiler that did not start pages for its service and cause after the 1m hold; pushes failing
+  # for longer than about 30s (more than 5 in 5m) page; a 2-push blip (an lgtm restart) and an old flat count do not,
+  # nor does a JVM whose 9 lifetime push failures predate Prometheus's own start (eureka: born holding 9, not growing).
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="ledger-svc", instance="ledger-1:8081:1", cause="start"}'
+        values: '_x6 1x54'
+      - series: 'ezeebit_profiling_failures_total{job="conversion-svc", instance="conversion-1:8082:1", cause="push"}'
+        values: '_x18 1+1x42'
+      - series: 'ezeebit_profiling_failures_total{job="gateway-svc", instance="gateway-1:8080:1", cause="push"}'
+        values: '_x6 1x6 2x48'
+      - series: 'ezeebit_profiling_failures_total{job="config-svc", instance="config-1:8888:1", cause="push"}'
+        values: '3x60'
+      - series: 'ezeebit_profiling_failures_total{job="eureka-svc", instance="eureka-1:8761:1", cause="push"}'
+        values: '9x60'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: ProfilingFailing
+        exp_alerts: []
+      - eval_time: 5m30s
+        alertname: ProfilingFailing
+        exp_alerts:
+          - exp_labels: {alertname: ProfilingFailing, job: ledger-svc, cause: start, severity: warning}
+          - exp_labels: {alertname: ProfilingFailing, job: conversion-svc, cause: push, severity: warning}
+      - eval_time: 7m30s
+        alertname: ProfilingFailing
+        exp_alerts:
+          - exp_labels: {alertname: ProfilingFailing, job: conversion-svc, cause: push, severity: warning}

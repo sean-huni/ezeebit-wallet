@@ -117,3 +117,12 @@ groups:
         for: 60s
         labels:
           severity: critical
+      - alert: ProfilingFailing
+        expr: |-
+          (
+            sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~"push|push_dropped"} - ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~"push|push_dropped"} unless ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m))
+            or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push|push_dropped"}[5m])) > 5)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning

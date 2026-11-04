@@ -1,0 +1,109 @@
+# ProfilingFailing promtool evidence, 2026-11-04, bash docker/lgtm/test-rules.sh [rules-file]
+
+## red, case written, rule absent
+  FAILED:
+    alertname: ProfilingFailing, time: 5m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+
+
+exit=1
+
+## red, push arm on the series-born helper; eureka born holding 9 lifetime failures
+
+
+  FAILED:
+    alertname: ProfilingFailing, time: 1m30s, 
+        exp:[], 
+        got:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="eureka-svc", severity="warning"}
+              Annotations:{}
+            ]
+exit=1
+
+## green, final rule
+  SUCCESS
+
+exit=0
+
+## red-proof 1, start-arm selector renamed (ezeebit_profiling_failure_total)
+
+
+  FAILED:
+    alertname: ProfilingFailing, time: 5m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{}
+            ]
+exit=1
+
+## red-proof 2, push-arm selector renamed
+
+
+
+  FAILED:
+    alertname: ProfilingFailing, time: 5m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ]
+    alertname: ProfilingFailing, time: 7m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+exit=1
+
+## red-proof 3, push threshold 5 lowered to 0
+  FAILED:
+    alertname: ProfilingFailing, time: 5m30s, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="push", job="conversion-svc", severity="warning"}
+              Annotations:{},
+            1:
+              Labels:{alertname="ProfilingFailing", cause="push", job="gateway-svc", severity="warning"}
+              Annotations:{},
+            2:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ]
+
+
+exit=1

@@ -95,7 +95,7 @@ All four were dropped on 2026-11-04 with the bump to Boot 4.1.2, which manages T
 3.1.7 and 2.21.7, and FreeMarker 2.3.35 (spring-boot-dependencies-4.1.2.pom).
 Since 2026-10-15 conversion-svc also pins lz4-java 1.11.4 (`lz4JavaVersion` in `gradle.properties`,
 a dependency constraint in its `build.gradle`) for CVE-2026-106451. It is a transitive override of
-kafka-clients 4.2.1, not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
+kafka-clients 4.2.2 (which brings lz4 1.11.2), not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 
 One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images.
 The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers)

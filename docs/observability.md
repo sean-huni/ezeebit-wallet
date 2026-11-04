@@ -77,9 +77,9 @@ How the boards connect:
 - **Exemplars.** Latency panels (diamonds) carry one real request each; its `trace_id` opens Tempo. They
   ride on histogram buckets, which the shared config enables for the HTTP timers and every business timer
   but `ezeebit.sweep`.
-- **Datasources** (`docker/lgtm/datasources.yaml`, replacing the image's file): Loki's `trace_id` field
-  links to Tempo; Tempo links a span to its logs (filtered by trace id) and to its service's request rate,
-  p95 and 5xx ratio; the Prometheus step is 10 s, the services' export interval.
+- **Datasources** (`docker/lgtm/datasources.yml`, replacing the image's file): Loki's `trace_id` field
+  links to Tempo; Tempo links a span to its logs (filtered by trace id), to its service's request rate,
+  p95 and 5xx ratio, and (SERVER spans only) to its profile, see [Profiling](#profiling); the Prometheus step is 10 s, the services' export interval.
 - **Annotations.** Every rule is linked to its input panel on the Alerts dashboard, so each Pending,
   Alerting and Normal transition is a marker on the graph of the expression that caused it.
 
@@ -110,6 +110,30 @@ caller input). A database or transaction failure is recorded on the business spa
 spans: no JDBC instrumentation is on the classpath, and Hikari's pool metrics stand in.
 
 Every log line written inside a request carries `trace_id` and `span_id` as Loki structured metadata.
+
+## Profiling
+
+Every service is profiled continuously by the Pyroscope Java SDK, started from the shared `observability`
+module: config-svc, eureka-svc, gateway-svc, ledger-svc and conversion-svc. Each sends wall-clock time,
+allocation (every 512 KB allocated) and lock contention (locks held 10 ms or longer, so lock series appear only
+under contention) to Pyroscope inside the lgtm container. `PYROSCOPE_URL` names the server
+(default `http://localhost:4040`; `http://lgtm.ezeebit-obs:4040` on kind). Profiles arrive in chunks of
+about 10 s. Tests run with `ezeebit.profiling.enabled=false`. A failed start or push is counted on
+`ezeebit.profiling.failures` and never stops the service.
+
+A span opens its profile through Grafana's own link, and only a service's SERVER span carries one: the
+`io.pyroscope:otel` span processor tags that span with `pyroscope.profile.id`, and a child span such as
+`quote` or `http get` has no link. On a SERVER span, "Profiles for this span" (in the span's Links menu)
+opens the span plus 60 s each side, filtered by that profile id, as a wall-clock flame graph; the span detail
+also draws the same filtered graph inline. Proof on kind:
+`docs/observability/verification/2026-11-04-span-profile-capture.mjs`.
+
+Read that graph with care. The services run on virtual threads, and the profiler's span tag sits on the
+carrier thread, so the graph is mostly carrier idle time (`ForkJoinPool.awaitWork`) and a single trace may
+hold no frame of the slow call. Time a request spends parked on I/O does not appear in any profile: the
+span's duration shows that wait. The graph answers "what was the JVM doing", the trace answers "where did
+the time go". For the whole service, unfiltered, use the dashboard's profiling row with the trace's time
+range. Evidence: `docs/observability/verification/2026-11-04-profiling-spike.md`.
 
 ## Business metrics
 

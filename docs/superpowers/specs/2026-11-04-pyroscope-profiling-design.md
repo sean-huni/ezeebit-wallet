@@ -133,13 +133,21 @@ Tempo's datasource gains `tracesToProfiles` (`datasourceUid: pyroscope`, tag `se
 **Ruled 2026-11-04 by the spike** (`docs/observability/verification/2026-11-04-profiling-spike.md`):
 - Boot 4.1.2 adds the `SpanProcessor` bean to its SDK and keeps its own exporter; the processor writes
   `pyroscope.profile.id` (read from the 2.1.4 jar) on each service's SERVER span only (`rootSpanOnly`).
-- **`LINK_MODE=window`.** The span filter does not work under virtual threads: the tracing context is per
-  carrier, so the filtered graph showed 97% carrier idle time, more time than the spans lasted, and no frame
-  of the slow call. Clicking a span opens that service's flame graph for the span's window, no span filter.
-- The window is padded to at least one upload interval (10 s) each side: the exact sub-second window returned
-  no samples, unfiltered included. The graph is the service's work in that padded window, and says so.
-- The processor stays registered (it costs one call per root span and keeps the attribute for a later fix);
-  its native-load failure degrades to a no-op processor counted on `ezeebit.profiling.failures`.
+- The span filter is distorted under virtual threads: the tracing context is per carrier, so over 14 slow
+  spans the filtered graph was 97% carrier idle time, more time than the spans lasted, and held one 10 ms
+  `RateCall.get` sample of the slow call. For the single filtered trace it held no frame of the slow call.
+- The exact sub-second span window returned no samples, unfiltered included: profiles arrive in roughly
+  10 s chunks, so any window must be padded by at least that.
+- A service-window link without the span filter was ruled first and then withdrawn (Task 4, 2026-11-04):
+  Grafana 13.3.0 cannot express it. Its bundled Tempo plugin always adds `spanSelector` with the span's
+  `pyroscope.profile.id`, ignores time shifts for profiles, and drops the link on a span without the tag.
+
+**Ruled 2026-11-04 (Sean): Grafana's native per-span link.** `tracesToProfiles` with `customQuery: false`.
+Only SERVER spans carry the link; child spans have none. Grafana opens the span plus 60 s each side, filtered
+by the span's profile id. Under virtual threads that graph is dominated by carrier idle time and a single
+trace may hold no frame of the slow call; time parked on I/O does not appear (the span's duration shows it).
+The service-wide view is the dashboard's profiling row (7.6), opened with the trace's time range. A
+native-load failure of the processor degrades to a no-op processor counted on `ezeebit.profiling.failures`.
 
 ### 7.4 Network
 
@@ -161,7 +169,8 @@ wall-clock and say so.
 
 **Ruled 2026-11-04: `EVENT=wall`.** With an 800 ms WireMock delay on the rate call, neither event showed the
 wait: `RateCall.get` was 10 ms (one sample, before the park) under both, against 11 to 14 s of injected delay,
-while `io.ezeebit` frames appeared under both. Neither shows both, so wall ships. A parked virtual thread is on
+while `io.ezeebit` frames appeared under both. On the literal rule above the two events tie, since neither
+shows both; the tie was ruled to wall, the shipped default. A parked virtual thread is on
 no OS thread, so no async-profiler event sees it: the trace answers "where did the time go", the profile
 answers "what was the JVM doing in that window". Evidence: the spike file named in 7.3.
 

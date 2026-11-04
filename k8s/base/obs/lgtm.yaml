@@ -110,7 +110,7 @@ spec:
             - {name: tree, mountPath: /ezeebit, readOnly: true}
             - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/ezeebit.yaml, subPath: dashboards.yaml, readOnly: true}
             - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/alerting/ezeebit-rules.yaml, subPath: alerting/rules.yaml, readOnly: true}
-            - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml, subPath: datasources.yaml, readOnly: true}
+            - {name: tree, mountPath: /otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml, subPath: datasources.yml, readOnly: true}
             - {name: data, mountPath: /data}
             # Grafana's own DB stays ephemeral: everything in it is provisioned from files, and a persisted Pending
             # alert restored after downtime fires the instant a booting fleet is first evaluated.

@@ -425,6 +425,17 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 | monitoring end | `k8s/sweep/monitoring.sh` | the lgtm pod uid and restart count unchanged; Grafana `/api/health` 200 at the start, after every check and at the end |
 | down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `builds/` (the build logs), the lease released |
 
+**Release 0.3.2** (guava 33.7.2 and snappy-java 1.1.10.9 pinned, OpenAPI patterns fixed): one run started
+09:03:04Z on `rel-0.3.2` at `1945363` with a clean tree, ending `sweep exit=0`
+([2026-11-04-0.3.2-sweep.log](k8s/verification/2026-11-04-0.3.2-sweep.log)): 3 kills, 1581 requests,
+2 merchant failures (a convert 504 and a quote 504, 3.3 and 3.6 s after the conversion-svc kill, inside the
+20 s budget), 789 COMPLETED conversions against 789 POSTED journals, none posted twice; the outage alert fired
+5 s after the first dead letter. **The first kind run with Slack delivery asserted**: the sweep ran with
+`SLACK_WEBHOOK_URL` set (`secrets: ... slack set`), `grafana_alerting_notifications_total{integration="slack"}`
+rose 0 to 1, and `#ezeebit-alerts` received `[FIRING:1] ConversionLedgerDeadLettered Ezeebit Alerts` at
+09:09Z ([2026-11-04-0.3.2-slack-delivery.jpg](k8s/verification/2026-11-04-0.3.2-slack-delivery.jpg)). No
+RESOLVED message follows it: the sweep deletes the cluster right after the outage step.
+
 **Release 0.3.1** (Paketo builder 0.0.197, virtual threads on): one run started 15:32:02Z on
 `rel-0.3.1` at `ba589da` with a clean tree, ending `sweep exit=0`
 ([2026-10-16-0.3.1-sweep.log](k8s/verification/2026-10-16-0.3.1-sweep.log)): 3 kills, 1634 requests,

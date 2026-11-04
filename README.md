@@ -396,7 +396,7 @@ ezeebit-wallet/
 ├── discovery/              DeregisterBeforeDrain: leave Eureka before the graceful drain; compiled into gateway, ledger and conversion
 ├── fleet.sh                up | status | down | purge; its sweep test is docs/fleet/verification/
 ├── k8s/                    kube.sh (up | down | status | chaos | sweep), kind-cluster.yaml, base/ and overlays/local/ manifests, chaos/, sweep/, gates/; see docs/k8s.md
-├── scripts/                env-guard.sh: the one lease that keeps fleet.sh and kube.sh from running together, and its stubbed test
+├── scripts/                env-guard.sh: the one lease that keeps fleet.sh and kube.sh from running together, and its stubbed test; uuid.sh: a fresh Idempotency-Key, printed and copied to the clipboard
 └── services/
     ├── config-svc/         Config Server; served/*.yml is the fleet's configuration
     ├── eureka-svc/         service registry

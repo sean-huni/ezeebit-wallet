@@ -204,7 +204,7 @@ def yaml_str(text):
 
 
 def rules_yaml():
-    out = [f"# {BANNER}", "apiVersion: 1", "groups:", "  - orgId: 1", "    name: ezeebit", "    folder: Ezeebit alerts",
+    out = [f"# {BANNER}", "apiVersion: 1", "groups:", "  - orgId: 1", "    name: ezeebit", "    folder: Ezeebit Alerts",
            "    interval: 10s", "    rules:"]
     for r in RULES:
         out += [f"      - uid: {r['uid']}", f"        title: {r['title']}", "        condition: B"]
@@ -385,9 +385,21 @@ def textbox(name, label, default=""):
             "current": {"text": default, "value": default}, "options": [{"text": default, "value": default, "selected": True}]}
 
 
-def dashboard(uid, title, description, panels, variables, time_from="now-30m"):
+def datasource_types(node):
+    if isinstance(node, dict):
+        found = {node["datasource"]["type"]} if isinstance(node.get("datasource"), dict) else set()
+        return found.union(*(datasource_types(v) for v in node.values()))
+    if isinstance(node, list):
+        return set().union(*(datasource_types(v) for v in node))
+    return set()
+
+
+# Tags: the shared "ezeebit" (the cross-board link menu filters on it), the uid (unique per board), its
+# purpose, and the datasources its panels actually query, derived so they cannot drift from the panels.
+def dashboard(uid, title, description, panels, variables, *, purpose, time_from="now-30m"):
+    tags = ["ezeebit", uid, purpose] + sorted(datasource_types(panels) - {"grafana"})
     return {
-        "uid": uid, "title": title, "description": f"{description} {BANNER}", "tags": ["ezeebit"],
+        "uid": uid, "title": title, "description": f"{description} {BANNER}", "tags": tags,
         "editable": False, "graphTooltip": 1, "schemaVersion": 41, "refresh": "10s",
         "time": {"from": time_from, "to": "now"},
         "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
@@ -501,7 +513,7 @@ def fleet():
                      [prom(f'sum by (job, level) (rate(logback_events_total{{{SEL}, level=~"warn|error"}}{WINDOW})) * 60',
                            "{{job}} {{level}}")], "short", SERVICE_LINKS), 8, 8)
     return dashboard("ezeebit-fleet", "Fleet Overview", "Every service's health, RED metrics, dependencies, limiter, pool "
-                     "and JVM.", b.numbered(), [service_var(), interval_var()])
+                     "and JVM.", b.numbered(), [service_var(), interval_var()], purpose="health")
 
 
 GRPC_CALLS = 'grpc_client_milliseconds_count{job="conversion-svc", net_peer_name="ledger-svc"}'
@@ -626,7 +638,7 @@ def money():
                            '_total|ezeebit_conversion_accept_milliseconds_count"}, outcome)'),
                  interval_var()]
     return dashboard("ezeebit-money", "Money", "Deposits, quotes, conversions and ledger postings: what the business did, "
-                     "by currency, pair and outcome.", b.numbered(), variables)
+                     "by currency, pair and outcome.", b.numbered(), variables, purpose="business")
 
 
 def tempo_table(title, description, query, table_type="traces", limit=20):
@@ -675,7 +687,8 @@ def traces():
     variables = [service_var(), textbox("trace_id", "Trace ID"), textbox("min_duration", "Min duration", "100ms"),
                  interval_var()]
     return dashboard("ezeebit-traces", "Traces", "One request is one trace: gateway, conversion-svc and ledger-svc, with the "
-                     "business spans inside.", b.numbered(), variables, time_from="now-1h")
+                     "business spans inside.", b.numbered(), variables, purpose="tracing",
+                     time_from="now-1h")
 
 
 def logs():
@@ -708,7 +721,7 @@ def logs():
                   "multi": True, "includeAll": True, "allValue": ".*", "current": {"text": ["All"], "value": ["$__all"]}},
                  textbox("search", "Search"), textbox("trace_id", "Trace ID", ".*")]
     return dashboard("ezeebit-logs", "Logs", "Every service's logs, by level, text and trace.", b.numbered(), variables,
-                     time_from="now-1h")
+                     purpose="logging", time_from="now-1h")
 
 
 LEGENDS = {"ServiceDown": "{{job}}", "HighErrorRate": "{{job}}", "RateFeedRefusing": "{{pair}}",
@@ -748,7 +761,7 @@ def alerts():
     for r in RULES:
         assert panels[rule_panel_id(r) - 1]["title"] == r["title"], r["title"]
     return dashboard("ezeebit-alerts", "Alerts", "Every alert rule, what is firing, and each rule's input with its state "
-                     "history.", panels, [], time_from="now-3h")
+                     "history.", panels, [], purpose="alerting", time_from="now-3h")
 
 
 BOARDS = {"fleet-overview.json": fleet, "money.json": money, "traces.json": traces, "logs.json": logs,

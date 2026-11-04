@@ -12,7 +12,7 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 | `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
 
 ```sh
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.3.1, one per service, Paketo only
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.3.2, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
@@ -66,7 +66,19 @@ quoting an older console.
 
 ## State
 
-Latest recorded verdict: PASSED on 2026-10-15, 5 of 5 images scanned, trivy database 2026-10-15T07:10Z,
+Latest recorded verdict, release 0.3.2: PASSED on 2026-11-04 at `1945363`, 5 of 5 images scanned, trivy
+database 2026-11-04T07:16Z, nothing suppressed. The run before it, on `365e3d6`, failed on three HIGH, fixable
+SERVICE findings published after 0.3.1: CVE-2026-102554 (guava 33.6.0 via grpc-java, 33.0.0-jre via the Eureka
+server) and CVE-2026-108106 and CVE-2026-93451 (snappy-java 1.1.10.7 via kafka-clients 4.2.1). Commit `2eda9a4`
+pins guava 33.7.2-jre and snappy-java 1.1.10.9; neither run's console was committed.
+
+**0.3.2 ships with fixable HIGH findings in the SHARED layers**, in buildpack helper binaries of the builder
+pin (all 5 images): Go `stdlib` 1.26.8 and 1.27.1 (CVE-2026-111943, CVE-2026-78667, CVE-2026-78669,
+CVE-2026-97031) and `golang.org/x/net` 0.58.0 (CVE-2026-78669). They are not fixed here because no builder
+clears them under the pin rule: the newest builder tag at least two weeks old on 2026-11-04 is 0.0.197, the
+current pin (0.0.198 was pushed 2026-10-22). Moving the builder pin past 0.0.197 is the fix for the next patch.
+
+Previous verdict: PASSED on 2026-10-15, 5 of 5 images scanned, trivy database 2026-10-15T07:10Z,
 after the run before it failed on one HIGH, fixable SERVICE finding: CVE-2026-106451 in lz4-java 1.10.1,
 pulled into conversion-svc by kafka-clients 4.2.1. Commit `65f9d0c` pins lz4-java 1.11.4 and records
 both results in its message; that run's console and status file were not committed.
@@ -94,7 +106,7 @@ Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) fil
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.3.1 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.3.2 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

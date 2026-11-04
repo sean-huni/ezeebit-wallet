@@ -60,28 +60,31 @@ which is beyond the brief (section 3, "Rate limiting").
 ## 3. Runtime topology
 
 ```
-                         client (merchant dashboard)
-                                    |
-                                    v
-                        +-----------------------+
-                        |  gateway-svc :8080    |  route table, per-merchant rate limit,    +----------------+
-                        |                       |  /api/v1 -> /v1, proof header,  -------->| redis :6379    |
-                        +-----------------------+  503/504 on upstream failure             | (rate buckets) |
-                                                                                           +----------------+
-                          |                   |
-             lb://ledger-svc            lb://conversion-svc
-                          v                   v
-            +------------------+   gRPC :9081, HTTP/2   +----------------------+      HTTP, 2s timeouts, 1 retry
-            | ledger-svc :8081 |<-----------------------| conversion-svc :8082 |-----> exchange-rate service
-            +------------------+  discovery:///ledger-  +----------------------+       (assumed; WireMock :8089 locally)
-                     |            svc, round_robin            |           |
-                     |                                        |           | dead letters, record and alert only
-                     v                                        v           v
-            +---------------------------------------------------------------+   +----------------------------------+
-            |  postgres:18.6-alpine (one container)                         |   | kafka :9092 (apache/kafka:4.3.1) |
-            |  db "ledger" (role ledger)  db "conversion" (role conversion) |   | ezeebit.conversion.ledger.       |
-            +---------------------------------------------------------------+   | deadletter, 7-day retention      |
-                                                                                +----------------------------------+
+               client (merchant dashboard)
+                            |
+                            v
+                +-----------------------+  route table,                     +----------------+
+                | gateway-svc :8080     |  per-merchant rate limit, ------->| redis :6379    |
+                |                       |  /api/v1 -> /v1, proof header,    | (rate buckets) |
+                +-----------------------+  503/504 on upstream failure      +----------------+
+                  |                   |
+                  |                   +---------------------+
+                  | lb://ledger-svc                         | lb://conversion-svc
+                  |                                         |
+                  v                                         v
+    +------------------+   gRPC :9081, HTTP/2   +----------------------+  HTTP, 2s timeouts, 1 retry
+    | ledger-svc :8081 |<-----------------------| conversion-svc :8082 |---> exchange-rate service
+    +------------------+  discovery:///ledger-  +----------------------+     (assumed; WireMock
+             |            svc, round_robin          |               |        :8089 locally)
+             |                                      |               |
+             |                                      |               | dead letters,
+             |                                      |               | record and alert only
+             v                                      v               v
+    +-----------------------------------------------------+   +----------------------------------+
+    | postgres:18.6-alpine (one container)                |   | kafka :9092 (apache/kafka:4.3.1) |
+    | db "ledger"      (role ledger)                      |   | topic ezeebit.conversion.ledger. |
+    | db "conversion"  (role conversion)                  |   | deadletter, 7-day retention      |
+    +-----------------------------------------------------+   +----------------------------------+
 
    control plane, started first:
      config-svc :8888  (Spring Cloud Config, native backend, serves served/*.yml)

@@ -1679,7 +1679,7 @@
         {
           "type": "timeseries",
           "title": "Profiler failures by service and cause",
-          "description": "start: the profiler did not start; push: an upload to Pyroscope failed; push_dropped: the SDK gave up on one; link-*: the span-to-profile link is off; any other cause is the class thrown at start. Empty is the healthy state. ProfilingFailing pages on any start failure and on more than 5 push failures in 5m. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
+          "description": "start: the profiler did not start; push: an upload to Pyroscope failed; push_dropped: the SDK gave up on one; link-*: the span-to-profile link is off; any other cause is the class thrown at start. Empty is the healthy state. ProfilingFailing pages on every cause but push and push_dropped while the JVM runs, and on more than 5 of those in 5m. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1737,10 +1737,92 @@
           "gridPos": {
             "x": 0,
             "y": 53,
-            "w": 24,
+            "w": 12,
             "h": 6
           },
           "id": 29
+        },
+        {
+          "type": "timeseries",
+          "title": "Seconds since the last accepted upload",
+          "description": "Per JVM: now minus the last upload Pyroscope accepted (or the profiler's setup, before the first). Uploads run every 10s; ProfilesAbsent fires past the 120s line. A JVM missing here while it exports metrics has profiling off.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "time() - max by (job, instance) (last_over_time(ezeebit_profiling_last_push_seconds{job=~\"$service\"}[1m]))",
+              "legendFormat": "{{instance}}",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "thresholdsStyle": {
+                  "mode": "dashed"
+                }
+              },
+              "links": [
+                {
+                  "title": "Logs for ${__field.labels.job}",
+                  "url": "/d/ezeebit-logs/logs?var-service=${__field.labels.job}&${__url_time_range}"
+                },
+                {
+                  "title": "Traces for ${__field.labels.job}",
+                  "url": "/d/ezeebit-traces/traces?var-service=${__field.labels.job}&${__url_time_range}"
+                }
+              ],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 120
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 53,
+            "w": 12,
+            "h": 6
+          },
+          "id": 30
         },
         {
           "type": "flamegraph",
@@ -1772,7 +1854,7 @@
             "w": 12,
             "h": 14
           },
-          "id": 30
+          "id": 31
         }
       ],
       "id": 28
@@ -1788,7 +1870,7 @@
         "h": 1
       },
       "panels": [],
-      "id": 31
+      "id": 32
     },
     {
       "type": "timeseries",
@@ -1863,7 +1945,7 @@
         "w": 8,
         "h": 8
       },
-      "id": 32
+      "id": 33
     },
     {
       "type": "timeseries",
@@ -1928,7 +2010,7 @@
         "w": 8,
         "h": 8
       },
-      "id": 33
+      "id": 34
     },
     {
       "type": "timeseries",
@@ -1993,7 +2075,7 @@
         "w": 8,
         "h": 8
       },
-      "id": 34
+      "id": 35
     }
   ]
 }

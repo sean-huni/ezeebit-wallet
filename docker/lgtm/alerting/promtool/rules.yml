@@ -120,8 +120,21 @@ groups:
       - alert: ProfilingFailing
         expr: |-
           (
-            sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~"push|push_dropped"} - ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~"push|push_dropped"} unless ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m))
-            or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push|push_dropped"}[5m])) > 5)
+            max by (job, cause) (last_over_time(ezeebit_profiling_failures_total{cause!~"push.*"}[1m])) > 0
+            or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push.*"}[5m])) > 5)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+      - alert: ProfilesAbsent
+        expr: |-
+          (
+            count by (job) (
+              (group by (job, instance) (present_over_time(jvm_threads_live[1m]))
+                unless group by (job, instance) (present_over_time(ezeebit_profiling_running[1m])))
+              or (max by (job, instance) (last_over_time(ezeebit_profiling_running[1m])) == 0)
+              or (time() - max by (job, instance) (last_over_time(ezeebit_profiling_last_push_seconds[1m])) > 120)
+            )
           ) > 0
         for: 1m
         labels:

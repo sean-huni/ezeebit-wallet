@@ -170,31 +170,146 @@ tests:
         alertname: KafkaAbsent
         exp_alerts: []
 
-  # ProfilingFailing: a profiler that did not start pages for its service and cause after the 1m hold; pushes failing
-  # for longer than about 30s (more than 5 in 5m) page; a 2-push blip (an lgtm restart) and an old flat count do not,
-  # nor does a JVM whose 9 lifetime push failures predate Prometheus's own start (eureka: born holding 9, not growing).
+
+  # ProfilingFailing, start: a profiler that did not start pages for as long as its JVM runs, not for a 5m window.
+  # Pending at 1m30s (born at 1m, 1m hold), still firing at 10m.
   - interval: 10s
     input_series:
       - series: 'ezeebit_profiling_failures_total{job="ledger-svc", instance="ledger-1:8081:1", cause="start"}'
-        values: '_x6 1x54'
-      - series: 'ezeebit_profiling_failures_total{job="conversion-svc", instance="conversion-1:8082:1", cause="push"}'
-        values: '_x18 1+1x42'
-      - series: 'ezeebit_profiling_failures_total{job="gateway-svc", instance="gateway-1:8080:1", cause="push"}'
-        values: '_x6 1x6 2x48'
-      - series: 'ezeebit_profiling_failures_total{job="config-svc", instance="config-1:8888:1", cause="push"}'
-        values: '3x60'
-      - series: 'ezeebit_profiling_failures_total{job="eureka-svc", instance="eureka-1:8761:1", cause="push"}'
-        values: '9x60'
+        values: '_x6 1x66'
     alert_rule_test:
       - eval_time: 1m30s
+        alertname: ProfilingFailing
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: ProfilingFailing
+        exp_alerts:
+          - exp_labels: {alertname: ProfilingFailing, job: ledger-svc, cause: start, severity: warning}
+
+  # ProfilingFailing, a thrown class at start and a span-link failure page per job and cause; held 1m first.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="ledger-svc", instance="ledger-1:8081:1", cause="UnsatisfiedLinkError"}'
+        values: '1x40'
+      - series: 'ezeebit_profiling_failures_total{job="gateway-svc", instance="gateway-1:8080:1", cause="link-NoClassDefFoundError"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ProfilingFailing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ProfilingFailing
+        exp_alerts:
+          - exp_labels: {alertname: ProfilingFailing, job: ledger-svc, cause: UnsatisfiedLinkError, severity: warning}
+          - exp_labels: {alertname: ProfilingFailing, job: gateway-svc, cause: link-NoClassDefFoundError, severity: warning}
+
+  # ProfilingFailing, push: one failed push every 10s, the series born with the outage at 3m. Not yet at 3m30s.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="conversion-svc", instance="conversion-1:8082:1", cause="push"}'
+        values: '_x18 1+1x42'
+    alert_rule_test:
+      - eval_time: 3m30s
         alertname: ProfilingFailing
         exp_alerts: []
       - eval_time: 5m30s
         alertname: ProfilingFailing
         exp_alerts:
-          - exp_labels: {alertname: ProfilingFailing, job: ledger-svc, cause: start, severity: warning}
           - exp_labels: {alertname: ProfilingFailing, job: conversion-svc, cause: push, severity: warning}
-      - eval_time: 7m30s
+
+  # ProfilingFailing, push_dropped: a snapshot given up every 10s pages like push.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="ledger-svc", instance="ledger-1:8081:1", cause="push_dropped"}'
+        values: '0+1x60'
+    alert_rule_test:
+      - eval_time: 3m
         alertname: ProfilingFailing
         exp_alerts:
-          - exp_labels: {alertname: ProfilingFailing, job: conversion-svc, cause: push, severity: warning}
+          - exp_labels: {alertname: ProfilingFailing, job: ledger-svc, cause: push_dropped, severity: warning}
+
+  # ProfilingFailing, push below the threshold: a 2-push blip (an lgtm restart) does not page. 4m: a threshold
+  # of 0 would be firing by then (growth seen from 2m, 1m hold).
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="gateway-svc", instance="gateway-1:8080:1", cause="push"}'
+        values: '_x6 1x6 2x48'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ProfilingFailing
+        exp_alerts: []
+
+  # ProfilingFailing, push with no growth: 9 lifetime failures first seen by a fresh Prometheus do not page.
+  - interval: 10s
+    input_series:
+      - series: 'ezeebit_profiling_failures_total{job="eureka-svc", instance="eureka-1:8761:1", cause="push"}'
+        values: '9x60'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ProfilingFailing
+        exp_alerts: []
+
+  # ProfilesAbsent, profiling disabled: a JVM exports metrics but no profiling gauge. Held 1m first.
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="gateway-svc", instance="gateway-1:8080:1"}'
+        values: '30x60'
+    alert_rule_test:
+      - eval_time: 50s
+        alertname: ProfilesAbsent
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ProfilesAbsent
+        exp_alerts:
+          - exp_labels: {alertname: ProfilesAbsent, job: gateway-svc, severity: warning}
+
+  # ProfilesAbsent, the profiler is not running: the gauge reads 0 while uploads are recent.
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="conversion-svc", instance="conversion-1:8082:1"}'
+        values: '30x60'
+      - series: 'ezeebit_profiling_running{job="conversion-svc", instance="conversion-1:8082:1"}'
+        values: '0x60'
+      - series: 'ezeebit_profiling_last_push_seconds{job="conversion-svc", instance="conversion-1:8082:1"}'
+        values: '0+10x60'
+    alert_rule_test:
+      - eval_time: 50s
+        alertname: ProfilesAbsent
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ProfilesAbsent
+        exp_alerts:
+          - exp_labels: {alertname: ProfilesAbsent, job: conversion-svc, severity: warning}
+
+  # ProfilesAbsent, uploads stalled: running, but the last accepted upload is stuck at 60s, so it is over 120s old
+  # after 3m; pending at 3m30s, firing at 5m.
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="eureka-svc", instance="eureka-1:8761:1"}'
+        values: '30x60'
+      - series: 'ezeebit_profiling_running{job="eureka-svc", instance="eureka-1:8761:1"}'
+        values: '1x60'
+      - series: 'ezeebit_profiling_last_push_seconds{job="eureka-svc", instance="eureka-1:8761:1"}'
+        values: '0+10x6 60x54'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: ProfilesAbsent
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: ProfilesAbsent
+        exp_alerts:
+          - exp_labels: {alertname: ProfilesAbsent, job: eureka-svc, severity: warning}
+
+  # ProfilesAbsent, healthy: running, uploads accepted every 10s; nothing fires.
+  - interval: 10s
+    input_series:
+      - series: 'jvm_threads_live{job="config-svc", instance="config-1:8888:1"}'
+        values: '30x60'
+      - series: 'ezeebit_profiling_running{job="config-svc", instance="config-1:8888:1"}'
+        values: '1x60'
+      - series: 'ezeebit_profiling_last_push_seconds{job="config-svc", instance="config-1:8888:1"}'
+        values: '0+10x60'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ProfilesAbsent
+        exp_alerts: []

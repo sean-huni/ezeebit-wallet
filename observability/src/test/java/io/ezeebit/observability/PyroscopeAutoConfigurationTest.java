@@ -104,6 +104,18 @@ class PyroscopeAutoConfigurationTest {
 	}
 
 	@Test
+	void registersTheProfilingGaugesWhenEnabled() {
+		runner(new RecordingLauncher(false, true, null)).withPropertyValues("ezeebit.profiling.enabled=true")
+				.run(context -> assertThat(context).hasSingleBean(ProfilingGauges.class));
+	}
+
+	@Test
+	void registersNoProfilingGaugesWhenDisabled() {
+		runner(new RecordingLauncher(false, true, null)).withPropertyValues("ezeebit.profiling.enabled=false")
+				.run(context -> assertThat(context).doesNotHaveBean(ProfilingGauges.class));
+	}
+
+	@Test
 	void registersTheSpanProfileLinkWhenEnabled() {
 		runner(new RecordingLauncher(false, true, null)).withPropertyValues("ezeebit.profiling.enabled=true")
 				.run(context -> assertThat(context.getBean(SpanProcessor.class))

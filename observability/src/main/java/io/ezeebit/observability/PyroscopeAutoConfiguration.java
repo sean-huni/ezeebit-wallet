@@ -1,5 +1,7 @@
 package io.ezeebit.observability;
 
+import java.time.Clock;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.sdk.trace.SpanProcessor;
 import io.otel.pyroscope.PyroscopeOtelSpanProcessor;
@@ -15,9 +17,20 @@ import org.springframework.context.annotation.Bean;
 public class PyroscopeAutoConfiguration {
 
 	@Bean
+	PushRecorder profilingPushRecorder() {
+		return new PushRecorder(Clock.systemUTC());
+	}
+
+	@Bean
 	@ConditionalOnMissingBean
-	ProfilerLauncher profilerLauncher(final MeterRegistry registry) {
-		return new PyroscopeLauncher(registry);
+	ProfilerLauncher profilerLauncher(final MeterRegistry registry, final PushRecorder recorder) {
+		return new PyroscopeLauncher(registry, recorder);
+	}
+
+	// Boot binds every MeterBinder bean to its registries.
+	@Bean
+	ProfilingGauges profilingGauges(final ProfilerLauncher launcher, final PushRecorder recorder) {
+		return new ProfilingGauges(launcher, recorder);
 	}
 
 	@Bean

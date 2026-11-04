@@ -64,7 +64,7 @@
     {
       "type": "alertlist",
       "title": "Every rule, every state",
-      "description": "All 13 rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
+      "description": "All 14 rules including Normal, so a rule that failed to load is visible by its absence. Rules: docker/lgtm/alerting/rules.yaml.",
       "options": {
         "viewMode": "list",
         "showInstances": false,
@@ -1021,8 +1021,81 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} - ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} unless ezeebit_profiling_failures_total{cause!~\"push|push_dropped\"} offset 5m)) or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~\"push|push_dropped\"}[5m])) > 5)",
+          "expr": "max by (job, cause) (last_over_time(ezeebit_profiling_failures_total{cause!~\"push.*\"}[1m])) > 0 or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~\"push.*\"}[5m])) > 5)",
           "legendFormat": "{{job}} {{cause}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false,
+            "gradientMode": "opacity",
+            "thresholdsStyle": {
+              "mode": "line"
+            },
+            "axisSoftMax": 1
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 8,
+        "h": 7
+      },
+      "id": 16
+    },
+    {
+      "type": "timeseries",
+      "title": "ProfilesAbsent",
+      "description": "{{ $labels.job }}: {{ $values.A.Value }} JVMs send no profiles (profiling off, the profiler not running, or no accepted upload for 120s). Holds 1m before firing. Runbook: Fleet Overview, Profiling row: upload age and failures for {{ $labels.job }}; check EZEEBIT_PROFILING_ENABLED on the deployment and the service's log for 'io.pyroscope' or 'Profiler did not start'. Empty: the expression returns no series, which this rule treats as OK.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count by (job) (   (group by (job, instance) (present_over_time(jvm_threads_live[1m]))     unless group by (job, instance) (present_over_time(ezeebit_profiling_running[1m])))   or (max by (job, instance) (last_over_time(ezeebit_profiling_running[1m])) == 0)   or (time() - max by (job, instance) (last_over_time(ezeebit_profiling_last_push_seconds[1m])) > 120) )",
+          "legendFormat": "{{job}} JVMs",
           "range": true
         }
       ],
@@ -1072,12 +1145,12 @@
         }
       },
       "gridPos": {
-        "x": 0,
+        "x": 8,
         "y": 41,
         "w": 8,
         "h": 7
       },
-      "id": 16
+      "id": 17
     }
   ]
 }

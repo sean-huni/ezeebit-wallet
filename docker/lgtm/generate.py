@@ -49,9 +49,12 @@ INVARIANT = 'outcome="refused", code=~"CURRENCY_MISMATCH|UNBALANCED_POSTING"'
 DEAD_LETTERS = 'ezeebit_conversion_ledger_deadletter_total{job="conversion-svc"}'
 DEAD_LETTERS_LOST = 'ezeebit_conversion_ledger_deadletter_publish_failed_total{job="conversion-svc"}'
 PROFILING_FAILURES = "ezeebit_profiling_failures_total"
-PROFILING_START = PROFILING_FAILURES + '{cause!~"push|push_dropped"}'
-PROFILING_PUSH = PROFILING_FAILURES + '{cause=~"push|push_dropped"}'
-PRODUCER_CONNECTIONS ='kafka_producer_connection_count{job="conversion-svc"}'
+PROFILING_START = PROFILING_FAILURES + '{cause!~"push.*"}'
+PROFILING_PUSH = PROFILING_FAILURES + '{cause=~"push.*"}'
+PROFILING_RUNNING = "ezeebit_profiling_running"
+PROFILING_LAST_PUSH = "ezeebit_profiling_last_push_seconds"
+PUSH_STALE_SECONDS = 120
+PRODUCER_CONNECTIONS = 'kafka_producer_connection_count{job="conversion-svc"}'
 KAFKA_WHY = ["Spring creates the producer at the first dead letter, so before one there is no series: absent_over_time()",
              "would page every healthy fleet that never dead-lettered, and a first send that cannot reach Kafka is",
              "DeadLetterPublishFailing's. Measured: 0 within 10s of the broker stopping; idle for 17m it held 1 connection",
@@ -203,18 +206,39 @@ RULES = [
     },
     {
         "uid": "ezeebit-profiling-failing", "title": "ProfilingFailing", "severity": "warning", "for": "1m", "from": 360,
-        "why": ["The SDK-side counter, not a profiles-received series: Pyroscope's ingest metrics carry only a tenant label",
-                "and nothing scrapes them, and its datasource cannot alert (plugin.json alerting false), checked 2026-11-04.",
-                "A start (or thrown) failure is born with its one count: series-born arm. Push failures: increase() above 5",
-                "in 5m (over 30s failing), so an lgtm-restart blip and a lifetime count first seen by a fresh Prometheus",
-                "do not page. Blind spot: a profiler that never runs and never fails; ServiceDown covers a dead JVM."],
-        "expr": (f"sum by (job, cause) {increase_new(PROFILING_START, '5m')}\n"
+        "why": ["A start, thrown or link-* failure is counted once and its counter lives as long as the JVM, so it pages",
+                "for as long as that JVM runs (last_over_time, 1m: a replaced pod's series drops out). Push failures page",
+                "above 5 in 5m by increase(): a series born with the outage needs about 60 to 70s of failed pushes, and an",
+                "lgtm-restart blip or a lifetime count first seen by a fresh Prometheus does not page. A profiler that",
+                "stops pushing without failing is ProfilesAbsent's."],
+        "expr": (f"max by (job, cause) (last_over_time({PROFILING_START}[1m])) > 0\n"
                  f"or (sum by (job, cause) (increase({PROFILING_PUSH}[5m])) > 5)"),
+        "spanNulls": False,
         "threshold": 0, "noData": "No profiling failure since the services started returns no series: nothing to report.",
         "summary": "{{ $labels.job }}: profiling failed (cause {{ $labels.cause }}), so its profiles, or for link-* its "
                    "span-to-profile links, are missing",
         "runbook": "Logs for {{ $labels.job }}, search 'io.pyroscope' or 'Profiler did not start'; push means lgtm:4040 does "
                    "not answer (check the lgtm pod and the 4040 NetworkPolicy edge).",
+    },
+    {
+        "uid": "ezeebit-profiles-absent", "title": "ProfilesAbsent", "severity": "warning", "for": "1m", "from": 120,
+        "why": ["Per JVM exporting metrics in the last minute, counted per service: no profiling gauge (profiling disabled",
+                "or not loaded), the profiler not running, or no upload Pyroscope accepted for 120s (12 upload intervals;",
+                "PushRecorder infers acceptance, agent 2.9.2 logs no success). Range windows: pushed series get no",
+                "staleness marker. Gap: a profile Pyroscope accepts and then drops is not seen here (Task 7's delivery",
+                "query covers it). A dead JVM is ServiceDown's."],
+        "expr": ("count by (job) (\n"
+                 f"  (group by (job, instance) (present_over_time(jvm_threads_live[1m]))\n"
+                 f"    unless group by (job, instance) (present_over_time({PROFILING_RUNNING}[1m])))\n"
+                 f"  or (max by (job, instance) (last_over_time({PROFILING_RUNNING}[1m])) == 0)\n"
+                 f"  or (time() - max by (job, instance) (last_over_time({PROFILING_LAST_PUSH}[1m])) > {PUSH_STALE_SECONDS})\n"
+                 ")"),
+        "threshold": 0,
+        "noData": "Every JVM profiling and uploading returns no series: that is the healthy state.",
+        "summary": "{{ $labels.job }}: {{ $values.A.Value }} JVMs send no profiles (profiling off, the profiler not running, "
+                   "or no accepted upload for 120s)",
+        "runbook": "Fleet Overview, Profiling row: upload age and failures for {{ $labels.job }}; check EZEEBIT_PROFILING_ENABLED "
+                   "on the deployment and the service's log for 'io.pyroscope' or 'Profiler did not start'.",
     },
 ]
 
@@ -549,13 +573,18 @@ def profiling_panels():
                           "labelSelector": '{service_name=~"$service"}', "groupBy": []}]}
     failures = timeseries("Profiler failures by service and cause", "start: the profiler did not start; push: an upload to "
                     "Pyroscope failed; push_dropped: the SDK gave up on one; link-*: the span-to-profile link is off; any "
-                    "other cause is the class thrown at start. Empty is the healthy state. ProfilingFailing pages on any "
-                    "start failure and on more than 5 push failures in 5m." + COUNTED,
+                    "other cause is the class thrown at start. Empty is the healthy state. ProfilingFailing pages on every "
+                    "cause but push and push_dropped while the JVM runs, and on more than 5 of those in 5m." + COUNTED,
                     [prom(counted("job, cause", f"{PROFILING_FAILURES}{{{SEL}}}"), "{{job}} {{cause}}")], "short",
                     SERVICE_LINKS, min_max=(0, None))
     # A replaced pod's series and its successor's share one (job, cause); joined across the gap they draw a false ramp.
     failures["fieldConfig"]["defaults"]["custom"]["spanNulls"] = False
-    return [(failures, 24, 6), (flame, 12, 14)]
+    age = timeseries("Seconds since the last accepted upload", "Per JVM: now minus the last upload Pyroscope accepted "
+                     "(or the profiler's setup, before the first). Uploads run every 10s; ProfilesAbsent fires past the "
+                     f"{PUSH_STALE_SECONDS}s line. A JVM missing here while it exports metrics has profiling off.",
+                     [prom(f"time() - max by (job, instance) (last_over_time({PROFILING_LAST_PUSH}{{{SEL}}}[1m]))",
+                           "{{instance}}")], "s", SERVICE_LINKS, thresholds=PUSH_STALE_SECONDS, min_max=(0, None))
+    return [(failures, 12, 6), (age, 12, 6), (flame, 12, 14)]
 
 
 GRPC_CALLS = 'grpc_client_milliseconds_count{job="conversion-svc", net_peer_name="ledger-svc"}'
@@ -771,7 +800,7 @@ LEGENDS = {"ServiceDown": "{{job}}", "HighErrorRate": "{{job}}", "RateFeedRefusi
            "RateLimiterStoreDown": "store down", "LatencySLOBurn": "{{job}} burn", "DbPoolSaturated": "{{job}} {{instance}}",
            "LedgerInvariantBroken": "{{job}} {{code}}", "ConversionLedgerDeadLettered": "{{op}} {{reason}}",
            "DeadLetterPublishFailing": "{{op}} not published", "KafkaAbsent": "{{job}} producer",
-           "ProfilingFailing": "{{job}} {{cause}}"}
+           "ProfilingFailing": "{{job}} {{cause}}", "ProfilesAbsent": "{{job}} JVMs"}
 
 
 def rule_panel_id(rule):
@@ -799,6 +828,7 @@ def alerts():
                            [prom(r["expr"].replace("\n", " "), LEGENDS[r["title"]])], "short",
                            thresholds=r["threshold"], style="line", min_max=(0, None))
         panel["fieldConfig"]["defaults"]["custom"]["axisSoftMax"] = max(1, r["threshold"] * 2)
+        panel["fieldConfig"]["defaults"]["custom"]["spanNulls"] = r.get("spanNulls", True)
         b.add(panel, 8, 7)
     panels = b.numbered()
     for r in RULES:

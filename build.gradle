@@ -52,6 +52,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 		implementation "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:${otelLogbackAppenderVersion}"
 		implementation "io.pyroscope:agent:${pyroscopeAgentVersion}"
 		implementation "io.pyroscope:otel:${pyroscopeOtelVersion}"
+		compileOnly "org.jetbrains:annotations:${jetbrainsAnnotationsVersion}"
 		testImplementation 'org.springframework.boot:spring-boot-starter-test'
 		// TestObservationRegistry: business spans are asserted on the observation, without an exporter.
 		testImplementation 'io.micrometer:micrometer-observation-test'

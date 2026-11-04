@@ -27,7 +27,9 @@ class PyroscopeLogBridgeTest {
 
 	private final MutableClock clock = new MutableClock(Instant.parse("2026-11-04T10:00:00Z"));
 
-	private final PyroscopeLogBridge bridge = new PyroscopeLogBridge(registry, clock);
+	private final PushRecorder recorder = new PushRecorder(clock);
+
+	private final PyroscopeLogBridge bridge = new PyroscopeLogBridge(registry, clock, recorder);
 
 	private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
@@ -81,6 +83,28 @@ class PyroscopeLogBridgeTest {
 		assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
 				.containsExactly("Error uploading snapshot: refused", "Gave up uploading profiling snapshot after 8 tries");
 		assertThat(registry.counter("ezeebit.profiling.failures", "cause", "push_dropped").count()).isEqualTo(1.0);
+	}
+
+	@Test
+	void anUploadAttemptWithNoErrorAfterItRecordsAPush() {
+		recorder.begin();
+		clock.advance(Duration.ofSeconds(10));
+		bridge.log(Level.DEBUG, "Upload attempt %d to %s. Profile: %s bytes", 1, "http://pyroscope:4040", 2048);
+		recorder.end();
+
+		assertThat(recorder.lastPushEpochSeconds()).isEqualTo(clock.instant().getEpochSecond());
+	}
+
+	@Test
+	void anUploadErrorAfterTheAttemptRecordsNoPush() {
+		double before = recorder.lastPushEpochSeconds();
+		recorder.begin();
+		clock.advance(Duration.ofSeconds(10));
+		bridge.log(Level.DEBUG, "Upload attempt %d to %s. Profile: %s bytes", 1, "http://pyroscope:4040", 2048);
+		bridge.log(Level.ERROR, UPLOAD, "refused");
+		recorder.end();
+
+		assertThat(recorder.lastPushEpochSeconds()).isEqualTo(before);
 	}
 
 	@Test

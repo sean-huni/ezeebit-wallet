@@ -432,11 +432,11 @@ groups:
       - uid: ezeebit-profiling-failing
         title: ProfilingFailing
         condition: B
-        # The SDK-side counter, not a profiles-received series: Pyroscope's ingest metrics carry only a tenant label
-        # and nothing scrapes them, and its datasource cannot alert (plugin.json alerting false), checked 2026-11-04.
-        # A start (or thrown) failure is born with its one count: series-born arm. Push failures: increase() above 5
-        # in 5m (over 30s failing), so an lgtm-restart blip and a lifetime count first seen by a fresh Prometheus
-        # do not page. Blind spot: a profiler that never runs and never fails; ServiceDown covers a dead JVM.
+        # A start, thrown or link-* failure is counted once and its counter lives as long as the JVM, so it pages
+        # for as long as that JVM runs (last_over_time, 1m: a replaced pod's series drops out). Push failures page
+        # above 5 in 5m by increase(): a series born with the outage needs about 60 to 70s of failed pushes, and an
+        # lgtm-restart blip or a lifetime count first seen by a fresh Prometheus does not page. A profiler that
+        # stops pushing without failing is ProfilesAbsent's.
         data:
           - refId: A
             datasourceUid: prometheus
@@ -445,8 +445,8 @@ groups:
               refId: A
               instant: true
               expr: >-
-                sum by (job, cause) (clamp_min(ezeebit_profiling_failures_total{cause!~"push|push_dropped"} - ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m, 0) or (ezeebit_profiling_failures_total{cause!~"push|push_dropped"} unless ezeebit_profiling_failures_total{cause!~"push|push_dropped"} offset 5m))
-                or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push|push_dropped"}[5m])) > 5)
+                max by (job, cause) (last_over_time(ezeebit_profiling_failures_total{cause!~"push.*"}[1m])) > 0
+                or (sum by (job, cause) (increase(ezeebit_profiling_failures_total{cause=~"push.*"}[5m])) > 5)
           - refId: B
             datasourceUid: __expr__
             model:
@@ -466,3 +466,44 @@ groups:
           runbook: 'Logs for {{ $labels.job }}, search ''io.pyroscope'' or ''Profiler did not start''; push means lgtm:4040 does not answer (check the lgtm pod and the 4040 NetworkPolicy edge).'
           __dashboardUid__: ezeebit-alerts
           __panelId__: '16'
+      - uid: ezeebit-profiles-absent
+        title: ProfilesAbsent
+        condition: B
+        # Per JVM exporting metrics in the last minute, counted per service: no profiling gauge (profiling disabled
+        # or not loaded), the profiler not running, or no upload Pyroscope accepted for 120s (12 upload intervals;
+        # PushRecorder infers acceptance, agent 2.9.2 logs no success). Range windows: pushed series get no
+        # staleness marker. Gap: a profile Pyroscope accepts and then drops is not seen here (Task 7's delivery
+        # query covers it). A dead JVM is ServiceDown's.
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange: {from: 120, to: 0}
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                count by (job) (
+                  (group by (job, instance) (present_over_time(jvm_threads_live[1m]))
+                    unless group by (job, instance) (present_over_time(ezeebit_profiling_running[1m])))
+                  or (max by (job, instance) (last_over_time(ezeebit_profiling_running[1m])) == 0)
+                  or (time() - max by (job, instance) (last_over_time(ezeebit_profiling_last_push_seconds[1m])) > 120)
+                )
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        # Every JVM profiling and uploading returns no series: that is the healthy state.
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.job }}: {{ $values.A.Value }} JVMs send no profiles (profiling off, the profiler not running, or no accepted upload for 120s)'
+          runbook: 'Fleet Overview, Profiling row: upload age and failures for {{ $labels.job }}; check EZEEBIT_PROFILING_ENABLED on the deployment and the service''s log for ''io.pyroscope'' or ''Profiler did not start''.'
+          __dashboardUid__: ezeebit-alerts
+          __panelId__: '17'

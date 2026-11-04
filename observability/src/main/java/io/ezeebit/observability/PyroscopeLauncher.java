@@ -8,13 +8,18 @@ import io.pyroscope.http.Format;
 import io.pyroscope.javaagent.EventType;
 import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
+import io.pyroscope.javaagent.impl.PyroscopeExporter;
+import io.pyroscope.javaagent.impl.QueuedExporter;
 
 public final class PyroscopeLauncher implements ProfilerLauncher {
 
 	private final MeterRegistry registry;
 
-	public PyroscopeLauncher(final MeterRegistry registry) {
+	private final PushRecorder recorder;
+
+	PyroscopeLauncher(final MeterRegistry registry, final PushRecorder recorder) {
 		this.registry = registry;
+		this.recorder = recorder;
 	}
 
 	@Override
@@ -23,9 +28,14 @@ public final class PyroscopeLauncher implements ProfilerLauncher {
 	}
 
 	@Override
+	// The agent's own default exporter chain, with RecordingExporter around the uploader (Options.Builder.build).
 	public void launch(final ProfilingProperties properties) {
-		PyroscopeAgent.start(new PyroscopeAgent.Options.Builder(config(properties))
-				.setLogger(new PyroscopeLogBridge(registry, Clock.systemUTC()))
+		Config config = config(properties);
+		PyroscopeLogBridge bridge = new PyroscopeLogBridge(registry, Clock.systemUTC(), recorder);
+		RecordingExporter uploader = new RecordingExporter(new PyroscopeExporter(config, bridge), recorder);
+		PyroscopeAgent.start(new PyroscopeAgent.Options.Builder(config)
+				.setLogger(bridge)
+				.setExporter(new QueuedExporter(config, uploader, bridge))
 				.build());
 	}
 

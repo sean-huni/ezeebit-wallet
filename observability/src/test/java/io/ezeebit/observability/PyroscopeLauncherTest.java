@@ -3,6 +3,7 @@ package io.ezeebit.observability;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
 
@@ -31,7 +32,8 @@ class PyroscopeLauncherTest {
 
 	@Test
 	void reportsNotRunningAndStopsSafelyBeforeAnyStart() {
-		PyroscopeLauncher launcher = new PyroscopeLauncher(new SimpleMeterRegistry());
+		PyroscopeLauncher launcher = new PyroscopeLauncher(new SimpleMeterRegistry(),
+				new PushRecorder(Clock.systemUTC()));
 
 		assertThat(launcher.running()).isFalse();
 		launcher.stop();

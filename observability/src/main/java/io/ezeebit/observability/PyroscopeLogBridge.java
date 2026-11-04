@@ -26,9 +26,12 @@ final class PyroscopeLogBridge implements Logger {
 
 	private final Clock clock;
 
-	PyroscopeLogBridge(final MeterRegistry registry, final Clock clock) {
+	private final PushRecorder recorder;
+
+	PyroscopeLogBridge(final MeterRegistry registry, final Clock clock, final PushRecorder recorder) {
 		this.registry = registry;
 		this.clock = clock;
+		this.recorder = recorder;
 	}
 
 	@Override
@@ -50,7 +53,11 @@ final class PyroscopeLogBridge implements Logger {
 	}
 
 	private void count(final String format) {
-		if (format.startsWith("Error uploading snapshot")) {
+		if (format.startsWith("Upload attempt")) {
+			recorder.attempt();
+		}
+		else if (format.startsWith("Error uploading snapshot")) {
+			recorder.failed();
 			registry.counter("ezeebit.profiling.failures", "cause", "push").increment();
 		}
 		else if (format.startsWith("Gave up uploading")) {

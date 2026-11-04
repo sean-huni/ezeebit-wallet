@@ -28,7 +28,7 @@ built and gated with, read with `kind version`, `kubectl version --client`,
 | kind | v0.32.0 | `kube.sh`: create, load images, delete |
 | kubectl | v1.36.1 (Kustomize v5.8.1 built in) | every cluster call, always with `--context kind-ezeebit` |
 | Docker Engine | 29.8.2, linux/arm64 | the kind node, image builds (`./gradlew bootBuildImageAll`), `docker save` of third-party images |
-| bash | 3.2.57 (`/bin/bash` on macOS) | `kube.sh`, the sweep and the guard are written for it (`k8s/kube.sh:4`) |
+| bash | 3.2.57 (`/bin/bash` on macOS) | `kube.sh`, the sweep and the guard are written for it (`k8s/kube.sh:5`) |
 | curl, jq, perl, uuidgen, awk | curl 8.7.1, jq 1.7.1, perl 5.34.1 | the sweep checks (`k8s/sweep/lib.sh`) |
 
 The node image is `kindest/node:v1.36.1`, pinned by digest in `k8s/kind-cluster.yaml:11`. The
@@ -51,7 +51,7 @@ the host at all.
 `up` takes `--no-build` (load the `ezeebit/<svc>:<version>` images already in Docker) and
 `--only data,obs,app,chaos` (a subset of the stages: the selected ones are applied together, then
 waited on in that order). Step by step
-(`k8s/kube.sh:196-244`):
+(`k8s/kube.sh:197-245`):
 
 1. The `app-image-version` gate: every `ezeebit/<svc>` manifest tag must equal `build.gradle`'s version, or
    `up` refuses before touching anything. Then `scripts/env-guard.sh acquire k8s`; a refusal ends `up`
@@ -63,7 +63,7 @@ waited on in that order). Step by step
    and `./gradlew bootBuildImageAll`.
 4. Every third-party image the manifests name is loaded from the host's Docker into the node
    (pulled to the host once when absent), and `crictl inspecti` on the node must resolve each one, so
-   the kubelet never needs a registry (`k8s/kube.sh:58-103`).
+   the kubelet never needs a registry (`k8s/kube.sh:59-104`).
 5. The namespaces and their deny-all policies, then the Secrets and ConfigMaps, then
    `kubectl apply -k k8s/overlays/local` for the selected stages.
 6. `kubectl rollout status` (or `wait --for=condition=complete` for a Job) on every workload of
@@ -111,9 +111,9 @@ directions.
 | Images | third-party images by the `compose.yaml` refs | the same refs, copied from the host into the node; builds and loads `ezeebit/<svc>:<version>` |
 
 `scripts/env-guard.sh` is the one file that knows both fleets. `fleet.sh up` calls
-`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:215`);
+`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:216`);
 `fleet.sh down|purge` release the lease only when the stop succeeded (`fleet.sh:465-466`), and
-`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:259`).
+`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:260`).
 
 ```sh
 scripts/env-guard.sh acquire <compose|k8s>
@@ -202,7 +202,7 @@ third-party stand-in, so it carries the `data` stage and comes up before the ser
 **Variables.** `kube.sh` reads the caller's environment only; it never reads `.env` (a grep of
 `k8s/kube.sh`, `k8s/lib/common.sh` and `k8s/sweep/` for `.env` finds nothing). It creates the
 Secrets from the same variable names as the README's configuration table, each with the committed
-local default (`k8s/kube.sh:125-145`):
+local default (`k8s/kube.sh:126-146`):
 
 | Secret (namespace) | From |
 |---|---|
@@ -386,9 +386,10 @@ Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP g
 
 ```sh
 ./k8s/kube.sh sweep               # takes no options: it always builds the images it tests
+SWEEP_LABEL=profiling ./k8s/kube.sh sweep   # same run, log named <date>-profiling-sweep.log
 ```
 
-One command from no cluster to a deleted one (`k8s/kube.sh:384-462`). **It refuses a dirty working
+One command from no cluster to a deleted one (`k8s/kube.sh:385-462`). **It refuses a dirty working
 tree** (`git status --porcelain` non-empty, the count named), so the log describes exactly one commit.
 **For a release run, Slack delivery is asserted only when the webhook is in the sweep's environment**:
 `kube.sh` never reads `.env`, so run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that
@@ -407,9 +408,11 @@ those two never match (measured 2026-10-16: config-svc manifest `sha256:e9e70024
 `sha256:9581ff0e...`). On Docker's classic store `.Descriptor` is absent and the check fails rather
 than compare unlike ids. Created reads 1980-01-01 on every Paketo image (the builder pins it for
 reproducible builds), so the digest is what ties a run to its build. Each step appends its output and
-a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log` (truncated at
-the start; the sweep refuses to run when that file is already committed, and the 0.3.0 log predates
-the version in the name), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
+a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log`, or
+`<YYYY-MM-DD>-<label>-sweep.log` when `SWEEP_LABEL` is set (lower-case letters, digits, dots and hyphens;
+`sweep_log_path` in `k8s/lib/common.sh`). The file is truncated at the start; the sweep refuses to run when
+that file is already committed, under either name (the 0.3.0 log predates the version in the name).
+The last line is `sweep exit=0` only when every step passed. Once `up` has begun,
 the cluster is deleted and the lease released on every exit path, Ctrl-C included.
 
 | Step | Script | What it asserts |
@@ -503,5 +506,6 @@ On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` 
 | `checkK8s` / `replicas` | config-svc and eureka-svc at 1 replica with no HPA; the scaled three at 2 under HPA 2-4, 2-3, 2-3 at 70% | PASS |
 | `checkK8s` / `pool-budget` | maxReplicas x pool per database service + 10 reserved <= `max_connections` | PASS, 30 + 30 + 10 = 70 of 100 |
 | `checkK8s` / `virtual-threads` | each `ezeebit/*` Deployment: CPU limit above 1 core means `spring.threads.virtual.enabled` is `true`, 1 core or less means it is not; the value is read with Spring's precedence (manifest env, served per-service file, served shared file, the service's own file) | PASS, 5 services at limit 2 (added in 0.3.1; red-proofed on 7 mutations) |
+| `checkK8s` / `sweep-log-name` | the sweep log is `<date>-<version>-sweep.log` with no `SWEEP_LABEL` and `<date>-<label>-sweep.log` with one; a committed path is refused under either name, and a label with a slash, an upper-case letter or a leading dot or hyphen is refused | PASS, 3 names and 8 refusals (added 2026-11-05; red-proofed on 5 mutations) |
 | `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 at `e7aed35`; 48/48 after the final fix wave narrowed the k8s port scan |
 | `checkChaosMonkey` | the draw and its refusals against a stubbed kubectl | PASS 14/14 |

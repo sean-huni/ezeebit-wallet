@@ -38,6 +38,11 @@
 		<property name="id" value="illegalCatchMain"/>
 		<property name="files" value="[\\/]outbound[\\/]deadletter[\\/]KafkaDeadLetterPublisher\.java$"/>
 	</module>
+	<!-- The profiler fails open: any start failure, of any runtime type, must be counted and never stop the service. -->
+	<module name="SuppressionSingleFilter">
+		<property name="id" value="illegalCatchMain"/>
+		<property name="files" value="[\\/]observability[\\/]ProfilerStarter\.java$"/>
+	</module>
 
 	<module name="NewlineAtEndOfFile"/>
 	<module name="LineLength">

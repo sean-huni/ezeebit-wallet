@@ -44,7 +44,7 @@ service. Tool versions are pinned in `gradle.properties` (SpotBugs Gradle plugin
 | `checkCoverageFloors` | the same report | a floor sits more than 5 points below the measured value (`coverageBand`; raise it to the value the message prints), a floor sits above it, a measured counter has no floor, a declared floor has nothing to measure, or the report measured no lines |
 
 Floors in `coverageFloors` today (line / branch): ledger-svc 0.93 / 0.87, conversion-svc 0.92 / 0.84,
-gateway-svc 0.95 / 0.97, config-svc and eureka-svc 0.57 / none (no branches).
+gateway-svc 0.95 / 0.97, config-svc and eureka-svc 0.79 / none (no branches).
 
 Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/exclude.xml`. Reports land in
 `services/<svc>/build/reports/{spotbugs,checkstyle,jacoco}/`.

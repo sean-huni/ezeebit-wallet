@@ -1,0 +1,12 @@
+package io.ezeebit.observability;
+
+import java.net.URI;
+import java.time.Duration;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
+
+@ConfigurationProperties(prefix = "ezeebit.profiling")
+public record ProfilingProperties(boolean enabled, URI serverAddress, String applicationName, String instance,
+		String event, DataSize alloc, Duration lock) {
+}

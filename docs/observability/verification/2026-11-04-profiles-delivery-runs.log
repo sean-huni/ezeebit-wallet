@@ -1,0 +1,85 @@
+######## kind-green-1
+2026-11-04T17:03:18Z
+window: last 600s (1793811198000..1793811798000 ms), http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues
+control: no-such-svc-8782 returned nothing (expected)
+service_name values: [config-svc conversion-svc eureka-svc gateway-svc ledger-svc pyroscope]
+present config-svc
+present eureka-svc
+present ledger-svc
+present conversion-svc
+present gateway-svc
+all 5 services present
+exit=0
+rc=0
+######## kind-red
+2026-11-04T17:47:29Z
+window: last 600s (1793813849000..1793814449000 ms), http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues
+control: no-such-svc-32582 returned nothing (expected)
+service_name values: [pyroscope]
+MISSING config-svc
+MISSING eureka-svc
+MISSING ledger-svc
+MISSING conversion-svc
+MISSING gateway-svc
+missing 5 of 5: config-svc eureka-svc ledger-svc conversion-svc gateway-svc
+exit=1
+rc=1
+######## kind-green-2
+2026-11-04T18:11:59Z
+window: last 600s (1793815319000..1793815919000 ms), http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues
+control: no-such-svc-39895 returned nothing (expected)
+service_name values: [config-svc conversion-svc eureka-svc gateway-svc ledger-svc pyroscope]
+present config-svc
+present eureka-svc
+present ledger-svc
+present conversion-svc
+present gateway-svc
+all 5 services present
+exit=0
+rc=0
+######## compose-green
+2026-11-04T18:14:32Z
+window: last 600s (1793815472000..1793816072000 ms), http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues
+control: no-such-svc-42539 returned nothing (expected)
+service_name values: [config-svc conversion-svc eureka-svc gateway-svc ledger-svc pyroscope]
+present config-svc
+present eureka-svc
+present ledger-svc
+present conversion-svc
+present gateway-svc
+all 5 services present
+exit=0
+rc=0
+["localhost:8080:41018","localhost:8081:41016","localhost:8082:41017","localhost:8761:40964","localhost:8888:40904"]
+######## identity-kind
+ledger-svc pyroscope instance (last 60s): ["ledger-svc-59cc6fb7c8-stqm8:8081:1","ledger-svc-59cc6fb7c8-zckpv:8081:1","ledger-svc-84dc7b6665-btcvj:8081:1","ledger-svc-84dc7b6665-kjfsd:8081:1"]
+ledger-svc pods: ledger-svc-84dc7b6665-btcvj ledger-svc-84dc7b6665-kjfsd
+gateway-svc pyroscope instance (last 60s): ["gateway-svc-5ff8587f97-qkqgm:8080:1","gateway-svc-5ff8587f97-x6kmk:8080:1","gateway-svc-74d85884c8-l6r8h:8080:1","gateway-svc-74d85884c8-xnzfj:8080:1"]
+gateway-svc pods: gateway-svc-74d85884c8-l6r8h gateway-svc-74d85884c8-xnzfj
+conversion-svc pyroscope instance (last 60s): ["conversion-svc-84dfcc4c4c-2fjvm:8082:1","conversion-svc-84dfcc4c4c-mp6cr:8082:1","conversion-svc-f799758c6-mvnsh:8082:1","conversion-svc-f799758c6-q7zrc:8082:1"]
+conversion-svc pods: conversion-svc-f799758c6-mvnsh conversion-svc-f799758c6-q7zrc
+otel resource ledger-svc service.instance.id=ledger-svc-59cc6fb7c8-zckpv:8081:1
+otel resource conversion-svc service.instance.id=conversion-svc-84dfcc4c4c-2fjvm:8082:1
+otel resource gateway-svc service.instance.id=gateway-svc-5ff8587f97-qkqgm:8080:1
+otel resource ledger-svc service.instance.id=ledger-svc-59cc6fb7c8-stqm8:8081:1
+otel resource gateway-svc service.instance.id=gateway-svc-5ff8587f97-x6kmk:8080:1
+otel resource conversion-svc service.instance.id=conversion-svc-84dfcc4c4c-mp6cr:8082:1
+otel resource gateway-svc service.instance.id=gateway-svc-74d85884c8-xnzfj:8080:1
+otel resource ledger-svc service.instance.id=ledger-svc-84dc7b6665-kjfsd:8081:1
+otel resource conversion-svc service.instance.id=conversion-svc-f799758c6-q7zrc:8082:1
+otel resource gateway-svc service.instance.id=gateway-svc-74d85884c8-l6r8h:8080:1
+otel resource conversion-svc service.instance.id=conversion-svc-f799758c6-mvnsh:8082:1
+otel resource ledger-svc service.instance.id=ledger-svc-84dc7b6665-btcvj:8081:1
+== 2026-11-04T18:12:07Z, last 30s
+ledger-svc pyroscope instance: ["ledger-svc-84dc7b6665-btcvj:8081:1","ledger-svc-84dc7b6665-kjfsd:8081:1"]
+ledger-svc pods: ledger-svc-84dc7b6665-btcvj ledger-svc-84dc7b6665-kjfsd
+gateway-svc pyroscope instance: ["gateway-svc-74d85884c8-l6r8h:8080:1","gateway-svc-74d85884c8-xnzfj:8080:1"]
+gateway-svc pods: gateway-svc-74d85884c8-l6r8h gateway-svc-74d85884c8-xnzfj
+conversion-svc pyroscope instance: ["conversion-svc-f799758c6-mvnsh:8082:1","conversion-svc-f799758c6-q7zrc:8082:1"]
+conversion-svc pods: conversion-svc-f799758c6-mvnsh conversion-svc-f799758c6-q7zrc
+otel resource conversion-svc service.instance.id=conversion-svc-f799758c6-mvnsh:8082:1
+otel resource conversion-svc service.instance.id=conversion-svc-f799758c6-q7zrc:8082:1
+otel resource gateway-svc service.instance.id=gateway-svc-74d85884c8-l6r8h:8080:1
+otel resource gateway-svc service.instance.id=gateway-svc-74d85884c8-xnzfj:8080:1
+otel resource ledger-svc service.instance.id=ledger-svc-84dc7b6665-btcvj:8081:1
+otel resource ledger-svc service.instance.id=ledger-svc-84dc7b6665-kjfsd:8081:1

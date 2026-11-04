@@ -188,11 +188,18 @@ answers "what was the JVM doing in that window". Evidence: the spike file named 
 1. Unit: the auto-configuration starts with `enabled=true` and does not with `false`; a start failure
    does not fail the context (red-proofed by forcing the failure).
 2. Delivery: a query against the Pyroscope API returns profiles for each of the 5 services, on compose
-   AND on kind. Red-proof: the same query on the current `dev` returns none.
+   AND on kind. Red-proof (ruled 2026-11-04): the same query on the same kind fleet with
+   `EZEEBIT_PROFILING_ENABLED=false` on all five Deployments, run after the query window has passed, returns
+   none. The cost: a `dev` build, which has no SDK at all, is not shown separately; the red proves the query
+   sees the profiler stopping, not the SDK's absence.
 3. Identity: at 2 replicas, two distinct instance labels for ledger, gateway and conversion.
 4. Click-through, Playwright: drive traffic that hits an injected slow method, open its trace in Tempo,
-   click the span, follow "Profiles for this span", and assert the injected method's name in the flame
-   graph. Screenshot, read the image, and assert from the datasource request, not only the pixels.
+   click the span, follow "Profiles for this span". Ruled 2026-11-04 (Sean: "per-span link + dashboard"):
+   the span link is asserted by its datasource request (the service and the span's profile id) plus a
+   non-empty flame graph, and the injected method's name is asserted on the dashboard's profiling row over
+   the trace's time range padded by at least 10 s each side, because under virtual threads the per-span
+   graph is carrier idle time. Screenshot, read the image, and assert from the datasource request, not only
+   the pixels.
 5. Overhead: p95 latency and CPU with profiling on and off over the same traffic. Budget (Sean,
    2026-11-04): at most +5% p95, and added CPU at most 5% of the pod CPU limit (100 millicores at limit 2).
    The relative CPU delta is reported beside it but does not gate: on a near-idle baseline it is a ratio of
@@ -226,7 +233,7 @@ Sean's: profiling comes before the agent; success is clicking the span and landi
 no outdated versions, `otel-lgtm` at `0.39.0`.
 
 Claude's calls, open to override: SDK started from code in the shared module; `PYROSCOPE_URL` as a new
-env var; the 5% overhead budget; CPU versus wall decided by the proof; loopback-only port in compose.
+env var; the overhead budget (5% of the pod CPU limit in added CPU, +5% p95, section 8 item 5); CPU versus wall decided by the proof; loopback-only port in compose.
 
 ### 11.1 Rulings from the builder check (2026-11-04)
 

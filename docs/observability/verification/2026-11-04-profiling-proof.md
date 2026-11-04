@@ -2,7 +2,15 @@
 
 Proof for spec section 8 of `docs/superpowers/specs/2026-11-04-pyroscope-profiling-design.md`, with the rulings in
 force: `LINK_MODE=per-span` (Grafana's native "Profiles for this span", span plus 60 s each side, filtered by
-`pyroscope.profile.id`) and `EVENT=wall`. Branch `feat-pyroscope-profiling` at `c035dcf`. Times are UTC.
+`pyroscope.profile.id`) and `EVENT=wall`. Branch `feat-pyroscope-profiling`. Times are UTC. Which build each run
+used: delivery, identity, compose, the 10 ms overhead arm, the lock and alloc arms and click-through run 1 ran on
+images or jars built from `c035dcf`; the fix-round images, the 20 ms and 50 ms arms with their off baseline,
+both 50 ms click-throughs and click-through run 2 ran on images built from `b2d53e6`.
+
+Raw evidence, committed beside this file: `2026-11-04-overhead-raw/` (each overhead arm's `run-*.json` from the load
+generator and `measure-*.txt` from Prometheus), `2026-11-04-overhead-phases.log` (each arm's phase output),
+`2026-11-04-span-to-profile-runs.log` (all four click-through outputs) and `2026-11-04-profiles-delivery-runs.log`
+(the delivery and identity runs). Screenshots are gitignored and kept only on the machine that took them.
 
 Universe: kind cluster `kind-ezeebit` (Grafana `http://127.0.0.1:3000` through NodePort 30300, gateway
 `http://127.0.0.1:8080` through NodePort 30080), images `ezeebit/*:0.3.2` already built from this tree; then the
@@ -55,7 +63,9 @@ all 5 services present
 exit=0
 ```
 
-Red-proof on kind, as ruled: `EZEEBIT_PROFILING_ENABLED=false` set on all five app Deployments with
+Red-proof on kind, as ruled 2026-11-04 (spec 8.2 amended): profiling disabled on the same fleet rather than a fleet
+built from `dev`. Its cost: `dev`'s lack of an SDK is not shown separately; the red shows that the query sees the
+profiler stop. `EZEEBIT_PROFILING_ENABLED=false` set on all five app Deployments with
 `kubectl set env` (rollouts done 17:36:37, the last profiled pod gone 17:36:56), script run at 17:47:29, 10 min
 33 s later, so the whole 600 s window postdates the last profiled JVM:
 
@@ -87,7 +97,20 @@ fleet printed for gateway, ledger, conversion, eureka and config. Then `./fleet.
 ## 2. Identity at 2 replicas (spec 8.3)
 
 Kind, 18:12:07, Pyroscope `LabelValues` for `instance` per service over the last 30 s, beside the running pods and
-the OpenTelemetry resource `service.instance.id` (`last_over_time(target_info[30s])` in Prometheus):
+the OpenTelemetry resource `service.instance.id`. The queries, runnable as they stand:
+
+```bash
+now=$(( $(date +%s) * 1000 ))
+for s in ledger-svc gateway-svc conversion-svc; do
+  curl -s -X POST -H 'Content-Type: application/json' \
+    http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues \
+    -d "{\"name\":\"instance\",\"matchers\":[\"{service_name=\\\"$s\\\"}\"],\"start\":$((now-30000)),\"end\":$now}"
+  kubectl -n ezeebit-app get pods -l app.kubernetes.io/name=$s -o jsonpath='{.items[*].metadata.name}'; echo
+done
+curl -s --data-urlencode 'query=group by (job, service_instance_id) (last_over_time(target_info{job=~"ledger-svc|gateway-svc|conversion-svc"}[30s]))' \
+  http://127.0.0.1:3000/api/datasources/proxy/uid/prometheus/api/v1/query
+```
+
 
 | service | Pyroscope `instance` | pods | `service.instance.id` |
 |---|---|---|---|
@@ -102,12 +125,19 @@ each service listed 4.
 
 ## 3. Span click-through (spec 8.4), at the shipped 10 ms interval
 
+Ruled 2026-11-04 (Sean, "per-span link + dashboard"; spec 8.4 amended): the span link is asserted by its datasource
+request (service and the span's profile id) plus a non-empty flame graph, and the injected method's name is asserted
+on the dashboard's profiling row over the trace +/- 15 s, because under virtual threads the per-span graph is carrier
+idle time.
+
 `node docs/observability/verification/2026-11-04-span-to-profile.mjs` on kind, run twice at 10 ms, exit 0 both
-times, every check PASS. It adds a WireMock mapping through a port-forward to `svc/wiremock` (`18089:8080`):
-`GET /rates` ZAR/USDT with `fixedDelayMilliseconds: 800` (POST 201). It drives 48 quotes (4 workers x 12, all
-`201`, all at least 800 ms), deletes the mapping (DELETE 200; 39 mappings left, 0 with `fixedDelayMilliseconds`,
-39 before), waits 30 s, finds the slow traces with TraceQL
-`{resource.service.name="conversion-svc" && name="http get" && duration>700ms}` (48 found) and takes the middle one.
+times, every check PASS (outputs in `2026-11-04-span-to-profile-runs.log`). It adds a WireMock mapping through a
+port-forward to `svc/wiremock` (`18089:8080`): `GET /rates` ZAR/USDT with `fixedDelayMilliseconds: 800` (POST 201),
+drives 48 quotes (4 workers x 12, all `201`, all at least 800 ms), deletes the mapping (DELETE 200; 39 mappings
+left, 0 with `fixedDelayMilliseconds`, 39 before), waits 30 s and finds the slow traces with TraceQL
+`{resource.service.name="conversion-svc" && name="http get" && duration>700ms}` (48 found). Both runs below took
+the MIDDLE trace by start time; the script now takes the slowest (`durationMs`), as the brief asks, and that version
+has not been run against the cluster.
 
 | | run 1, 17:04, images from `c035dcf` | run 2, 19:35, images from `b2d53e6` |
 |---|---|---|
@@ -115,26 +145,32 @@ times, every check PASS. It adds a WireMock mapping through a port-forward to `s
 | conversion SERVER span, `pyroscope.profile.id` | `c8b811cf1387b313`, 808 ms, same id | `e8ee9d117ec35639`, 807 ms, same id |
 | "Profiles for this span" | offered once | offered once |
 | (a) link request | `{service_name="conversion-svc"}`, `spanSelector=["c8b811cf1387b313"]`, span +/- 60 s | `{service_name="conversion-svc"}`, `spanSelector=["e8ee9d117ec35639"]`, span +/- 60 s |
-| (b) span flame graph | 41 rows, 150 ms, canvas 343x682 | 60 rows, 10 ms (one sample), canvas 343x1320 |
+| (b) span flame graph | 41 rows, canvas 343x682 | 60 rows, 10 ms (one sample), canvas 343x1320 |
 | `RateCall.get` in the span graph | no | no |
-| (c) dashboard row, trace +/- 15 s | 2396 rows, holds `RateCall.get` (80 ms) | 4577 rows, holds `RateCall.get` (60 ms) |
+| (c) dashboard row, trace +/- 15 s | 2396 rows, holds `RateCall.get` | 4577 rows, holds `RateCall.get` (60 ms) |
 
 (a) and (c) are read off the `/api/ds/query` request bodies and responses the browser sent; (b) off the response
-and the canvas. Screenshots are in the gitignored `out/`, and each one was read:
+and the canvas.
 
-- `t7-trace.png` (run 1): the six-span trace, gateway then conversion, `http get` 803.74 ms inside `quote` 806.18 ms.
-- `t7-span-links.png` (run 1): the conversion SERVER span's attributes (`pyroscope.profile.id`,
-  `service.instance.id conversion-svc-bcb444774-xbc48:8082:1`) and the Links menu holding "Profiles for this span".
-- `t7-span-flamegraph.png`: run 1 is 150 ms total, almost all `java/util/concurrent/ForkJoinWorkerThread.run`
-  (carrier time). Run 2 is "(60) total (10 ms)": one sample, drawn as a single collapsed 60-frame chain.
-- `t7-service-window.png`: Fleet Overview with Service `conversion-svc` over the trace +/- 15 s, and the Wall clock
-  panel searched for `RateCall.get`. It shows one `io/ezeebit/conversi...` symbol, 80 ms in run 1 and 60 ms in run 2.
+**Run 1's screenshots were not retained**: the script then wrote fixed names and the 50 ms runs overwrote them, so
+nothing in this file rests on a run-1 image. Run 1 stands on its logged datasource traffic only. The script now
+writes `out/t7-<date>-<commit>-<time>-<state>.png` and refuses to overwrite an existing file or a tracked path.
 
-As the spike predicted, the per-span graph is carrier-dominated and holds no frame of the slow call. How much it
-holds varies from trace to trace (15 samples, then 1). The service-window view names the rate client's frame.
-`RateCall.get` is the CPU spent before the virtual thread parks (60 to 80 ms for 48 calls), not the 800 ms wait,
-and every quote runs it, delayed or not. No window without the delay was captured, so (c) proves the frame can be
-found there. It does not prove the delay put it there.
+Run 2's four images are retained, renamed to `out/t7-2026-11-04-b2d53e6-run2-*.png`, and each was read:
+
+- `trace`: the six-span trace, gateway then conversion: `http post` 809.34 ms, `quote` 805.71 ms, `http get` 803 ms.
+- `span-links`: the conversion SERVER span (807.18 ms) with `pyroscope.profile.id e8ee9d117ec35639` and
+  `service.instance.id conversion-svc-86b9c87cd4-mnqht:8082:1`, and the Links menu holding "Profiles for this span".
+- `span-flamegraph`: Pyroscope pane `{service_name="conversion-svc"}`, "Span ID: e8ee9d117ec35639", "(60) total
+  (10 ms)": one sample, drawn as a single collapsed 60-frame chain.
+- `service-window`: Fleet Overview, Service `conversion-svc`, 21:34:51 to 21:35:21 local, the Wall clock panel searched
+  for `RateCall.get`: one `io/ezeebit/conversi...` symbol, total 60 ms.
+
+As the spike predicted, the per-span graph holds no frame of the slow call, and what it holds varies from trace to
+trace (41 rows in run 1, one sample in run 2). The service-window view names the rate client's frame. `RateCall.get`
+is the CPU spent before the virtual thread parks (60 ms for 48 calls in run 2), not the 800 ms wait, and every quote
+runs it, delayed or not. No window without the delay was captured, so (c) proves the frame can be found there, not
+that the delay put it there.
 
 ## 4. Overhead (spec 8.5): within budget at 10 ms
 
@@ -149,9 +185,15 @@ Method: the same traffic for 300 s per arm on kind, profiling on against `EZEEBI
 - funds 8 merchants (`-deposit.sh`, from inside a ledger pod, because a port-forward to ledger-svc is refused);
 - warms up for 60 s, then drives an open loop of 10 units/s for 300 s (`-load.mjs`; a unit is a ZAR/USDT quote of
   100.00, its conversion and a balances read);
-- measures (`-measure.sh`) and restores the HPAs to 3/3/4 on exit.
+- measures (`-measure.sh`) and restores the HPAs on exit.
 
-Compare with `python3 2026-11-04-overhead-compare.py out/overhead <on> <off>`. Every window:
+The arms recorded here ran on earlier versions of the phase and measure scripts (the 10 ms, lock and alloc arms on a
+scratch copy, the 20 ms and 50 ms arms on the version committed in `c96cf0f`). Both have since been made fail
+closed: any step that cannot prove its result exits 1, the settle loop has a deadline, and the HPAs get back the
+`maxReplicas` read before pinning instead of a hardcoded 3/3/4. The raw files of every arm are in
+`2026-11-04-overhead-raw/`; compare with `python3 2026-11-04-overhead-compare.py 2026-11-04-overhead-raw <on> <off>`
+(labels `r0-10ms`, `r0-lock1h`, `r0-lock1h-alloc1gb` against `r0-off`; `r1-20ms`, `r1-50ms` against `r1-off`;
+`void-hpa-10ms` is the first void attempt). Every kept window:
 
 - 3000 quotes 201, 3000 conversions 201, 3000 balances 200;
 - 1/1/2/2/2 JVMs (`count_over_time(process_cpu_usage[299s])`);
@@ -185,31 +227,58 @@ from `b2d53e6`. The off baselines agree within 2% (conversion 33.37 and 33.96 CP
 p95 at 20 ms ranged from -9.4% to -0.1%, and at 50 ms from -15.3% to -0.7%. The client-side p95 over all requests
 was -0.8% at 10 ms, -3.0% at 20 ms and -11.2% at 50 ms. config-svc served no non-actuator request, so it has no p95.
 
-**Verdict at 10 ms, the shipped default: within budget.**
+**The noise floor for p95.** The two off baselines are the same configuration measured an hour apart on two
+clusters, so their difference is what p95 does with nothing changed:
+
+| service | p95 off, 17:42 (ms) | p95 off, 18:38 (ms) | off against off |
+|---|---|---|---|
+| eureka-svc | 0.95 | 0.96 | +1.0% |
+| ledger-svc | 1.39 | 1.59 | +14.3% |
+| conversion-svc | 9.90 | 10.47 | +5.8% |
+| gateway-svc | 11.36 | 11.91 | +4.9% |
+| client side, all requests | 13.0 | 13.4 | +3.1% |
+
+A single on-against-off p95 delta here is only meaningful beyond about 14%.
+
+**Verdict at 10 ms, the shipped default: within budget on CPU; on p95, no regression visible above a noise floor
+of about 14%.**
 
 - Added CPU is at most 11.5 millicores per JVM (gateway-svc), against the 100-millicore budget.
-- p95 is at most +1.4% (gateway-svc).
+- p95 moved -0.4% to +1.4%, well inside that noise floor. The data cannot show a +5% p95 effect either way; it can
+  only rule out one larger than about 14%.
 - The relative deltas (+14.6% to +26.2% on the loaded services, and over +100% on the near-idle ones) are ratios
   of small baselines (1 to 34 CPU-seconds in 300 s). They do not gate.
-- The p95 drops at 20 ms and 50 ms are larger than any plausible profiler effect in that direction. With one run
-  per arm they show the run-to-run spread, which bounds how far any single delta here can be trusted.
+- The p95 drops at 20 ms and 50 ms (up to -15.3%) sit at the edge of the same noise floor.
 
 **Why the interval stays at 10 ms although 50 ms costs less.** At 50 ms the click-through was run twice
 (19:06 and 19:08). (a) and (b) passed both times, but (b) held only 11 rows (one collapsed chain, 800 ms in 16
 samples). (c) passed in only 1 of 2 runs. In the failing run, a direct `SelectMergeStacktraces` over the whole
 drive window plus 15 s each side (40 s, 48 delayed quotes) held no `RateCall.get`, `QuoteService.quote` or
 `HttpClientImpl.send` frame. The control frames were there: 7 `io/ezeebit` frames, including 3.35 s of
-`RecordingExporter.export`. The quote path's CPU per call is far below one 50 ms sample, so it shows only when a
-sample lands on it. At 10 ms it showed in both runs.
+`RecordingExporter.export`. The query, runnable as it stands (drive 19:06:20 to 19:06:31 UTC, +/- 15 s):
+
+```bash
+curl -s -X POST -H 'Content-Type: application/json' \
+  http://127.0.0.1:3000/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/SelectMergeStacktraces \
+  -d '{"profileTypeID":"wall:wall:nanoseconds:wall:nanoseconds","labelSelector":"{service_name=\"conversion-svc\"}","start":1793819165000,"end":1793819206000}' \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin)["flamegraph"]; n=d["names"]; t={}
+[t.__setitem__(n[v[i+3]], t.get(n[v[i+3]],0)+v[i+1]) for lv in d["levels"] for v in [list(map(int,lv["values"]))] for i in range(0,len(v),4)]
+print({k: x/1e6 for k,x in t.items() if "io/ezeebit" in k})'
+```
+
+Our reading (inference, not measured per call): the quote path's CPU per call is far below one 50 ms sample, so it
+shows only when a sample lands on it. At 10 ms it showed in both runs.
 
 The interval is now configurable: `PYROSCOPE_INTERVAL` / `ezeebit.profiling.interval`, default 10 ms, commit
 `b2d53e6`. It reaches `Config.Builder.setProfilingInterval(Duration)`, which agent 2.9.2 sends to async-profiler
 as `,interval=` (both read with `javap`). Before that existed, the brief's other two options were tried at 10 ms:
 
-- dropping lock (`EZEEBIT_PROFILING_LOCK=1h`): ledger +15.0%, conversion +17.0%, gateway +11.6% on the gauge;
-- dropping alloc as well (`EZEEBIT_PROFILING_ALLOC=1GB`): +14.2%, +16.5%, +11.4%.
+- dropping lock (`EZEEBIT_PROFILING_LOCK=1h`): ledger +15.0%, conversion +17.0%, gateway +11.6% on the gauge
+  (raw: `r0-lock1h`);
+- dropping alloc as well (`EZEEBIT_PROFILING_ALLOC=1GB`): +14.2%, +16.5%, +11.4% (raw: `r0-lock1h-alloc1gb`).
 
-Neither moved the cost: it is the wall-clock event, which samples every thread, idle carriers included. Every
+Neither moved the cost. Inference, not measured: the cost sits in the wall-clock event, which samples every thread,
+idle carriers included; what the data shows is only that lock and alloc changed nothing and the interval did. Every
 override set here was removed afterwards.
 
 ## 5. Cluster and fleets left as found
@@ -232,19 +301,26 @@ override set here was removed afterwards.
   sample granularity in both 50 ms graphs, not read from the profiler.
 - The 10 ms overhead arm on the `b2d53e6` images: it ran on `c035dcf` images, where 10 ms was the agent's default
   rather than the configured value; the 20 ms and 50 ms arms ran on `b2d53e6`.
-- Overhead variance: one 300 s run per arm; only the off baseline was repeated (on two clusters, within 2%).
+- Overhead variance: one 300 s run per arm. Only the off baseline was repeated (two clusters): CPU-seconds agreed
+  within 2%, p95 differed by up to 14.3% (ledger-svc), which is the floor any p95 claim here sits on.
+- A p95 effect smaller than about 14%, in either direction, at any interval.
 - Overhead on compose: measured on kind only, by ruling.
 - Server-side drops inside Pyroscope: the delivery script sees a label, not every chunk; a profile Pyroscope
   accepts and then drops is invisible to it and to ProfilesAbsent.
 - Native async-profiler crashes: no crash was induced; what a SIGSEGV in the native library does to the JVM is
   untested.
-- Parked I/O under virtual threads: not visible in any profile (spike, and section 3: 60 to 80 ms of
+- Parked I/O under virtual threads: not visible in any profile (spike, and section 3: 60 ms of
   `RateCall.get` for 48 x 800 ms waits). The trace's span duration is the only instrument for it.
 - That the service-window frame is caused by the delay: no undelayed control window (section 3).
 - Slack delivery for ProfilingFailing and ProfilesAbsent: not rehearsed; neither alert was raised in this task.
 - The one-time ProfilesAbsent page when the fleet rolls out from a pre-gauge image (Task 6 observed it on kind):
   not re-tested, still expected on the first rollout of this branch over older images.
-- The lock and alloc overrides reaching the profiler (section 4).
+- The lock and alloc overrides reaching the profiler (section 4); their raw measurements are retained, their
+  effect inside async-profiler is not observed.
+- Run 1 of the click-through: its screenshots were overwritten; only its logged datasource traffic remains.
+- The slowest-trace selection in `2026-11-04-span-to-profile.mjs`: changed after both 10 ms runs, not yet run.
+- The fail-closed phase and measure scripts against a real cluster: red-proofed with stubs (empty HPA read, jq
+  failure on the event read) and read-only measure runs, but no full overhead arm has run on them.
 - Identity on compose at 2 replicas: compose runs one JVM per service.
 - Until the fix round the kind images were the host's `ezeebit/*:0.3.2` from Task 6's final build; the fix round
   rebuilt them from `b2d53e6`. The working tree also carries an uncommitted, unrelated change to

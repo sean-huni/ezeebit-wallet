@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 const require = createRequire(new URL('./package.json', import.meta.url));
 const { chromium } = require('playwright');
 // Usage: node 2026-11-04-span-to-profile.mjs. Delays ZAR/USDT rates in WireMock (RATES_ADMIN, a port-forward to
@@ -10,6 +12,16 @@ const GATEWAY = process.env.GATEWAY_URL ?? 'http://127.0.0.1:8080';
 const RATES_ADMIN = process.env.RATES_ADMIN ?? 'http://127.0.0.1:18089';
 const OUT = new URL('./out/', import.meta.url).pathname;
 const SERVICE = 'conversion-svc', FRAME = 'RateCall.get', DELAY_MS = 800, PAD_MS = 15000;
+// Screenshots are keyed by date, commit and time (RUN_ID overrides), and never overwrite a file or a tracked path.
+const RUN = process.env.RUN_ID ?? `${new Date().toISOString().slice(0, 10)}-${execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim()}-${new Date().toISOString().slice(11, 19).replaceAll(':', '')}`;
+const shot = async (page, name) => {
+  const path = `${OUT}t7-${RUN}-${name}.png`;
+  let tracked = true;
+  try { execFileSync('git', ['ls-files', '--error-unmatch', path], { stdio: 'ignore' }); } catch { tracked = false; }
+  if (tracked || existsSync(path)) throw new Error(`refusing to overwrite ${path}`);
+  await page.screenshot({ path });
+  console.log(`screenshot ${path}`);
+};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const log = (...a) => console.log(...a);
 let failed = 0;
@@ -51,10 +63,11 @@ await sleep(30000);
 
 const q = encodeURIComponent(`{resource.service.name="${SERVICE}" && name="http get" && duration>${DELAY_MS - 100}ms}`);
 const found = await getJson(`${G}/api/datasources/proxy/uid/tempo/api/search?q=${q}&start=${Math.floor(driveStart / 1000) - 5}&end=${Math.ceil(driveEnd / 1000) + 5}&limit=100`);
-const traces = (found.body?.traces ?? []).sort((a, b) => Number(a.startTimeUnixNano) - Number(b.startTimeUnixNano));
+const traces = (found.body?.traces ?? []).sort((a, b) => Number(b.durationMs ?? 0) - Number(a.durationMs ?? 0));
 log(`tempo search HTTP ${found.status}: ${traces.length} slow traces`);
 check(traces.length > 0, 'a slow trace was found');
-const traceId = traces[Math.floor(traces.length / 2)]?.traceID;
+const traceId = traces[0]?.traceID;
+log(`slowest of ${traces.length}: ${traceId} ${traces[0]?.durationMs} ms`);
 const trace = await getJson(`${G}/api/datasources/proxy/uid/tempo/api/v2/traces/${traceId}`);
 let server;
 for (const rs of trace.body?.trace?.resourceSpans ?? []) {
@@ -76,7 +89,7 @@ page.on('response', async r => {
 const pane = { datasource: 'tempo', queries: [{ refId: 'A', datasource: { type: 'tempo', uid: 'tempo' }, queryType: 'traceql', query: traceId }], range: { from: String(spanStart - 600000), to: String(spanEnd + 600000) } };
 await page.goto(`${G}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify({ a: pane }))}`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(8000);
-await page.screenshot({ path: `${OUT}t7-trace.png` });
+await shot(page, 'trace');
 const span = page.getByText(server.name, { exact: true });
 log(`span rows named "${server.name}": ${await span.count()}`);
 check(await span.count() >= 1, 'the SERVER span is shown in the trace view');
@@ -87,7 +100,7 @@ await page.getByRole('button', { name: 'Links' }).first().click();
 await page.waitForTimeout(1500);
 const link = page.getByText('Profiles for this span');
 check(await link.count() === 1, '"Profiles for this span" offered once');
-await page.screenshot({ path: `${OUT}t7-span-links.png` });
+await shot(page, 'span-links');
 profileCalls.length = 0;
 await link.first().click();
 await page.waitForTimeout(10000);
@@ -106,7 +119,7 @@ const box = (await canvas.count()) ? await canvas.first().boundingBox() : null;
 log(`link flame graph: ${linkRows} rows, root ${linkTotalMs} ms in the response, canvas ${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'absent'}`);
 check(linkRows > 1 && box && box.height >= 20, '(b) the span flame graph renders non-empty');
 log(`(info) ${FRAME} in the span-filtered response: ${linkQueries.some(x => x.res.includes(FRAME))}`);
-await page.screenshot({ path: `${OUT}t7-span-flamegraph.png` });
+await shot(page, 'span-flamegraph');
 
 profileCalls.length = 0;
 const from = spanStart - PAD_MS, to = spanEnd + PAD_MS;
@@ -127,7 +140,7 @@ const search = page.getByPlaceholder(/search/i).last();
 if (await search.count()) { await search.fill(FRAME); await page.waitForTimeout(1500); }
 await header.evaluate(el => el.scrollIntoView({ block: 'start' }));
 await page.waitForTimeout(1500);
-await page.screenshot({ path: `${OUT}t7-service-window.png` });
+await shot(page, 'service-window');
 await browser.close();
 log(`span to profile ${failed === 0 ? 'PASS' : 'FAIL'} (${failed} failed checks)`);
 process.exit(failed === 0 ? 0 : 1);

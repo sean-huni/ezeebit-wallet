@@ -23,7 +23,7 @@ public record DepositReq(
 		@Pattern(regexp = NO_CONTROL_CHARACTERS, message = "{validation.reference.control}") String reference) {
 
 	// Postgres text cannot hold NUL, and no reference or key needs any control character.
-	public static final String NO_CONTROL_CHARACTERS = "\\P{Cc}*";
+	public static final String NO_CONTROL_CHARACTERS = "^[^\\u0000-\\u001F\\u007F-\\u009F]*$";
 
-	public static final String DECIMAL = "-?\\d{1,40}(\\.\\d{1,40})?";
+	public static final String DECIMAL = "^-?\\d{1,40}(\\.\\d{1,40})?$";
 }

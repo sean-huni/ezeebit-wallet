@@ -204,7 +204,7 @@ def yaml_str(text):
 
 
 def rules_yaml():
-    out = [f"# {BANNER}", "apiVersion: 1", "groups:", "  - orgId: 1", "    name: ezeebit", "    folder: Ezeebit alerts",
+    out = [f"# {BANNER}", "apiVersion: 1", "groups:", "  - orgId: 1", "    name: ezeebit", "    folder: Ezeebit Alerts",
            "    interval: 10s", "    rules:"]
     for r in RULES:
         out += [f"      - uid: {r['uid']}", f"        title: {r['title']}", "        condition: B"]

@@ -11,7 +11,7 @@ const shot = async (url, name, wait = 7000) => {
   await page.screenshot({ path: `${OUT}${name}` });
   console.log(`${new Date().toTimeString().slice(0, 8)} ${name} ${url}`);
 };
-await shot(`/alerting/list?view=list&search=${encodeURIComponent('namespace:"Ezeebit alerts"')}`, 'alert-rule-list.png');
+await shot(`/alerting/list?view=list&search=${encodeURIComponent('namespace:"Ezeebit Alerts"')}`, 'alert-rule-list.png');
 await shot('/alerting/grafana/ezeebit-rate-feed-refusing/view?tab=history', 'alert-state-history.png');
 for (let i = 0; i < 3; i++) {
   await page.goto(`${G}/d/ezeebit-traces?from=now-30m&to=now&refresh=`, { waitUntil: 'domcontentloaded', timeout: 60000 });

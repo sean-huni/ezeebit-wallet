@@ -19,7 +19,8 @@ class PyroscopeLauncherTest {
 	@Test
 	void mapsThePropertiesOntoTheSdkConfig() {
 		Config config = PyroscopeLauncher.config(new ProfilingProperties(true, URI.create("http://pyroscope:4040"),
-				"ledger-svc", "pod-1:8080:7", "wall", DataSize.ofKilobytes(512), Duration.ofMillis(10)));
+				"ledger-svc", "pod-1:8080:7", "wall", DataSize.ofKilobytes(512), Duration.ofMillis(10),
+				Duration.ofMillis(20)));
 
 		assertThat(config.applicationName).isEqualTo("ledger-svc");
 		assertThat(config.serverAddress).isEqualTo("http://pyroscope:4040");
@@ -27,6 +28,7 @@ class PyroscopeLauncherTest {
 		assertThat(config.profilingEvent).isEqualTo(EventType.WALL);
 		assertThat(config.profilingAlloc).isEqualTo("524288");
 		assertThat(config.profilingLock).isEqualTo("10000000");
+		assertThat(config.profilingInterval).isEqualTo(Duration.ofMillis(20));
 		assertThat(config.format).isEqualTo(Format.JFR);
 	}
 

@@ -53,6 +53,7 @@ public final class PyroscopeLauncher implements ProfilerLauncher {
 				.setProfilingEvent(EventType.fromId(properties.event()))
 				.setProfilingAlloc(Long.toString(properties.alloc().toBytes()))
 				.setProfilingLock(Long.toString(properties.lock().toNanos()))
+				.setProfilingInterval(properties.interval())
 				.setFormat(Format.JFR)
 				.build();
 	}

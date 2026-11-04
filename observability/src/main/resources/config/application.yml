@@ -54,3 +54,4 @@ ezeebit:
     event: wall
     alloc: 512KB
     lock: 10ms
+    interval: ${PYROSCOPE_INTERVAL:10ms}

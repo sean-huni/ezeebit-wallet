@@ -233,8 +233,8 @@ tasks.register('generateOpenApiSnapshots') {
 // Floors sit a few points under a measured run; checkCoverageFloors fails when one drifts more than
 // coverageBand below it, so they ratchet up. A service with no branches declares no BRANCH floor.
 def coverageFloors = [
-	'config-svc'    : [LINE: '0.88', BRANCH: '0.97'],
-	'eureka-svc'    : [LINE: '0.88', BRANCH: '0.97'],
+	'config-svc'    : [LINE: '0.90', BRANCH: '0.97'],
+	'eureka-svc'    : [LINE: '0.90', BRANCH: '0.97'],
 	'gateway-svc'   : [LINE: '0.95', BRANCH: '0.97'],
 	'ledger-svc'    : [LINE: '0.93', BRANCH: '0.87'],
 	'conversion-svc': [LINE: '0.92', BRANCH: '0.84'],

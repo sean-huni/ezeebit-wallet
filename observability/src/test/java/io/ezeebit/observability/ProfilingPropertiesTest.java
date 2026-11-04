@@ -1,12 +1,16 @@
 package io.ezeebit.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.boot.env.YamlPropertySourceLoader;
@@ -22,6 +26,18 @@ class ProfilingPropertiesTest {
 
 		assertThat(binder.bindOrCreate("ezeebit.profiling", ProfilingProperties.class).interval())
 				.isEqualTo(Duration.ofMillis(10));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"0ms", "-5ms"})
+	void aSamplingIntervalOfZeroOrLessIsRefused(final String interval) {
+		Binder binder = new Binder(new MapConfigurationPropertySource(Map.of("ezeebit.profiling.interval", interval)));
+
+		assertThatThrownBy(() -> binder.bind("ezeebit.profiling", ProfilingProperties.class))
+				.isInstanceOf(BindException.class)
+				.rootCause()
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("ezeebit.profiling.interval");
 	}
 
 	@Test

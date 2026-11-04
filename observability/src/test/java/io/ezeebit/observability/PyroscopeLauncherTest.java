@@ -6,6 +6,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.pyroscope.http.Format;
 import io.pyroscope.javaagent.EventType;
 import io.pyroscope.javaagent.config.Config;
@@ -26,5 +27,14 @@ class PyroscopeLauncherTest {
 		assertThat(config.profilingAlloc).isEqualTo("524288");
 		assertThat(config.profilingLock).isEqualTo("10000000");
 		assertThat(config.format).isEqualTo(Format.JFR);
+	}
+
+	@Test
+	void reportsNotRunningAndStopsSafelyBeforeAnyStart() {
+		PyroscopeLauncher launcher = new PyroscopeLauncher(new SimpleMeterRegistry());
+
+		assertThat(launcher.running()).isFalse();
+		launcher.stop();
+		assertThat(launcher.running()).isFalse();
 	}
 }

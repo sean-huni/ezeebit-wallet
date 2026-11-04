@@ -1,7 +1,10 @@
 package io.ezeebit.observability;
 
-@FunctionalInterface
 public interface ProfilerLauncher {
 
+	boolean running();
+
 	void launch(ProfilingProperties properties);
+
+	void stop();
 }

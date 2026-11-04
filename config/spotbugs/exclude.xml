@@ -98,4 +98,14 @@
 		<Method name="doFilterInternal"/>
 	</Match>
 
+	<!-- The Pyroscope SDK log bridge: the format is one of the SDK's own constant strings, never caller text, and
+	     render() replaces CR and LF in the formatted line before emit() logs it, which FSB cannot see. -->
+	<Match>
+		<Class name="io.ezeebit.observability.PyroscopeLogBridge"/>
+		<Or>
+			<And><Bug pattern="CRLF_INJECTION_LOGS"/><Method name="emit"/></And>
+			<And><Bug pattern="FORMAT_STRING_MANIPULATION"/><Method name="render"/></And>
+		</Or>
+	</Match>
+
 </FindBugsFilter>

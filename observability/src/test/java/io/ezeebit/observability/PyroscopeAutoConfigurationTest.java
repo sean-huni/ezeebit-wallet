@@ -14,11 +14,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class PyroscopeAutoConfigurationTest {
 
-	private final List<ProfilingProperties> launched = new ArrayList<>();
-
 	private final MeterRegistry registry = new SimpleMeterRegistry();
 
-	private ApplicationContextRunner runner(final ProfilerLauncher launcher) {
+	private ApplicationContextRunner runner(final RecordingLauncher launcher) {
 		return new ApplicationContextRunner()
 				.withConfiguration(AutoConfigurations.of(PyroscopeAutoConfiguration.class))
 				.withBean(MeterRegistry.class, () -> registry)
@@ -32,41 +30,99 @@ class PyroscopeAutoConfigurationTest {
 
 	@Test
 	void startsTheProfilerWhenEnabled() {
-		runner(launched::add).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
+		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context).hasNotFailed();
-			assertThat(launched).hasSize(1);
-			assertThat(launched.getFirst().applicationName()).isEqualTo("svc");
-			assertThat(launched.getFirst().serverAddress()).isEqualTo(URI.create("http://pyroscope.test:4040"));
+			assertThat(launcher.launched).hasSize(1);
+			assertThat(launcher.launched.getFirst().applicationName()).isEqualTo("svc");
+			assertThat(launcher.launched.getFirst().serverAddress())
+					.isEqualTo(URI.create("http://pyroscope.test:4040"));
 		});
 	}
 
 	@Test
 	void doesNotStartWhenDisabled() {
-		runner(launched::add).withPropertyValues("ezeebit.profiling.enabled=false").run(context -> {
+		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=false").run(context -> {
 			assertThat(context).doesNotHaveBean(ProfilerStarter.class);
-			assertThat(launched).isEmpty();
+			assertThat(launcher.launched).isEmpty();
 		});
 	}
 
 	@Test
 	void nativeLoadFailureDoesNotFailTheContext() {
-		runner(properties -> {
-			throw new UnsatisfiedLinkError("no libasyncProfiler");
-		}).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
+		RecordingLauncher launcher = new RecordingLauncher(false, new UnsatisfiedLinkError("no libasyncProfiler"));
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
 			assertThat(context.getStartupFailure()).isNull();
 			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "UnsatisfiedLinkError").count())
+					.isEqualTo(1.0);
+		});
+		assertThat(launcher.stops).isZero();
+	}
+
+	@Test
+	void runtimeFailureDoesNotFailTheContext() {
+		RecordingLauncher launcher = new RecordingLauncher(false, new IllegalStateException("collector refused"));
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
+			assertThat(context.getStartupFailure()).isNull();
+			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "IllegalStateException").count())
 					.isEqualTo(1.0);
 		});
 	}
 
 	@Test
-	void runtimeFailureDoesNotFailTheContext() {
-		runner(properties -> {
-			throw new IllegalStateException("collector refused");
-		}).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
-			assertThat(context.getStartupFailure()).isNull();
-			assertThat(registry.counter("ezeebit.profiling.failures", "cause", "IllegalStateException").count())
-					.isEqualTo(1.0);
+	void closingTheContextStopsTheProfilerItStarted() {
+		RecordingLauncher launcher = new RecordingLauncher(false, null);
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true")
+				.run(context -> assertThat(launcher.stops).isZero());
+		assertThat(launcher.stops).isEqualTo(1);
+	}
+
+	@Test
+	void aProfilerAlreadyRunningIsNotStartedAgainNorStopped() {
+		RecordingLauncher launcher = new RecordingLauncher(true, null);
+		runner(launcher).withPropertyValues("ezeebit.profiling.enabled=true").run(context -> {
+			assertThat(context).hasNotFailed();
+			assertThat(launcher.launched).isEmpty();
+			assertThat(registry.find("ezeebit.profiling.failures").counter()).isNull();
 		});
+		assertThat(launcher.stops).isZero();
+	}
+
+	private static final class RecordingLauncher implements ProfilerLauncher {
+
+		private final boolean alreadyRunning;
+
+		private final Throwable failure;
+
+		private final List<ProfilingProperties> launched = new ArrayList<>();
+
+		private int stops;
+
+		RecordingLauncher(final boolean alreadyRunning, final Throwable failure) {
+			this.alreadyRunning = alreadyRunning;
+			this.failure = failure;
+		}
+
+		@Override
+		public boolean running() {
+			return alreadyRunning;
+		}
+
+		@Override
+		public void launch(final ProfilingProperties properties) {
+			if (failure instanceof RuntimeException runtime) {
+				throw runtime;
+			}
+			if (failure instanceof LinkageError linkage) {
+				throw linkage;
+			}
+			launched.add(properties);
+		}
+
+		@Override
+		public void stop() {
+			stops++;
+		}
 	}
 }

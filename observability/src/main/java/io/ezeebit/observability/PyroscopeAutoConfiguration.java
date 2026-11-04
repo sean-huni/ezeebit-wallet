@@ -14,8 +14,8 @@ public class PyroscopeAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	ProfilerLauncher profilerLauncher() {
-		return new PyroscopeLauncher();
+	ProfilerLauncher profilerLauncher(final MeterRegistry registry) {
+		return new PyroscopeLauncher(registry);
 	}
 
 	@Bean

@@ -10,3 +10,14 @@ GITLEAKS_IMAGE=zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a
 TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2
 TRIVY_JAVA_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-java-db:1
 TRIVY_CACHE_VOLUME=ezeebit-trivy-cache
+
+# The DAST scanners (security/dast.sh is the only reader), pinned the same way. Verified 2026-11-05: the Docker Hub
+# tag API digest and `docker buildx imagetools inspect` agree, each is the newest release at least two weeks old.
+# Schemathesis and Nuclei ship Alpine (3.24) images. ZAP publishes no Alpine variant, only Debian bookworm, and it
+# is the primary scanner, so it is the one non-Alpine image here; zaproxy/zap-stable:2.17.0 has the same digest.
+ZAP_IMAGE=ghcr.io/zaproxy/zaproxy:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+SCHEMATHESIS_IMAGE=schemathesis/schemathesis:4.32.4@sha256:b501f25d00fa6e2b393ddd1b525a11bb560d593fd06268491595c2e439090bf0
+NUCLEI_IMAGE=projectdiscovery/nuclei:v3.11.1@sha256:582d5546902e67052097cb2d07296c642d50a1afc5e44623cb038845df9a32eb
+
+# Nuclei's templates are data, like trivy's DB: fetched into this volume on first use, their count printed per run.
+NUCLEI_TEMPLATES_VOLUME=ezeebit-nuclei-templates

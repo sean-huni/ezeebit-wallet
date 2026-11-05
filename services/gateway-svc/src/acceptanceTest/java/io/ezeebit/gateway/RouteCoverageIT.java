@@ -59,6 +59,13 @@ class RouteCoverageIT {
 				.isEqualTo(new MerchantPath(MerchantPath.Kind.MERCHANT, "merchant:%s".formatted(MERCHANT))));
 	}
 
+	// The services serve GET and POST only; any other method must stop at the edge rather than reach the proxy client.
+	@Test
+	void everyMerchantRouteServesGetAndPostOnly() {
+		assertThat(merchantRoutes().toList()).isNotEmpty().allSatisfy(route ->
+				assertThat(predicate(route, "Method")).as(route.getId()).containsExactlyInAnyOrder("GET", "POST"));
+	}
+
 	@Test
 	void everyDocRouteIsAllowListedAndServesOneLiteralPathToGetOnly() {
 		Map<String, RouteProperties> docs = new TreeMap<>();

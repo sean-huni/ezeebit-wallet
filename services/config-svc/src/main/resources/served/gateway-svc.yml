@@ -24,6 +24,9 @@ spring:
               uri: lb://ledger-svc
               predicates:
                 - Path=/api/v1/merchants/*/balances/**,/api/v1/merchants/*/entries/**
+                # Only the methods the services serve. Any other reached the proxy client, and one it cannot
+                # send (QUERY, FOO) threw there as a 500 (Schemathesis, 2026-11-05).
+                - Method=GET,POST
               filters:
                 - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
                 - RemoveRequestHeader=X-Ezeebit-Gateway
@@ -36,6 +39,9 @@ spring:
               uri: lb://conversion-svc
               predicates:
                 - Path=/api/v1/merchants/*/quotes/**,/api/v1/merchants/*/conversions/**
+                # Only the methods the services serve. Any other reached the proxy client, and one it cannot
+                # send (QUERY, FOO) threw there as a 500 (Schemathesis, 2026-11-05).
+                - Method=GET,POST
               filters:
                 - RewritePath=/api/v1/(?<rest>.*), /v1/$\{rest}
                 - RemoveRequestHeader=X-Ezeebit-Gateway

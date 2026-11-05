@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: eureka-svc
-          image: 'ezeebit/eureka-svc:0.3.2'
+          image: 'ezeebit/eureka-svc:0.4.0'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8761}
@@ -42,6 +42,7 @@ spec:
             # Standalone: a peer URL naming this host is dropped as its own, so the server replicates to nobody.
             - {name: EUREKA_INSTANCE_HOSTNAME, value: '$(SERVER_ADDRESS)'}
             - {name: OTLP_URL, value: 'http://lgtm.ezeebit-obs:4318'}
+            - {name: PYROSCOPE_URL, value: 'http://lgtm.ezeebit-obs:4040'}
             # The default peer, localhost:8761, is not this host and nothing answers it on a pod-IP bind. JSON, not
             # EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: an environment key binds as defaultzone, which Eureka never reads.
             - name: SPRING_APPLICATION_JSON

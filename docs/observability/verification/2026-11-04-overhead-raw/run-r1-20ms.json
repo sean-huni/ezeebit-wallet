@@ -1,0 +1,1 @@
+{"label":"r1-20ms","start":"2026-11-04T18:49:31.432Z","end":"2026-11-04T18:54:31.350Z","startMs":1793818171432,"endMs":1793818471350,"units":3000,"codes":{"quote 201":3000,"convert 201":3000,"balances 200":3000},"clientP95ms":{"quote":9.8,"convert":15.7,"balances":5.5,"all":13}}

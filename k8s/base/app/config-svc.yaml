@@ -32,7 +32,7 @@ spec:
       terminationGracePeriodSeconds: 40
       containers:
         - name: config-svc
-          image: 'ezeebit/config-svc:0.3.2'
+          image: 'ezeebit/config-svc:0.4.0'
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8888}
@@ -40,6 +40,7 @@ spec:
             - {name: SERVER_ADDRESS, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
             - {name: HOSTNAME, valueFrom: {fieldRef: {fieldPath: metadata.name}}}
             - {name: OTLP_URL, value: 'http://lgtm.ezeebit-obs:4318'}
+            - {name: PYROSCOPE_URL, value: 'http://lgtm.ezeebit-obs:4040'}
           resources:
             requests: {cpu: 250m, memory: 512Mi}
             limits: {cpu: "2", memory: 1Gi}

@@ -6,41 +6,63 @@
             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet id="002-account-table" author="ledger-svc">
-        <preConditions onFail="MARK_RAN"><not><tableExists tableName="account"/></not></preConditions>
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="account"/>
+            </not>
+        </preConditions>
         <createTable tableName="account">
-            <column name="id" type="UUID"><constraints primaryKey="true" primaryKeyName="pk_account"/></column>
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" primaryKeyName="pk_account"/>
+            </column>
             <column name="merchant_id" type="UUID"/>
             <column name="currency" type="VARCHAR(5)">
-                <constraints nullable="false" foreignKeyName="fk_account_currency" referencedTableName="currency" referencedColumnNames="code"/>
+                <constraints nullable="false" foreignKeyName="fk_account_currency" referencedTableName="currency"
+                             referencedColumnNames="code"/>
             </column>
-            <column name="type" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
             <column name="balance" type="NUMERIC(38,18)"/>
-            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
-        <addUniqueConstraint tableName="account" columnNames="merchant_id, currency, type" constraintName="uq_account_merchant_currency_type"/>
+        <addUniqueConstraint tableName="account" columnNames="merchant_id, currency, type"
+                             constraintName="uq_account_merchant_currency_type"/>
         <!-- Target of the entry composite FK: an entry's currency must be its account's currency. -->
         <addUniqueConstraint tableName="account" columnNames="id, currency" constraintName="uq_account_id_currency"/>
-        <rollback><dropTable tableName="account"/></rollback>
+        <rollback>
+            <dropTable tableName="account"/>
+        </rollback>
     </changeSet>
 
     <changeSet id="002-account-platform-unique" author="ledger-svc">
         <preConditions onFail="MARK_RAN">
-            <not><indexExists indexName="uq_account_platform_currency_type"/></not>
+            <not>
+                <indexExists indexName="uq_account_platform_currency_type"/>
+            </not>
         </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: createIndex has no WHERE clause; NULL merchant_id escapes the unique constraint -->
         <sql>CREATE UNIQUE INDEX uq_account_platform_currency_type ON account (currency, type) WHERE merchant_id IS NULL;</sql>
-        <rollback><dropIndex tableName="account" indexName="uq_account_platform_currency_type"/></rollback>
+        <rollback>
+            <dropIndex tableName="account" indexName="uq_account_platform_currency_type"/>
+        </rollback>
     </changeSet>
 
     <changeSet id="002-account-checks" author="ledger-svc">
         <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_account_type', 'ck_account_shape')</sqlCheck>
+            <sqlCheck expectedResult="0">SELECT count(*)
+                                         FROM pg_constraint
+                                         WHERE conname IN ('ck_account_type', 'ck_account_shape')</sqlCheck>
         </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
-        <sql>ALTER TABLE account ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING'));
-ALTER TABLE account ADD CONSTRAINT ck_account_shape CHECK (
-    (type = 'MERCHANT' AND merchant_id IS NOT NULL AND balance IS NOT NULL AND balance &gt;= 0)
-    OR (type &lt;&gt; 'MERCHANT' AND merchant_id IS NULL AND balance IS NULL));</sql>
+        <sql>ALTER TABLE account
+            ADD CONSTRAINT ck_account_type CHECK (type IN ('MERCHANT', 'PLATFORM_DEPOSIT_CLEARING'));
+        ALTER TABLE account
+            ADD CONSTRAINT ck_account_shape CHECK (
+                (type = 'MERCHANT' AND merchant_id IS NOT NULL AND balance IS NOT NULL AND balance &gt;= 0)
+                    OR (type &lt;&gt; 'MERCHANT' AND merchant_id IS NULL AND balance IS NULL));</sql>
         <rollback>
             <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
             <sql>ALTER TABLE account DROP CONSTRAINT ck_account_type, DROP CONSTRAINT ck_account_shape;</sql>

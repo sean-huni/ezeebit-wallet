@@ -28,7 +28,7 @@ built and gated with, read with `kind version`, `kubectl version --client`,
 | kind | v0.32.0 | `kube.sh`: create, load images, delete |
 | kubectl | v1.36.1 (Kustomize v5.8.1 built in) | every cluster call, always with `--context kind-ezeebit` |
 | Docker Engine | 29.8.2, linux/arm64 | the kind node, image builds (`./gradlew bootBuildImageAll`), `docker save` of third-party images |
-| bash | 3.2.57 (`/bin/bash` on macOS) | `kube.sh`, the sweep and the guard are written for it (`k8s/kube.sh:4`) |
+| bash | 3.2.57 (`/bin/bash` on macOS) | `kube.sh`, the sweep and the guard are written for it (`k8s/kube.sh:5`) |
 | curl, jq, perl, uuidgen, awk | curl 8.7.1, jq 1.7.1, perl 5.34.1 | the sweep checks (`k8s/sweep/lib.sh`) |
 
 The node image is `kindest/node:v1.36.1`, pinned by digest in `k8s/kind-cluster.yaml:11`. The
@@ -51,7 +51,7 @@ the host at all.
 `up` takes `--no-build` (load the `ezeebit/<svc>:<version>` images already in Docker) and
 `--only data,obs,app,chaos` (a subset of the stages: the selected ones are applied together, then
 waited on in that order). Step by step
-(`k8s/kube.sh:196-244`):
+(`k8s/kube.sh:197-245`):
 
 1. The `app-image-version` gate: every `ezeebit/<svc>` manifest tag must equal `build.gradle`'s version, or
    `up` refuses before touching anything. Then `scripts/env-guard.sh acquire k8s`; a refusal ends `up`
@@ -63,7 +63,7 @@ waited on in that order). Step by step
    and `./gradlew bootBuildImageAll`.
 4. Every third-party image the manifests name is loaded from the host's Docker into the node
    (pulled to the host once when absent), and `crictl inspecti` on the node must resolve each one, so
-   the kubelet never needs a registry (`k8s/kube.sh:58-103`).
+   the kubelet never needs a registry (`k8s/kube.sh:59-104`).
 5. The namespaces and their deny-all policies, then the Secrets and ConfigMaps, then
    `kubectl apply -k k8s/overlays/local` for the selected stages.
 6. `kubectl rollout status` (or `wait --for=condition=complete` for a Job) on every workload of
@@ -111,9 +111,9 @@ directions.
 | Images | third-party images by the `compose.yaml` refs | the same refs, copied from the host into the node; builds and loads `ezeebit/<svc>:<version>` |
 
 `scripts/env-guard.sh` is the one file that knows both fleets. `fleet.sh up` calls
-`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:215`);
+`acquire compose` (`fleet.sh:464`) and `kube.sh up` calls `acquire k8s` (`k8s/kube.sh:216`);
 `fleet.sh down|purge` release the lease only when the stop succeeded (`fleet.sh:465-466`), and
-`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:259`).
+`kube.sh down` releases it after deleting the cluster (`k8s/kube.sh:260`).
 
 ```sh
 scripts/env-guard.sh acquire <compose|k8s>
@@ -170,7 +170,7 @@ scripts/env-guard.sh state     # lease, compose, jvms, ports, kind: one line eac
 | `ezeebit-app` | gateway-svc | Deployment | 2 | 2 to 4 at 70% CPU of request | app |
 | `ezeebit-app` | ledger-svc | Deployment | 2 | 2 to 3 at 70% CPU of request | app |
 | `ezeebit-app` | conversion-svc | Deployment | 2 | 2 to 3 at 70% CPU of request | app |
-| `ezeebit-obs` | lgtm (`grafana/otel-lgtm:0.36.0`) | Deployment + 2Gi PVC, `Recreate` | 1 | none | obs |
+| `ezeebit-obs` | lgtm (`grafana/otel-lgtm:0.39.0`) | Deployment + 2Gi PVC, `Recreate` | 1 | none | obs |
 | `ezeebit-chaos` | chaos-monkey | CronJob, `suspend: true` | n/a | none | chaos |
 | `kube-system` | metrics-server v0.9.0 | Deployment | 1 | none | app |
 
@@ -202,7 +202,7 @@ third-party stand-in, so it carries the `data` stage and comes up before the ser
 **Variables.** `kube.sh` reads the caller's environment only; it never reads `.env` (a grep of
 `k8s/kube.sh`, `k8s/lib/common.sh` and `k8s/sweep/` for `.env` finds nothing). It creates the
 Secrets from the same variable names as the README's configuration table, each with the committed
-local default (`k8s/kube.sh:125-145`):
+local default (`k8s/kube.sh:126-146`):
 
 | Secret (namespace) | From |
 |---|---|
@@ -309,11 +309,13 @@ objects in the rendered overlay:
 | ledger-svc | postgres | 5432 |
 | gateway-svc, ledger-svc, conversion-svc | config-svc / eureka-svc | 8888 / 8761 |
 | the five services | lgtm (OTLP HTTP) | 4318 |
+| the five services | lgtm (Pyroscope) | 4040 |
 | kafka-topics Job, kafka itself | kafka | 9092 |
 | lgtm | any public address (Slack) | 443 |
 | chaos-monkey pods | any address (the API server) | 443, 6443 |
 
-Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP gRPC 4317 is not open.
+Nothing else: wiremock, postgres and redis have no egress beyond DNS, OTLP gRPC 4317 is not open, and
+Pyroscope 4040 is open only to the five services, never to the host.
 
 - **The NodePort rule is broad.** kindnet judges a NodePort packet before source NAT, from the kind
   network's gateway address, which differs per machine, so the rule admits any address except the
@@ -386,9 +388,10 @@ Nothing else: wiremock, postgres and redis have no egress beyond DNS, and OTLP g
 
 ```sh
 ./k8s/kube.sh sweep               # takes no options: it always builds the images it tests
+SWEEP_LABEL=profiling ./k8s/kube.sh sweep   # same run, log named <date>-profiling-sweep.log
 ```
 
-One command from no cluster to a deleted one (`k8s/kube.sh:384-462`). **It refuses a dirty working
+One command from no cluster to a deleted one (`k8s/kube.sh:414-467`). **It refuses a dirty working
 tree** (`git status --porcelain` non-empty, the count named), so the log describes exactly one commit.
 **For a release run, Slack delivery is asserted only when the webhook is in the sweep's environment**:
 `kube.sh` never reads `.env`, so run `export SLACK_WEBHOOK_URL=<the webhook from your .env>` in that
@@ -407,9 +410,11 @@ those two never match (measured 2026-10-16: config-svc manifest `sha256:e9e70024
 `sha256:9581ff0e...`). On Docker's classic store `.Descriptor` is absent and the check fails rather
 than compare unlike ids. Created reads 1980-01-01 on every Paketo image (the builder pins it for
 reproducible builds), so the digest is what ties a run to its build. Each step appends its output and
-a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log` (truncated at
-the start; the sweep refuses to run when that file is already committed, and the 0.3.0 log predates
-the version in the name), and the last line is `sweep exit=0` only when every step passed. Once `up` has begun,
+a `<step> exit=<code>` line to `docs/k8s/verification/<YYYY-MM-DD>-<version>-sweep.log`, or
+`<YYYY-MM-DD>-<label>-sweep.log` when `SWEEP_LABEL` is set (lower-case letters, digits, dots and hyphens;
+`sweep_log_path` in `k8s/lib/common.sh`). The file is truncated at the start; the sweep refuses to run when
+that file is already committed, under either name (the 0.3.0 log predates the version in the name).
+The last line is `sweep exit=0` only when every step passed. Once `up` has begun,
 the cluster is deleted and the lease released on every exit path, Ctrl-C included.
 
 | Step | Script | What it asserts |
@@ -424,6 +429,31 @@ the cluster is deleted and the lease released on every exit path, Ctrl-C include
 | outage | `k8s/sweep/outage.sh` | ConversionLedgerDeadLettered has no Alerting instance before the outage (waits up to 360 s); ledger-svc is scaled to 0 from the host's context; conversions run until `ezeebit_conversion_ledger_deadletter_total` rises (up to 180 s); the rule reaches firing with an Alerting instance whose `activeAt` is after the scale-down, within its `for` + 120 s; with the `slack` Secret present, `grafana_alerting_notifications_total{integration="slack"}` rises within 120 s, and without it the log says delivery was not asserted; the declared replica count is restored and read back on every exit path |
 | monitoring end | `k8s/sweep/monitoring.sh` | the lgtm pod uid and restart count unchanged; Grafana `/api/health` 200 at the start, after every check and at the end |
 | down | `kube.sh down` | the cluster deleted, `.kube-fleet/` removed except `builds/` (the build logs), the lease released |
+
+**Profiling branch** (`feat-pyroscope-profiling`, not a release): one run started 22:16:10Z on 2026-11-04 at
+`bd67734` with a clean tree, ending `sweep exit=0`
+([2026-11-05-profiling-sweep.log](k8s/verification/2026-11-05-profiling-sweep.log)): 3 of 3 kills, 1566
+requests, 3 merchant failures, all in the conversion-svc kill window (two quote 504s at 3.5 s and a convert 503 at
+6.9 s after that kill, inside the 20 s budget), 781 COMPLETED conversions against 781 POSTED journals, none
+posted twice; the outage alert fired 5 s after the first dead letter. Slack delivery not asserted (the `slack`
+Secret was absent). `./gradlew clean build` and `./gradlew bootBuildImageAll checkSupplyChain` each ended
+`exit=0` ([2026-11-05-profiling-gates-build.log](k8s/verification/2026-11-05-profiling-gates-build.log),
+[2026-11-05-profiling-gates-supplychain.log](k8s/verification/2026-11-05-profiling-gates-supplychain.log)).
+Neither log records its commit or tree state. They ran with HEAD at `bd67734`: the reflog holds HEAD there
+from 00:09:01 to 00:23:40 +0200, the logs were last written at 00:14:20 and 00:16:00 after runs of 5 m 3 s
+and 1 m 33 s, and gitleaks counted 278 commits, one fewer than the repository holds with `5fe4d69`. Whether
+the working tree was clean during them is not recorded.
+
+**Release 0.4.0** (Pyroscope profiling, G1 with compact object headers, Spring Boot 4.1.2, Paketo builder
+0.0.198): two runs on `rel-0.4.0`, each from a clean tree and ending `sweep exit=0`, 9 of 9 checks. The first,
+started 18:33:51Z at `9ec4107` ([2026-11-05-0.4.0-sweep.log](k8s/verification/2026-11-05-0.4.0-sweep.log)),
+ran without the Slack Secret: 3 kills, 1598 requests, 2 merchant failures, 798 COMPLETED against 798 POSTED,
+the outage alert firing 10 s after the dead letter. The second, started 18:41:40Z at `6a5d791` with
+`SLACK_WEBHOOK_URL` set ([2026-11-05-0.4.0-slack-sweep.log](k8s/verification/2026-11-05-0.4.0-slack-sweep.log)):
+3 kills, 1609 requests, 3 merchant failures (a quote 504 and two quote 503s, 3.5 to 8.2 s after the
+conversion-svc kill, inside the 20 s budget), 803 COMPLETED conversions against 803 POSTED journals, none posted
+twice; 50 of 200 burst requests admitted against a bound of 120; the outage alert fired 5 s after the first dead
+letter, and `grafana_alerting_notifications_total{integration="slack"}` rose 0 to 1.
 
 **Release 0.3.2** (guava 33.7.2 and snappy-java 1.1.10.9 pinned, OpenAPI patterns fixed): one run started
 09:03:04Z on `rel-0.3.2` at `1945363` with a clean tree, ending `sweep exit=0`
@@ -480,7 +510,7 @@ Where the kind fleet deliberately differs from compose:
 | Kafka listeners | one advertised `kafka.ezeebit-data.svc:9092`, no host listener | nothing outside the cluster connects |
 | Postgres readiness | `pg_isready` and a `SELECT 1` in both databases, over TCP to 127.0.0.1 | compose's healthcheck also checks both databases; TCP because initdb's temporary server listens on the socket only, so a socket check can pass before the init script has created them (`k8s/base/data/postgres.yaml:44-47`) |
 | Postgres `max_connections` | set to 100 explicitly | the pool budget gate reads it |
-| Grafana | NodePort 30300 to 127.0.0.1:3000; OTLP stays inside the cluster; analytics reporting off | only Grafana needs the host |
+| Grafana | NodePort 30300 to 127.0.0.1:3000; OTLP and Pyroscope stay inside the cluster; analytics reporting off | only Grafana needs the host |
 | WireMock | Service port 8080, no host port | compose publishes 8089 for the host |
 | File names | `.yaml` under `k8s/` | `[!CONVENTION-OVERRIDE]` the repository's `.yml` rule is for Spring configuration; Kubernetes and Kustomize use `.yaml` (`kustomization.yaml` is the name Kustomize looks for) |
 
@@ -492,8 +522,10 @@ They are kept in one list with the rest of the project's gaps:
 
 ## Build gates
 
-`./gradlew check` runs three static gates for this tree, no cluster needed (`build.gradle:536-560`).
-On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` exited 0:
+`./gradlew check` runs three static gates for this tree, no cluster needed (`build.gradle:540-560`).
+The table was first measured on 2026-10-16 at `e7aed35`, where `./gradlew checkK8s checkEnvGuard checkChaosMonkey`
+exited 0. Rows and results marked with a later date or with "the final fix wave" were added afterwards and carry
+their own run; the `sweep-log-name` row was added and passed on 2026-11-05, not on 2026-10-16:
 
 | Gate | What it checks | Result |
 |---|---|---|
@@ -503,5 +535,6 @@ On 2026-10-16 at `e7aed35`, `./gradlew checkK8s checkEnvGuard checkChaosMonkey` 
 | `checkK8s` / `replicas` | config-svc and eureka-svc at 1 replica with no HPA; the scaled three at 2 under HPA 2-4, 2-3, 2-3 at 70% | PASS |
 | `checkK8s` / `pool-budget` | maxReplicas x pool per database service + 10 reserved <= `max_connections` | PASS, 30 + 30 + 10 = 70 of 100 |
 | `checkK8s` / `virtual-threads` | each `ezeebit/*` Deployment: CPU limit above 1 core means `spring.threads.virtual.enabled` is `true`, 1 core or less means it is not; the value is read with Spring's precedence (manifest env, served per-service file, served shared file, the service's own file) | PASS, 5 services at limit 2 (added in 0.3.1; red-proofed on 7 mutations) |
+| `checkK8s` / `sweep-log-name` | the sweep log is `<date>-<version>-sweep.log` with no `SWEEP_LABEL` and `<date>-<label>-sweep.log` with one; a committed path is refused under either name, and a label with a slash, an upper-case letter or a leading dot or hyphen is refused | PASS, 3 names and 8 refusals (added 2026-11-05; red-proofed on 5 mutations) |
 | `checkEnvGuard` | the guard against stubbed docker, ps and lsof | PASS 39/39 at `e7aed35`; 48/48 after the final fix wave narrowed the k8s port scan |
 | `checkChaosMonkey` | the draw and its refusals against a stubbed kubectl | PASS 14/14 |

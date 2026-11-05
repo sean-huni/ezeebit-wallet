@@ -1,0 +1,829 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Ezeebit Wallet Take-Home</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,800&family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: an accountant's ledger on a desk. Each slide is a ruled ledger sheet (folio); the cover and back are leather boards; tech decisions are posted as Dr (what it buys) and Cr (what it costs). */
+:root {
+  --desk-a: #8a5a35; --desk-b: #6e4427; --desk-c: #a06c42; --lamp: rgba(255, 236, 200, .28); --vignette: rgba(30, 14, 4, .38);
+  --paper: #edf2e3; --paper-shade: #dfe7d2; --rule: rgba(64, 126, 120, .22); --rule-strong: rgba(48, 104, 98, .55);
+  --margin: rgba(196, 70, 60, .55); --ink: #1c2633; --ink-soft: #4a5560; --pencil: #6d716b;
+  --red-ink: #a3302a; --green-ink: #276349; --brass: #b38a3c; --leather: #1d3a30; --foil-a: #f3dc95; --foil-b: #a97c2b;
+  --tab: #2a4a3e; --tab-fg: #eadfbe; --chip: rgba(39, 99, 73, .1);
+  --display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --body: "Libre Franklin", "Franklin Gothic Book", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --m: 3.6rem;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --desk-a: #3a2416; --desk-b: #24150c; --desk-c: #4a2f1c; --lamp: rgba(255, 214, 150, .2); --vignette: rgba(0, 0, 0, .72);
+  --paper: #dfe6d4; --paper-shade: #ccd6bf; --tab: #1f3a30; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --desk-a: #3a2416; --desk-b: #24150c; --desk-c: #4a2f1c; --lamp: rgba(255, 214, 150, .2); --vignette: rgba(0, 0, 0, .72);
+  --paper: #dfe6d4; --paper-shade: #ccd6bf; --tab: #1f3a30; color-scheme: dark }
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem }
+@media (min-width: 1000px) and (min-height: 700px) { html { scroll-snap-type: y proximity } }
+body {
+  margin: 0; color: var(--ink); font: 400 1.02rem/1.55 var(--body);
+  background-color: var(--desk-b);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='300'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.0035 .16' numOctaves='4' seed='7'/><feColorMatrix values='0 0 0 0 .18  0 0 0 0 .09  0 0 0 0 .03  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>"),
+    linear-gradient(100deg, var(--desk-a), var(--desk-b) 45%, var(--desk-c) 70%, var(--desk-b));
+  background-size: 900px 300px, 100% 100%;
+  background-attachment: fixed;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 30%, var(--lamp), transparent 60%), radial-gradient(ellipse 120% 100% at 50% 50%, transparent 55%, var(--vignette)); }
+main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding-block: 2.5rem 6rem; display: grid; gap: 3.2rem }
+
+/* ---------- sheet (ledger paper) ---------- */
+.sheet {
+  position: relative; scroll-snap-align: start; min-width: 0;
+  padding: 2.4rem 2.6rem 2rem calc(var(--m) + 1.6rem);
+  background-color: var(--paper);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .25  0 0 0 0 .27  0 0 0 0 .2  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(to right, transparent calc(var(--m) - 5px), var(--margin) calc(var(--m) - 5px), var(--margin) calc(var(--m) - 4px), transparent calc(var(--m) - 4px), transparent calc(var(--m) - 1px), var(--margin) calc(var(--m) - 1px), var(--margin) var(--m), transparent var(--m)),
+    repeating-linear-gradient(to bottom, transparent 0 1.7rem, var(--rule) 1.7rem calc(1.7rem + 1px)),
+    radial-gradient(ellipse 140% 90% at 30% 10%, transparent 60%, var(--paper-shade));
+  border-radius: 2px 3px 3px 2px;
+  box-shadow: 0 1px 1px rgba(20, 10, 0, .3), 0 4px 8px -2px rgba(20, 10, 0, .28), 0 22px 40px -14px rgba(20, 10, 0, .55), 0 50px 90px -30px rgba(10, 4, 0, .5);
+}
+@media (min-width: 1000px) { .sheet { min-height: min(46rem, calc(100vh - 3rem)) } }
+.sheet::before { content: ""; position: absolute; inset: 6px -6px -6px 6px; z-index: -1; background: var(--paper-shade);
+  border-radius: 2px; box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .55) }
+.sheet::after { content: ""; position: absolute; right: 0; bottom: 0; width: 7rem; height: 7rem; pointer-events: none;
+  background: linear-gradient(315deg, rgba(0, 0, 0, .1), transparent 45%); border-radius: 0 0 3px 0 }
+.sheet > * { position: relative }
+
+.head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: .2rem 1.5rem; padding-bottom: .6rem; margin-bottom: 1.3rem;
+  border-bottom: 3px double var(--rule-strong) }
+.acct { grid-column: 1 / -1; font: 600 .74rem/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--green-ink) }
+h2 { margin: 0; font: 700 clamp(1.9rem, 3.4vw, 2.85rem)/1.05 var(--display); letter-spacing: -.01em; text-wrap: balance }
+.folio { font: 500 .85rem/1 var(--mono); color: var(--red-ink); white-space: nowrap }
+.lede { margin: 0 0 1.4rem; max-width: 62ch; font-size: 1.12rem; color: var(--ink-soft) }
+h3 { margin: 0 0 .35rem; font: 700 1.04rem/1.3 var(--body); color: var(--ink) }
+p { margin: 0 }
+.note { margin-top: 1.6rem; padding-top: .7rem; border-top: 1px dashed var(--rule-strong); font: 400 .86rem/1.5 var(--mono); color: var(--pencil); max-width: 95ch }
+.note b { color: var(--ink-soft); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: .72rem; margin-right: .6rem }
+code, .mono { font-family: var(--mono); font-size: .9em }
+
+.grid { display: grid; gap: 1.2rem 1.6rem }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)) }
+.split { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 2rem; align-items: start }
+.item p { color: var(--ink-soft); font-size: .97rem }
+.item { padding-left: .9rem; border-left: 2px solid var(--rule-strong) }
+.after { margin-top: 1rem; color: var(--ink-soft); font-size: .95rem }
+
+.stat .n { display: block; font: 800 clamp(2rem, 3.6vw, 2.9rem)/1 var(--display); color: var(--green-ink); font-variant-numeric: lining-nums tabular-nums }
+.stat.red .n { color: var(--red-ink) }
+.stat.big .n { font-size: clamp(3.6rem, 7vw, 5.6rem) }
+.stat .l { display: block; margin-top: .4rem; font-size: .9rem; color: var(--ink-soft); max-width: 28ch }
+
+/* ledger tables */
+.scroll { overflow-x: auto; min-width: 0 }
+.rel-wrap { position: relative }
+table.led { width: 100%; border-collapse: collapse; font-size: .95rem }
+.led th { font: 600 .7rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--green-ink); text-align: left; padding: .5rem .7rem; border-bottom: 3px double var(--rule-strong) }
+.led td { padding: .48rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top }
+.led td + td, .led th + th { border-left: 1px solid var(--rule-strong) }
+.led .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap }
+.led .neg { color: var(--red-ink) }
+.led tfoot td { border-top: 3px double var(--rule-strong); border-bottom: 0; font: 500 .82rem/1.3 var(--mono); color: var(--green-ink) }
+#memory .led { min-width: 34rem }
+#memory .led.wide { min-width: 52rem }
+#memory .led td.mono { white-space: nowrap }
+.led .t { font-family: var(--mono); color: var(--red-ink); white-space: nowrap }
+
+/* decision ledger: Dr buys, Cr costs */
+.dec { display: grid; border-top: 3px double var(--rule-strong) }
+.dec-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .8fr) minmax(0, 1.25fr) minmax(0, 1.05fr); border-bottom: 1px solid var(--rule) }
+.dec-row > div { padding: .62rem .8rem; min-width: 0 }
+.dec-row > div + div { border-left: 1px solid var(--rule-strong) }
+.dec-row.hd > div { font: 600 .68rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--green-ink); padding-block: .5rem }
+.dec-row .ch { font-weight: 700; line-height: 1.3 }
+.dec-row .alt { color: var(--pencil); font-size: .9rem }
+.dec-row .dr, .dec-row .cr { font-size: .9rem; color: var(--ink-soft) }
+.dec-row:not(.hd) .dr::before, .dec-row:not(.hd) .cr::before { font: 600 .66rem/1 var(--mono); margin-right: .4rem; padding: .12rem .3rem; border-radius: 2px; vertical-align: .1em }
+.dec-row:not(.hd) .dr::before { content: "Dr"; color: var(--green-ink); border: 1px solid var(--green-ink) }
+.dec-row:not(.hd) .cr::before { content: "Cr"; color: var(--red-ink); border: 1px solid var(--red-ink) }
+.dec-row .lbl { display: none }
+
+/* figures pasted in with photo corners */
+figure { margin: 0; min-width: 0 }
+.mount { position: relative; display: block; padding: 6px; background: #f8f8f2; transform: rotate(-.4deg);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 6px 14px -4px rgba(0, 0, 0, .35) }
+.mount.tilt { transform: rotate(.5deg) }
+.mount img { display: block; width: 100%; height: auto }
+.mount i { position: absolute; width: 22px; height: 22px; background: #2b2b28; box-shadow: 0 1px 2px rgba(0, 0, 0, .4) }
+.mount i:nth-child(1) { top: -4px; left: -4px; clip-path: polygon(0 0, 100% 0, 0 100%) }
+.mount i:nth-child(2) { top: -4px; right: -4px; clip-path: polygon(0 0, 100% 0, 100% 100%) }
+.mount i:nth-child(3) { bottom: -4px; left: -4px; clip-path: polygon(0 0, 0 100%, 100% 100%) }
+.mount i:nth-child(4) { bottom: -4px; right: -4px; clip-path: polygon(100% 0, 100% 100%, 0 100%) }
+figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--pencil) }
+
+/* rubber stamps */
+.stamp { position: absolute; z-index: 3; padding: .35rem .9rem; font: 800 1.5rem/1 var(--body); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--red-ink); border: 4px double currentColor; border-radius: 6px; transform: rotate(-9deg); opacity: .82; mix-blend-mode: multiply; pointer-events: none;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 1.9'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.4 1.9'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>") }
+.stamp small { display: block; font: 600 .62rem/1.2 var(--mono); letter-spacing: .08em; margin-top: .25rem }
+.stamp.green { color: var(--green-ink); transform: rotate(6deg) }
+.stamp.posted { right: 1rem; top: auto; bottom: -1.9rem }
+.stamp.void { right: .4rem; top: auto; bottom: .2rem }
+.stamp.pass { right: 2rem; top: 5.4rem }
+.in .stamp { animation: press .5s cubic-bezier(.2, .9, .3, 1.3) both }
+@keyframes press { 0% { transform: rotate(-9deg) scale(1.5); opacity: .4 } 60% { opacity: .9 } 100% { transform: rotate(-9deg) scale(1); opacity: .82 } }
+.in .stamp.green { animation-name: press-g }
+@keyframes press-g { 0% { transform: rotate(6deg) scale(1.5); opacity: .4 } 100% { transform: rotate(6deg) scale(1); opacity: .82 } }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem; counter-reset: s; margin-bottom: 1.6rem }
+.step { position: relative; padding: 1rem 1rem 1.1rem; background: rgba(255, 255, 255, .38); border: 1px solid var(--rule-strong); border-radius: 3px }
+.step h3 { display: flex; gap: .55rem; align-items: baseline }
+.step h3::before { counter-increment: s; content: counter(s); font: 800 1.5rem/1 var(--display); color: var(--red-ink) }
+.step p { font-size: .95rem; color: var(--ink-soft) }
+
+/* timeline (releases) */
+.tl { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
+.tl::before { content: ""; position: absolute; top: 1.05rem; left: .6rem; right: .6rem; height: 3px; background: var(--green-ink); opacity: .55 }
+.rel { position: relative }
+.rel::before { content: ""; position: absolute; top: -2.05rem; left: 0; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--green-ink); box-shadow: 0 0 0 3px var(--paper) }
+.rel.last::before { background: var(--red-ink) }
+.rel .v { font: 800 1.9rem/1 var(--display) }
+.rel .d { font: 500 .78rem/1.6 var(--mono); color: var(--red-ink) }
+.rel p { margin-top: .4rem; font-size: .93rem; color: var(--ink-soft) }
+
+/* contents index with dot leaders */
+.toc { columns: 2; column-gap: 3rem; margin: 0; padding: 0; list-style: none }
+.toc li { break-inside: avoid; display: flex; align-items: baseline; gap: .5rem; padding: .32rem 0 }
+.toc a { color: var(--ink); text-decoration: none; font-size: 1.05rem }
+.toc a:hover, .toc a:focus-visible { color: var(--red-ink); text-decoration: underline; text-underline-offset: 3px }
+.toc .dots { flex: 1; border-bottom: 2px dotted var(--rule-strong); transform: translateY(-.3rem) }
+.toc .fo { font: 500 .85rem/1 var(--mono); color: var(--red-ink) }
+.toc .new { font: 600 .62rem/1 var(--mono); color: var(--green-ink); border: 1px solid var(--green-ink); padding: .12rem .3rem; border-radius: 2px; letter-spacing: .06em }
+
+/* architecture diagram, drawn in ink */
+.arch { width: 100%; min-width: 720px; height: auto; display: block }
+.arch .box { fill: rgba(255, 255, 255, .5); stroke: var(--ink); stroke-width: 1.4 }
+.arch .box.ledger { fill: rgba(163, 48, 42, .1); stroke: var(--red-ink) }
+.arch .box.conv { fill: rgba(39, 99, 73, .12); stroke: var(--green-ink) }
+.arch .box.ctl { fill: none; stroke: var(--pencil); stroke-dasharray: 5 4 }
+.arch text { fill: var(--ink); font-family: var(--body); font-size: 15px }
+.arch .t { font-weight: 700; font-size: 16px }
+.arch .s { fill: var(--ink-soft); font-family: var(--mono); font-size: 11.5px }
+.arch .lbl { fill: var(--pencil); font-family: var(--mono); font-size: 11px }
+.arch .ln { stroke: var(--ink); stroke-width: 1.5; fill: none; marker-end: url(#ah) }
+.arch .ln.grpc { stroke: var(--red-ink); stroke-width: 2.2; marker-end: url(#ahr) }
+.arch .ln.dl { stroke-dasharray: 6 5; stroke: var(--pencil); marker-end: url(#ahp) }
+.arch .ah { fill: var(--ink) } .arch .ahr { fill: var(--red-ink) } .arch .ahp { fill: var(--pencil) }
+.arch .zone { fill: none; stroke: var(--pencil); stroke-width: 1.2; stroke-dasharray: 3 4 }
+.arch .zone.core { fill: rgba(39, 99, 73, .05); stroke: var(--green-ink); stroke-width: 1.6; stroke-dasharray: 8 5 }
+.arch .zl { fill: var(--pencil); font: 600 11px var(--mono); letter-spacing: .12em }
+.arch .zl.core { fill: var(--green-ink) }
+.arch .cap rect { stroke-width: 1.1; fill: var(--paper) }
+.arch .cap text { font: 600 10.5px var(--mono) }
+.arch .cap.cp rect { stroke: var(--red-ink) } .arch .cap.cp text { fill: var(--red-ink) }
+.arch .cap.ap rect { stroke: var(--green-ink) } .arch .cap.ap text { fill: var(--green-ink) }
+.arch .cap.mix rect { stroke: var(--brass) } .arch .cap.mix text { fill: var(--brass) }
+.arch .cap.na rect { stroke: var(--pencil) } .arch .cap.na text { fill: var(--pencil) }
+.capk { display: inline-block; font: 600 .7rem/1 var(--mono); padding: .14rem .32rem; border-radius: 2px; border: 1px solid currentColor; white-space: nowrap }
+.capk.cp { color: var(--red-ink) } .capk.ap { color: var(--green-ink) } .capk.mix { color: var(--brass) }
+
+/* leather boards (cover, back) */
+.board { position: relative; scroll-snap-align: start; min-width: 0; padding: clamp(2rem, 6vw, 4.5rem) clamp(1.6rem, 6vw, 5rem);
+  color: var(--tab-fg); border-radius: 6px 10px 10px 6px;
+  background-color: var(--leather);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='l'><feTurbulence type='turbulence' baseFrequency='.045' numOctaves='5' seed='11'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23l)'/></svg>"),
+    radial-gradient(ellipse 80% 70% at 35% 25%, rgba(255, 255, 255, .1), transparent 60%),
+    linear-gradient(90deg, rgba(0, 0, 0, .45), transparent 5%, transparent 96%, rgba(0, 0, 0, .3));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5), inset 0 2px 1px rgba(255, 255, 255, .1), 0 2px 2px rgba(0, 0, 0, .4), 0 30px 60px -18px rgba(0, 0, 0, .7) }
+.board::before { content: ""; position: absolute; inset: 14px; border: 1.5px dashed rgba(234, 223, 190, .32); border-radius: 4px; pointer-events: none }
+@media (min-width: 1000px) { .board { min-height: min(46rem, calc(100vh - 3rem)); display: flex; flex-direction: column; justify-content: center } }
+.corner { position: absolute; width: 58px; height: 58px; background: linear-gradient(135deg, #f1d895, #b2862f 45%, #6d4f17 70%, #c9a253); box-shadow: 0 2px 3px rgba(0, 0, 0, .5) }
+.corner.tl { top: 0; left: 0; clip-path: polygon(0 0, 100% 0, 0 100%); border-radius: 6px 0 0 0 }
+.corner.tr { top: 0; right: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); border-radius: 0 10px 0 0 }
+.corner.bl { bottom: 0; left: 0; clip-path: polygon(0 0, 0 100%, 100% 100%); border-radius: 0 0 0 6px }
+.corner.br { bottom: 0; right: 0; clip-path: polygon(100% 0, 100% 100%, 0 100%); border-radius: 0 0 10px 0 }
+.foil { background: linear-gradient(170deg, var(--foil-a) 10%, #d8b25e 40%, var(--foil-b) 62%, #f0d58a 85%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .55)) drop-shadow(0 -1px 0 rgba(255, 255, 255, .08)) }
+.board .eyebrow { font: 600 .78rem/1 var(--mono); letter-spacing: .3em; text-transform: uppercase }
+.board h1 { margin: 1rem 0 1.1rem; font: 800 clamp(2.8rem, 8vw, 5.6rem)/.95 var(--display); letter-spacing: -.015em }
+.board .sub { max-width: 46ch; font-size: clamp(1.02rem, 1.8vw, 1.22rem); color: rgba(234, 223, 190, .82) }
+.board .meta { margin-top: 2.6rem; display: grid; gap: .35rem; font: 400 .9rem/1.4 var(--mono); color: rgba(234, 223, 190, .7) }
+.board .meta strong { font: 600 1rem/1.4 var(--body); color: var(--tab-fg) }
+.label-plate { display: inline-block; margin-top: 2rem; padding: .55rem 1rem; font: 500 .82rem/1.3 var(--mono); color: #2c2412;
+  background: linear-gradient(180deg, #efe4c4, #d8c89c); border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(80, 60, 20, .4), 0 2px 4px rgba(0, 0, 0, .5) }
+
+/* thumb-index tabs and controls */
+.tabs { position: fixed; z-index: 5; right: 0; top: 50%; transform: translateY(-50%); display: none; flex-direction: column; gap: 3px;
+  padding-right: env(safe-area-inset-right, 0px) }
+@media (min-width: 1300px) { .tabs { display: flex } }
+.tabs a { display: block; width: 2.5rem; padding: .32rem .3rem .32rem .55rem; font: 600 .7rem/1 var(--mono); color: var(--tab-fg); text-decoration: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .25), transparent 30%), var(--tab); border-radius: 5px 0 0 5px;
+  box-shadow: -2px 2px 4px rgba(0, 0, 0, .4); transition: transform .2s ease }
+.tabs a:hover, .tabs a:focus-visible { transform: translateX(-4px) }
+.tabs a.on { background: linear-gradient(90deg, rgba(0, 0, 0, .2), transparent 30%), var(--red-ink); transform: translateX(-6px) }
+.ctrl { position: fixed; z-index: 6; left: max(10px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 6px }
+@media (max-width: 1399px) { .ctrl { opacity: .78 } .ctrl #fs { display: none } }
+.ctrl button { font: 600 .74rem/1 var(--mono); letter-spacing: .06em; color: var(--tab-fg); background: var(--tab); border: 1px solid rgba(0, 0, 0, .4);
+  border-radius: 4px; padding: .6rem .8rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .1) }
+.ctrl button:hover { filter: brightness(1.15) }
+:focus-visible { outline: 2px solid var(--red-ink); outline-offset: 3px }
+
+@media (max-width: 999px) {
+  .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .g3, .steps { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .split { grid-template-columns: minmax(0, 1fr) }
+  .tl { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 0 }
+  .tl::before, .rel::before { display: none }
+  .dec-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
+  .dec-row.hd { display: none }
+  .dec-row > div + div { border-left: 0 }
+  .dec-row .ch { grid-column: 1 / -1; padding-bottom: 0 }
+  .dec-row .alt { grid-column: 1 / -1; padding-top: .1rem }
+  .dec-row .lbl { display: inline }
+  .stamp.pass { top: 4.4rem }
+}
+@media (max-width: 620px) {
+  :root { --m: 1.5rem }
+  .sheet { padding: 1.6rem 1rem 1.4rem calc(var(--m) + .8rem) }
+  .g2, .g3, .g4, .steps, .tl { grid-template-columns: minmax(0, 1fr) }
+  .dec-row { grid-template-columns: minmax(0, 1fr) }
+  .toc { columns: 1 }
+  .capk { white-space: normal }
+  .stamp { font-size: 1.1rem }
+  .stamp.pass { right: .6rem; top: 1.2rem }
+  .corner { width: 40px; height: 40px }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } .in .stamp { animation: none } .tabs a { transition: none } }
+</style>
+
+<nav class="tabs" id="tabs" aria-label="Sheets"></nav>
+<div class="ctrl">
+  <button type="button" id="prev" aria-label="Previous sheet">PREV</button>
+  <button type="button" id="next" aria-label="Next sheet">NEXT</button>
+  <button type="button" id="fs" aria-label="Present full screen">PRESENT</button>
+</div>
+
+<main id="deck">
+
+<section class="board" id="cover" data-tab="C" aria-label="Cover">
+  <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+  <div class="eyebrow foil">Backend take-home assessment</div>
+  <h1 class="foil">Ezeebit Wallet</h1>
+  <p class="sub">A multi-currency double-entry ledger and firm-quote currency conversion, built to run the same on a laptop fleet and on Kubernetes. With the reasons behind every technology in it.</p>
+  <div class="meta">
+    <strong>Kudzai Sean Huni</strong>
+    <span>Senior Software Engineer (Java &amp; Spring)</span>
+    <span>Release 0.4.0 · Java 25 · Spring Boot 4.1.2 · 5 November 2026</span>
+  </div>
+  <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 21 folios</span></div>
+</section>
+
+<section class="sheet" id="contents" data-tab="1">
+  <header class="head"><span class="acct">Index</span><h2>Contents</h2><span class="folio">Fo. 1</span></header>
+  <ol class="toc">
+    <li><a href="#brief">The brief and the scope</a><span class="dots"></span><span class="fo">2</span></li>
+    <li><a href="#architecture">Architecture</a><span class="dots"></span><span class="fo">3</span></li>
+    <li><a href="#ledger">Task 1: the ledger</a><span class="dots"></span><span class="fo">4</span></li>
+    <li><a href="#conversion">Task 2: conversion</a><span class="dots"></span><span class="fo">5</span></li>
+    <li><a href="#failure">Failure handling</a><span class="dots"></span><span class="fo">6</span></li>
+    <li><a href="#cap">CAP, per operation</a> <span class="new">NEW</span><span class="dots"></span><span class="fo">7</span></li>
+    <li><a href="#dec-money">Decisions: the money model</a> <span class="new">WHY</span><span class="dots"></span><span class="fo">8</span></li>
+    <li><a href="#dec-seams">Decisions: the service seams</a> <span class="new">WHY</span><span class="dots"></span><span class="fo">9</span></li>
+    <li><a href="#dec-runtime">Decisions: runtime and delivery</a> <span class="new">WHY</span><span class="dots"></span><span class="fo">10</span></li>
+    <li><a href="#testing">Testing</a><span class="dots"></span><span class="fo">11</span></li>
+    <li><a href="#gates">Quality and supply-chain gates</a><span class="dots"></span><span class="fo">12</span></li>
+    <li><a href="#observability">Observability and alerting</a><span class="dots"></span><span class="fo">13</span></li>
+    <li><a href="#kubernetes">Kubernetes parity on kind</a><span class="dots"></span><span class="fo">14</span></li>
+    <li><a href="#chaos">Chaos and resilience</a><span class="dots"></span><span class="fo">15</span></li>
+    <li><a href="#releases">Releases</a><span class="dots"></span><span class="fo">16</span></li>
+    <li><a href="#tasks">How Tasks 3 to 6 fit</a><span class="dots"></span><span class="fo">17</span></li>
+    <li><a href="#summary">Summary</a><span class="dots"></span><span class="fo">18</span></li>
+    <li><a href="#lessons">Lessons learnt</a><span class="dots"></span><span class="fo">19</span></li>
+    <li><a href="#further">Potential further work</a><span class="dots"></span><span class="fo">20</span></li>
+    <li><a href="#memory">Memory: observed, then derived</a> <span class="new">NEW</span><span class="dots"></span><span class="fo">21</span></li>
+  </ol>
+  <p class="note"><b>How to read</b>Folios 8 to 10 post every technology choice like a ledger entry: Dr is what the choice buys, Cr is what it costs. Arrow keys, Page Up and Page Down move one sheet. The deep detail is in the repository: README, SOLUTION, ARCHITECTURE, EVIDENCE and docs/k8s.md.</p>
+</section>
+
+<section class="sheet" id="brief" data-tab="2">
+  <header class="head"><span class="acct">Scope</span><h2>The brief and the scope</h2><span class="folio">Fo. 2</span></header>
+  <p class="lede">Two of six tasks, chosen because every other task posts through them.</p>
+  <div class="split">
+    <div class="grid">
+      <div class="item"><h3>Task 1: hold money</h3><p>Hold a merchant’s money across five currencies, so every balance can be trusted completely and explained at any later date.</p></div>
+      <div class="item"><h3>Task 2: convert money</h3><p>Quote a firm price from the exchange-rate service, then convert at exactly that price, or reject clearly.</p></div>
+      <div class="item"><h3>Why these two</h3><p>They are the core money model. A withdrawal is a ledger debit; a crypto payment is a ledger deposit; auto-settlement is a conversion; payout routing sits behind the withdrawal. If the ledger and conversion are right, Tasks 3 to 6 are plumbing around them.</p></div>
+    </div>
+    <div class="grid g2">
+      <div class="stat"><span class="n">~3 h</span><span class="l">of my own attention, directing AI agents (Claude Code) under review gates</span></div>
+      <div class="stat red"><span class="n">24 days</span><span class="l">13 October to 5 November: the agent working window, releases 0.1.0 to 0.4.0</span></div>
+      <div class="stat"><span class="n">2 of 6</span><span class="l">tasks in scope; extras beyond the brief are listed as optional in SOLUTION.md</span></div>
+      <div class="stat"><span class="n">5</span><span class="l">currencies: ZAR, NGN, KES, USDT, USDC</span></div>
+    </div>
+  </div>
+  <p class="note"><b>Derivation</b>The brief was read as a grammar exercise: nouns proposed things, verbs proposed operations, and words like “completely”, “large” and “must never” became proof obligations the design had to make true. A subtractive pass then removed Merchant, Fiat, Crypto and Settlement as services, and added Conversion, which the first sketch missed.</p>
+</section>
+
+<section class="sheet" id="architecture" data-tab="3">
+  <header class="head"><span class="acct">Topology</span><h2>Architecture</h2><span class="folio">Fo. 3</span></header>
+  <p class="lede">Two core services own the money and their own PostgreSQL databases; everything else supports them. Only the ledger writes money.</p>
+  <div class="scroll">
+    <svg class="arch" viewBox="0 0 1000 520" role="img" aria-label="A merchant calls gateway-svc, which rate-limits through Redis and routes REST to the two core services, conversion-svc and ledger-svc, each with its own PostgreSQL database. Conversion calls the ledger over gRPC, the rate service over HTTP, and writes dead letters to Kafka. Config and Eureka form the control plane; every service exports telemetry to LGTM. Each component is tagged with the side of the CAP theorem it chooses under a partition.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahr" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahp" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="140" y="30" width="236" height="440" rx="6"/><text class="zl" x="152" y="50">SUPPORTING · EDGE</text>
+      <rect class="zone core" x="392" y="30" width="336" height="440" rx="6"/><text class="zl core" x="404" y="50">CORE DOMAIN · OWNS THE MONEY</text>
+      <rect class="zone" x="744" y="30" width="252" height="440" rx="6"/><text class="zl" x="756" y="50">SUPPORTING · PLATFORM</text>
+
+      <rect class="box" x="12" y="215" width="108" height="56" rx="3"/><text class="t" x="66" y="240" text-anchor="middle">Merchant</text><text class="s" x="66" y="258" text-anchor="middle">client</text>
+
+      <rect class="box" x="160" y="196" width="196" height="88" rx="3"/><text class="t" x="258" y="222" text-anchor="middle">gateway-svc</text><text class="s" x="258" y="241" text-anchor="middle">:8080 · routes, rate limit</text>
+      <g class="cap na"><rect x="172" y="256" width="70" height="18" rx="2"/><text x="179" y="269">stateless</text></g>
+      <rect class="box" x="160" y="372" width="196" height="78" rx="3"/><text class="t" x="258" y="396" text-anchor="middle">Redis</text><text class="s" x="258" y="414" text-anchor="middle">shared rate-limit buckets</text>
+      <g class="cap cp"><rect x="172" y="424" width="160" height="18" rx="2"/><text x="179" y="437">CP · fails closed, 503</text></g>
+
+      <rect class="box conv" x="410" y="76" width="300" height="94" rx="3"/><text class="t" x="560" y="102" text-anchor="middle">conversion-svc</text><text class="s" x="560" y="121" text-anchor="middle">:8082 · Task 2 · quote, accept, sweeper</text>
+      <g class="cap cp"><rect x="422" y="138" width="80" height="18" rx="2"/><text x="429" y="151">quote: CP</text></g>
+      <g class="cap mix"><rect x="510" y="138" width="188" height="18" rx="2"/><text x="517" y="151">accept: A reply, C money</text></g>
+      <rect class="box" x="410" y="186" width="148" height="50" rx="3"/><text class="t" x="484" y="207" text-anchor="middle">conversion DB</text><text class="s" x="484" y="225" text-anchor="middle">PostgreSQL 18.6</text>
+
+      <rect class="box ledger" x="410" y="300" width="300" height="92" rx="3"/><text class="t" x="560" y="326" text-anchor="middle">ledger-svc</text><text class="s" x="560" y="345" text-anchor="middle">:8081 · gRPC :9081 · Task 1</text>
+      <g class="cap cp"><rect x="422" y="361" width="204" height="18" rx="2"/><text x="429" y="374">CP · the only writer of money</text></g>
+      <rect class="box" x="410" y="408" width="148" height="50" rx="3"/><text class="t" x="484" y="429" text-anchor="middle">ledger DB</text><text class="s" x="484" y="447" text-anchor="middle">PostgreSQL 18.6</text>
+
+      <rect class="box" x="760" y="72" width="220" height="58" rx="3"/><text class="t" x="870" y="96" text-anchor="middle">rate service</text><text class="s" x="870" y="115" text-anchor="middle">WireMock stand-in · :8089</text>
+      <rect class="box" x="760" y="150" width="220" height="80" rx="3"/><text class="t" x="870" y="173" text-anchor="middle">Kafka · KRaft</text><text class="s" x="870" y="191" text-anchor="middle">dead-letter topic</text>
+      <g class="cap ap"><rect x="772" y="203" width="168" height="18" rx="2"/><text x="779" y="216">AP · signal, not state</text></g>
+      <rect class="box" x="760" y="248" width="220" height="96" rx="3"/><text class="t" x="870" y="271" text-anchor="middle">Control plane</text><text class="s" x="870" y="290" text-anchor="middle">config-svc :8888</text><text class="s" x="870" y="306" text-anchor="middle">eureka-svc :8761</text>
+      <g class="cap ap"><rect x="772" y="316" width="160" height="18" rx="2"/><text x="779" y="329">AP · last known state</text></g>
+      <rect class="box" x="760" y="362" width="220" height="96" rx="3"/><text class="t" x="870" y="385" text-anchor="middle">Telemetry · LGTM</text><text class="s" x="870" y="404" text-anchor="middle">metrics, logs, traces, profiles</text><text class="s" x="870" y="420" text-anchor="middle">OTLP from every service</text>
+      <g class="cap na"><rect x="772" y="430" width="160" height="18" rx="2"/><text x="779" y="443">off the request path</text></g>
+
+      <path class="ln" d="M120 243H156"/>
+      <path class="ln" d="M258 284V368"/>
+      <path class="ln" d="M356 222L406 132"/><text class="lbl" x="361" y="247">REST</text>
+      <path class="ln" d="M356 262L406 340"/>
+      <path class="ln" d="M484 170V182"/>
+      <path class="ln" d="M484 392V404"/>
+      <path class="ln grpc" d="M640 170V296"/><text class="lbl" x="630" y="262" text-anchor="end">gRPC · Post, Find, Void</text><text class="lbl" x="630" y="277" text-anchor="end">Resilience4j retry, breaker</text>
+      <path class="ln" d="M710 98L756 100"/>
+      <path class="ln dl" d="M710 150L756 186"/>
+      <text class="lbl" x="12" y="492">/internal/** is never routed by the gateway, so a merchant cannot credit itself.</text><text class="lbl" x="12" y="510">CAP under a partition: red refuses rather than answer wrong; green answers from its last known state; brass splits the reply from the money.</text>
+    </svg>
+  </div>
+  <p class="note"><b>Reading it</b>Core: conversion owns pricing, the ledger owns balances, each in its own database. Supporting: the gateway and Redis guard the edge; config, Eureka, Kafka, the rate stand-in and LGTM serve the core and hold no money. Red is the money path over gRPC; the dashed line is the Kafka dead-letter path. Both databases share one PostgreSQL instance here: separate databases, one failure domain.</p>
+</section>
+
+<section class="sheet" id="ledger" data-tab="4">
+  <header class="head"><span class="acct">Task 1</span><h2>The ledger</h2><span class="folio">Fo. 4</span></header>
+  <p class="lede">A double-entry journal: the statement explains every balance.</p>
+  <div class="split">
+    <div class="grid g2">
+      <div class="item"><h3>Balanced journals</h3><p>Every movement is a journal whose entries sum to zero per currency.</p></div>
+      <div class="item"><h3>Insert-only history</h3><p>Entries are never edited. Each carries <code>balance_after</code>, so a balance explains itself.</p></div>
+      <div class="item"><h3>Currencies cannot mix</h3><p>A composite foreign key ties each entry’s currency to its account’s, even under an application bug.</p></div>
+      <div class="item"><h3>Duplicates are expected</h3><p>The idempotency key is stored with the journal in the same transaction; a replay returns the stored answer.</p></div>
+    </div>
+    <div class="scroll">
+      <table class="led">
+        <thead><tr><th>Currency</th><th>Kind</th><th class="num">Scale</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ZAR · NGN · KES</td><td>FIAT</td><td class="num">2</td></tr>
+          <tr><td class="mono">USDT · USDC</td><td>STABLECOIN</td><td class="num">6</td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="3">"10.500" ZAR is accepted · "10.001" ZAR is refused, never rounded</td></tr></tfoot>
+      </table>
+      <p class="after">A replayed deposit returns the identical answer and credits once. The same key with a different body is 422.</p>
+    </div>
+  </div>
+  <p class="note"><b>Proven</b>Under row locks, 50 concurrent deposits sum exactly, and 20 concurrent copies of one deposit credit once. The journal is the source of truth; <code>account.balance</code> and <code>balance_after</code> are caches the journal can audit.</p>
+</section>
+
+<section class="sheet" id="conversion" data-tab="5">
+  <header class="head"><span class="acct">Task 2</span><h2>Conversion</h2><span class="folio">Fo. 5</span></header>
+  <p class="lede">Firm quote, then accept: the price shown is the price paid, or a clear rejection.</p>
+  <div class="steps">
+    <div class="step"><h3>Quote</h3><p>Call the rate service (2 s timeouts, no fallback rate), validate it, apply the spread, round in the platform’s favour.</p></div>
+    <div class="step"><h3>Accept</h3><p>Within the quote’s 15 s lifetime, with an Idempotency-Key. The same quote under another key is 409.</p></div>
+    <div class="step"><h3>Post</h3><p>The ledger posts four entries in one transaction, under merchant row locks, with funds and a deadline checked.</p></div>
+  </div>
+  <div class="rel-wrap">
+    <span class="stamp green posted">Posted<small>journal · CONVERSION</small></span>
+    <div class="scroll">
+      <table class="led">
+        <thead><tr><th>Account</th><th>Currency</th><th class="num">Amount</th><th class="num">Balance after</th></tr></thead>
+        <tbody>
+          <tr><td>Merchant</td><td class="mono">ZAR</td><td class="num neg">−1000.00</td><td class="num">500.00</td></tr>
+          <tr><td>Platform FX</td><td class="mono">ZAR</td><td class="num">+1000.00</td><td class="num">·</td></tr>
+          <tr><td>Platform FX</td><td class="mono">USDT</td><td class="num neg">−53.982730</td><td class="num">·</td></tr>
+          <tr><td>Merchant</td><td class="mono">USDT</td><td class="num">+53.982730</td><td class="num">53.982730</td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="4">Σ ZAR = 0.00 · Σ USDT = 0.000000 · rate 0.054254 less a 50 bps spread</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  <p class="note"><b>Demo path</b>From the README: deposit 1500.00 ZAR, quote 1000.00 ZAR to USDT, convert within 15 seconds, read back 53.982730 USDT and 500.00 ZAR. Rounding favours the platform by at most one minor unit. The platform FX account per currency is the open position, and may go negative.</p>
+</section>
+
+<section class="sheet" id="failure" data-tab="6">
+  <header class="head"><span class="acct">Failure</span><h2>Failure handling</h2><span class="folio">Fo. 6</span></header>
+  <p class="lede">A PENDING conversion is resolved, never guessed. Rehearsed ledger outage, 14 October.</p>
+  <div class="split">
+    <div>
+      <div class="rel-wrap"><span class="stamp void">Void<small>5 of 5 · t+350s</small></span>
+      <div class="scroll">
+        <table class="led">
+          <thead><tr><th>Time</th><th>Event</th></tr></thead>
+          <tbody>
+            <tr><td class="t">t+0s</td><td>ledger-svc killed with <code>kill -9</code></td></tr>
+            <tr><td class="t">t+1 to 4s</td><td>5 conversions answer 202 PENDING; 5 dead letters to Kafka</td></tr>
+            <tr><td class="t">t+16s</td><td><code>ConversionLedgerDeadLettered</code> alerting</td></tr>
+            <tr><td class="t">t+27s</td><td>Page delivered to Slack</td></tr>
+            <tr><td class="t">t+166s</td><td>FIND circuit breaker open</td></tr>
+            <tr><td class="t">t+350s</td><td>Sweeper voided all 5 on both sides</td></tr>
+            <tr><td class="t">t+369s</td><td>PENDING count back to 0</td></tr>
+          </tbody>
+        </table>
+      </div></div>
+      <p class="after">Up to 3 gRPC attempts, then PENDING. A ledger refusal is committed before it is answered, so a late posting can never land. The sweeper asks the ledger once no posting can still commit: found means settled; not found writes a VOID marker.</p>
+    </div>
+    <figure>
+      <span class="mount"><i></i><i></i><i></i><i></i><img src="img/grpc-row.png" alt="Grafana fleet overview during the outage: Post calls fail UNAVAILABLE, error ratio 100%, three circuit breakers, five POST dead letters" width="1440" height="900"></span>
+      <figcaption>Grafana during the outage: retries exhausted, 5 dead letters, one breaker per ledger operation.</figcaption>
+    </figure>
+  </div>
+  <p class="note"><b>Why no replay</b>A dead letter for a call with an unknown outcome is record and alert only. Replaying it would race the sweeper, which owns the outcome. A posting and a void race on one unique index, so the first commit wins and the two databases’ clocks do not matter.</p>
+</section>
+
+<section class="sheet" id="cap" data-tab="7">
+  <header class="head"><span class="acct">Trade-offs</span><h2>CAP, per operation</h2><span class="folio">Fo. 7</span></header>
+  <p class="lede">Under a partition a service either refuses or risks a wrong answer. The choice is made per operation, not per system: money refuses, signals keep going.</p>
+  <div class="scroll">
+    <table class="led">
+      <thead><tr><th>Operation</th><th>Cut off from</th><th>Chooses</th><th>What the merchant sees</th></tr></thead>
+      <tbody>
+        <tr><td>Post money (deposit, conversion legs)</td><td class="mono">ledger DB</td><td><span class="capk cp">CP</span></td><td>The request fails; nothing is half-written, every posting is one transaction</td></tr>
+        <tr><td>Balances, statement</td><td class="mono">ledger DB</td><td><span class="capk cp">CP</span></td><td>An error, never a stale balance: no cache, no read replica</td></tr>
+        <tr><td>Quote</td><td class="mono">rate service</td><td><span class="capk cp">CP</span></td><td>503 <code>RATE_UNAVAILABLE</code> in about 4.2 s; never a default rate</td></tr>
+        <tr><td>Accept</td><td class="mono">ledger-svc (gRPC)</td><td><span class="capk mix">A reply · C money</span></td><td>202 PENDING within the gateway’s 10 s; the sweeper settles it with Find, or voids it</td></tr>
+        <tr><td>Rate limit</td><td class="mono">Redis</td><td><span class="capk cp">CP · fails closed</span></td><td>503 <code>RATE_LIMITER_UNAVAILABLE</code>; nothing is forwarded unlimited</td></tr>
+        <tr><td>Routing</td><td class="mono">eureka-svc</td><td><span class="capk ap">AP</span></td><td>Served from the last registry; only a never-sent request is resent</td></tr>
+        <tr><td>Configuration</td><td class="mono">config-svc</td><td><span class="capk ap">AP</span></td><td>Nothing while running; a restarting service cannot boot</td></tr>
+        <tr><td>Dead letter</td><td class="mono">Kafka</td><td><span class="capk ap">AP</span></td><td>Nothing: the publish is asynchronous; a failed publish is counted and paged</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid g3" style="margin-top:1.4rem">
+    <div class="item"><h3>Why accept splits</h3><p>The reply cannot wait for a partition to heal, and the money cannot be guessed. A late posting and a void race on one unique index: the first commit wins.</p></div>
+    <div class="item"><h3>Why the dead letter sits in conversion</h3><p>The caller is the side that sees the partition. Kafka is a separate failure domain, so the alert survives a ledger outage. It is a signal; the sweeper owns the outcome.</p></div>
+    <div class="item"><h3>PACELC: no partition</h3><p>The ledger still trades latency for consistency: one merchant’s postings serialise on row locks, and every read comes from the primary.</p></div>
+  </div>
+  <p class="note"><b>Under test</b>The rehearsed ledger outage (Fo. 6) is this table under fire: 5 conversions answered PENDING, 5 dead letters, 5 voids, and no conversion was posted twice.</p>
+</section>
+
+<section class="sheet" id="dec-money" data-tab="8">
+  <header class="head"><span class="acct">Decisions I</span><h2>The money model, and why</h2><span class="folio">Fo. 8</span></header>
+  <p class="lede">Each choice posted as an entry: what it buys (Dr) against what it costs (Cr).</p>
+  <div class="dec">
+    <div class="dec-row hd"><div>Choice</div><div>Chosen over</div><div>Buys</div><div>Costs</div></div>
+    <div class="dec-row"><div class="ch">Double-entry journal; <code>account.balance</code> and <code>balance_after</code> are caches of it</div><div class="alt"><span class="lbl">Over: </span>A balance column as the only record</div><div class="dr">The brief asks to trust balances completely and explain them at any later date. A journal does both.</div><div class="cr">More rows; every posting writes the journal and the cached balance in one transaction.</div></div>
+    <div class="dec-row"><div class="ch">Decimal strings on the wire; <code>NUMERIC(38,18)</code> and <code>BigDecimal</code></div><div class="alt"><span class="lbl">Over: </span>JSON numbers, floating point</div><div class="dr">No binary float ever reaches a balance. Too many decimals is refused, never rounded.</div><div class="cr">Clients send strings. Currency scales live in two places until the ledger serves them.</div></div>
+    <div class="dec-row"><div class="ch">Idempotency key and request hash stored with the journal</div><div class="alt"><span class="lbl">Over: </span>A separate dedupe cache</div><div class="dr">A flaky mobile retry replays the stored answer. Key and journal commit together, so neither exists without the other.</div><div class="cr">A unique index and a hash on every POST that moves money.</div></div>
+    <div class="dec-row"><div class="ch">Row locks, with <code>CHECK (balance &gt;= 0)</code> as the last line</div><div class="alt"><span class="lbl">Over: </span>Check the balance, then write</div><div class="dr">A merchant can never convert more than they hold, even under concurrent requests.</div><div class="cr">One merchant’s postings serialise on their accounts.</div></div>
+    <div class="dec-row"><div class="ch">Firm quote: 15 s lifetime, 50 bps spread</div><div class="alt"><span class="lbl">Over: </span>“Last look”, re-pricing at accept</div><div class="dr">The price shown is the price paid, or a clear “quote expired”.</div><div class="cr">The platform carries 15 s of market move. Revisit if measured slippage exceeds the spread.</div></div>
+    <div class="dec-row"><div class="ch">One local transaction, plus a sweeper</div><div class="alt"><span class="lbl">Over: </span>A saga, or a distributed transaction</div><div class="dr">The money moves once, in one database. A PENDING is settled by asking, never guessed.</div><div class="cr">A deadline, a sweeper and a VOID marker to reason about.</div></div>
+    <div class="dec-row"><div class="ch">PostgreSQL 18.6</div><div class="alt"><span class="lbl">Over: </span>MySQL, Ezeebit’s stack</div><div class="dr">Transactional DDL: a failed migration rolls back cleanly. One identical image in tests and compose.</div><div class="cr">A driver, datasource and dialect change to move. Only portable features are used, so it is not a redesign.</div></div>
+  </div>
+</section>
+
+<section class="sheet" id="dec-seams" data-tab="9">
+  <header class="head"><span class="acct">Decisions II</span><h2>The service seams, and why</h2><span class="folio">Fo. 9</span></header>
+  <p class="lede">Where the system is cut, and how each cut is guarded.</p>
+  <div class="dec">
+    <div class="dec-row hd"><div>Choice</div><div>Chosen over</div><div>Buys</div><div>Costs</div></div>
+    <div class="dec-row"><div class="ch">Two domain services; only the ledger writes money</div><div class="alt"><span class="lbl">Over: </span>One service with two modules</div><div class="dr">Different invariants, rates of change and failure domains. A slow rate feed cannot stall deposits or balance reads.</div><div class="cr">A network hop. One modular service was also defensible at this volume.</div></div>
+    <div class="dec-row"><div class="ch">gRPC from conversion to ledger, one <code>.proto</code> compiled by both</div><div class="alt"><span class="lbl">Over: </span>Internal REST with hand-written DTOs</div><div class="dr">One contract that cannot drift (a build check fails on a second copy). Deadlines and status codes on the wire.</div><div class="cr">HTTP/2 pins a client to one replica: a Eureka name resolver, round-robin, and 30 s connection ageing fix it.</div></div>
+    <div class="dec-row"><div class="ch">Resilience4j: a retry and a breaker per operation</div><div class="alt"><span class="lbl">Over: </span>One shared breaker, or no retries</div><div class="dr">Only UNAVAILABLE and DEADLINE_EXCEEDED retry, 3 attempts. A breaker opens at 50% failures over 20 calls. Post’s worst case, 6.6 s, fits the gateway’s 10 s. A failing Void cannot block Post.</div><div class="cr">Breakers are per replica. Correctness never depends on them; the sweeper settles every PENDING.</div></div>
+    <div class="dec-row"><div class="ch">Kafka dead-letter topic, record and alert only</div><div class="alt"><span class="lbl">Over: </span>A consumer that replays</div><div class="dr">An unknown outcome is visible and paged, never retried into a race. Publishing is asynchronous, so a dead broker never slows a merchant.</div><div class="cr">A broker to run, for a topic nothing consumes by design.</div></div>
+    <div class="dec-row"><div class="ch">Gateway, Eureka and Config Server</div><div class="alt"><span class="lbl">Over: </span>Fixed URLs, no gateway</div><div class="dr">One route table, and one place that keeps <code>/internal/**</code> unreachable. Room for payouts and settlement.</div><div class="cr">Three extra processes, a boot order, registry caches to tune. The first to go if the fleet stays small.</div></div>
+    <div class="dec-row"><div class="ch">Redis rate limit per merchant, failing closed</div><div class="alt"><span class="lbl">Over: </span>No limiter, or buckets in each pod</div><div class="dr">A payday burst from one merchant cannot starve the rest. Every gateway replica shares the same buckets.</div><div class="cr">Redis is on the edge’s critical path: without it, no merchant call succeeds.</div></div>
+  </div>
+  <p class="note"><b>Per-pod buckets</b>In-heap buckets multiply the limit by the replica count, and an autoscaler adds replicas exactly when traffic is abusive. That is why the limit lives in Redis.</p>
+</section>
+
+<section class="sheet" id="dec-runtime" data-tab="10">
+  <header class="head"><span class="acct">Decisions III</span><h2>Runtime and delivery, and why</h2><span class="folio">Fo. 10</span></header>
+  <p class="lede">The platform under the code, and how it gets built, shipped and watched.</p>
+  <div class="dec">
+    <div class="dec-row hd"><div>Choice</div><div>Chosen over</div><div>Buys</div><div>Costs</div></div>
+    <div class="dec-row"><div class="ch">Java 25 with virtual threads, G1 and compact object headers</div><div class="alt"><span class="lbl">Over: </span>Platform thread pools, or reactive code</div><div class="dr">Plain blocking code with cheap concurrency. The bound is the database pool (70 of 100 connections at full scale), not the CPU count.</div><div class="cr">Needs 2 CPUs per pod: at 1 CPU a single pinned thread stalls every request. A build gate holds it.</div></div>
+    <div class="dec-row"><div class="ch">Spring Boot 4.1.2, Spring Cloud 2025.1.3</div><div class="alt"><span class="lbl">Over: </span>Quarkus</div><div class="dr">The role is Java and Spring. Gateway, registry, config server and gRPC come as first-party parts.</div><div class="cr">More memory per pod than a leaner runtime.</div></div>
+    <div class="dec-row"><div class="ch">Liquibase with a PostgreSQL session advisory lock</div><div class="alt"><span class="lbl">Over: </span>Liquibase’s default lock row</div><div class="dr">A lock row outlives a SIGKILLed migrator and blocks every later pod. A session lock dies with its connection.</div><div class="cr">A small custom lock service, shared by both database-owning services.</div></div>
+    <div class="dec-row"><div class="ch">Paketo buildpacks pinned by digest, an SBOM per image, trivy</div><div class="alt"><span class="lbl">Over: </span>A hand-written Dockerfile</div><div class="dr">Reproducible images, base layers maintained by the builder; fixable HIGH and CRITICAL CVEs in the service layers fail the build.</div><div class="cr">Less control over layers. A base-layer CVE waits for a builder bump: 0.3.1 fixed openssl this way.</div></div>
+    <div class="dec-row"><div class="ch">OpenTelemetry to one LGTM stack; dashboards generated and provisioned</div><div class="alt"><span class="lbl">Over: </span>Separate tools; dashboards clicked together</div><div class="dr">Metrics, logs, traces and profiles link to each other: a span opens its flame graph. Dashboards are a reviewable diff; 10 alert rules are unit-tested by promtool.</div><div class="cr">The all-in-one container is a development stack, not a highly available one.</div></div>
+    <div class="dec-row"><div class="ch">kind, Kubernetes v1.36.1 in Docker</div><div class="alt"><span class="lbl">Over: </span>A cloud cluster</div><div class="dr">The same images and config names as compose, 2+ replicas, built and deleted in one command, at no cost.</div><div class="cr">Not a cloud: one machine, no real load balancer.</div></div>
+    <div class="dec-row"><div class="ch">Chaos by script, plus a paused CronJob</div><div class="alt"><span class="lbl">Over: </span>Chaos Mesh, LitmusChaos</div><div class="dr">A named kill at a known moment, with traffic, a kill counter and a money audit. No CRDs to install.</div><div class="cr">Pod kills and scale-to-zero only; no network or clock faults.</div></div>
+    <div class="dec-row"><div class="ch">WireMock, Testcontainers and Cucumber against the real ledger jar</div><div class="alt"><span class="lbl">Over: </span>Mocks inside unit tests</div><div class="dr">The acceptance tier speaks real HTTP and gRPC to real processes, with faults scripted at the wire.</div><div class="cr">Slower suites, and Docker is required to run them.</div></div>
+    <div class="dec-row"><div class="ch">One repository for five services</div><div class="alt"><span class="lbl">Over: </span>A repository per service</div><div class="dr">One clone builds and runs with one command.</div><div class="cr">A departure from 12-factor’s one codebase per app. Shared code is limited to telemetry, persistence, discovery and contracts.</div></div>
+  </div>
+</section>
+
+<section class="sheet" id="testing" data-tab="11">
+  <header class="head"><span class="acct">Proof</span><h2>Testing</h2><span class="folio">Fo. 11</span></header>
+  <p class="lede">Every concurrency, idempotency and currency test was seen failing with its control removed.</p>
+  <div class="split">
+    <div>
+      <div class="stat big"><span class="n">831</span><span class="l">tests, 0 failures, at release 0.4.0: unit, integration and Cucumber acceptance scenarios</span></div>
+      <p class="after">conversion-svc’s scenarios run against the real ledger jar, with WireMock and a gRPC proxy scripting faults.</p>
+    </div>
+    <div class="grid g2">
+      <div class="item"><h3>Concurrency</h3><p>50 concurrent deposits sum exactly. 20 copies of one deposit credit once. 8 concurrent conversions from one balance succeed exactly as often as the funds allow.</p></div>
+      <div class="item"><h3>Red before green</h3><p>A test was trusted only after it failed without its control: row lock, unique constraint, composite foreign key, request-hash check.</p></div>
+      <div class="item"><h3>Edge inputs</h3><p>Three inputs once answered 500: a balance past 20 digits, a NUL in a reference, a statement window out of range. Each now answers 422 or 400.</p></div>
+      <div class="item"><h3>Architecture tests</h3><p>A shared gate fails the build when any bean takes more than 3 injected dependencies. OpenAPI snapshots are checked in the build.</p></div>
+    </div>
+  </div>
+  <p class="note"><b>Caught</b>The first concurrent-conversion test stayed green with the source-account lock removed, because a shared target lock serialised everything. It now buys a different currency per request and goes red without the source lock.</p>
+</section>
+
+<section class="sheet" id="gates" data-tab="12">
+  <header class="head"><span class="acct">Gates</span><h2>Quality and supply-chain gates</h2><span class="folio">Fo. 12</span></header>
+  <p class="lede">One Gradle build carries every gate.</p>
+  <div class="grid g3">
+    <div class="item"><h3>Dependency budget</h3><p>At most 3 injected collaborators per bean; 8 beans were split by job to meet it.</p></div>
+    <div class="item"><h3>Static analysis</h3><p>SpotBugs with Find Security Bugs, Checkstyle, JaCoCo coverage floors; SonarQube opt-in.</p></div>
+    <div class="item"><h3>Secrets</h3><p>gitleaks scans the whole git history.</p></div>
+    <div class="item"><h3>Images</h3><p>Paketo buildpacks, builder and run image pinned by tag and digest. No hand-written Dockerfile.</p></div>
+    <div class="item"><h3>SBOM and CVEs</h3><p>A software bill of materials per image; trivy fails fixable HIGH and CRITICAL findings in the service layers and reports the base layers.</p></div>
+    <div class="item"><h3>Kubernetes gates</h3><p>Manifest tags match the build version; replicas, connection-pool budget and virtual threads are checked.</p></div>
+  </div>
+  <p class="note"><b>Not yet</b>A CircleCI pipeline runs the same Gradle commands, but it has not been connected, so it has never run. The dependency budget is a hard gate rather than a heuristic: a count of constructor collaborators cannot be gamed the way a coverage percentage can.</p>
+</section>
+
+<section class="sheet" id="observability" data-tab="13">
+  <header class="head"><span class="acct">Watch</span><h2>Observability and alerting</h2><span class="folio">Fo. 13</span></header>
+  <p class="lede">Metrics, logs, traces and continuous profiles to one LGTM stack. Delivery proven by breaking something, not by the rule existing.</p>
+  <div class="split">
+    <figure>
+      <span class="mount"><i></i><i></i><i></i><i></i><img src="img/trace.png" alt="Grafana trace of one merchant conversion across gateway-svc, conversion-svc and ledger-svc, 17.44 ms" width="1440" height="900"></span>
+      <figcaption>One merchant conversion traced across gateway, conversion and ledger: 17.44 ms.</figcaption>
+    </figure>
+    <div class="grid">
+      <div class="grid g2">
+        <div class="stat"><span class="n">14</span><span class="l">alert rules; 10 unit-tested with promtool</span></div>
+        <div class="stat red"><span class="n">27 s</span><span class="l">from the kill to the Slack page</span></div>
+      </div>
+      <figure>
+        <span class="mount tilt"><i></i><i></i><i></i><i></i><img src="img/slack.png" alt="Slack channel ezeebit-alerts showing ServiceDown firing for conversion-svc, config-svc and ledger-svc, then resolved" width="1372" height="875"></span>
+        <figcaption>Firing and resolved, both delivered to the alerts channel.</figcaption>
+      </figure>
+    </div>
+  </div>
+  <p class="note"><b>Profiles</b>Since 0.4.0 every service streams wall-clock, allocation and lock profiles to Pyroscope at a 10 ms interval, at most 12 millicores per JVM; ProfilingFailing and ProfilesAbsent page when a profile stops arriving. <b>Limits</b>EVIDENCE.md holds every screenshot with what it proves, and what it does not: one Slack channel is not an on-call rota.</p>
+</section>
+
+<section class="sheet" id="kubernetes" data-tab="14">
+  <header class="head"><span class="acct">Parity</span><h2>Kubernetes parity on kind</h2><span class="folio">Fo. 14</span></header>
+  <p class="lede">The same images and configuration names as the laptop fleet, at more than one replica. Proof against “it works on my machine”.</p>
+  <div class="grid g4">
+    <div class="stat"><span class="n">2 to 4</span><span class="l">replicas under an HPA: gateway up to 4, ledger and conversion up to 3</span></div>
+    <div class="stat"><span class="n">70 ≤ 100</span><span class="l">pooled connections at full scale against PostgreSQL max_connections</span></div>
+    <div class="stat"><span class="n">20</span><span class="l">NetworkPolicies on a default-deny base</span></div>
+    <div class="stat red"><span class="n">1</span><span class="l">replica for config and Eureka, held by a build gate</span></div>
+  </div>
+  <div class="split" style="margin-top:1.6rem">
+    <div class="grid">
+      <div class="item"><h3>Replica fixes</h3><p>A killed pod leaves Eureka in about 30 s: 5 s renewals, a 15 s lease that eureka-core counts twice, eviction every 5 s. Meanwhile the gateway resends only a request that was never sent, never one that reached a service. Rate-limit buckets live in Redis, shared by every gateway replica.</p></div>
+      <div class="item"><h3>Run it</h3><p><code>./k8s/kube.sh up | status | down | sweep</code>. A lease lets only one fleet run at a time, compose or kind.</p></div>
+    </div>
+    <figure>
+      <span class="mount"><i></i><i></i><i></i><i></i><img src="img/eureka.png" alt="Eureka dashboard on kind: conversion-svc, gateway-svc and ledger-svc each UP with 2 instances" width="1440" height="900"></span>
+      <figcaption>Eureka on kind: every scaled service registered twice.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="sheet" id="chaos" data-tab="15">
+  <header class="head"><span class="acct">Resilience</span><h2>Chaos and resilience</h2><span class="folio">Fo. 15</span></header>
+  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.4.0.</p>
+  <span class="stamp green pass">9 / 9 pass<small>kind sweep · 0.4.0</small></span>
+  <div class="grid g4">
+    <div class="stat"><span class="n">1609</span><span class="l">merchant requests during 3 pod kills; 3 failed, within the 20 s budget</span></div>
+    <div class="stat"><span class="n">803 / 803</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
+    <div class="stat"><span class="n">50 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
+    <div class="stat red"><span class="n">5 s</span><span class="l">from the dead letter to a firing alert, with the ledger scaled to zero</span></div>
+  </div>
+  <div class="split" style="margin-top:1.6rem">
+    <div class="scroll">
+      <table class="led">
+        <thead><tr><th>Check</th><th>What it proves</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">parity, replicas</td><td>The cluster runs what the manifests and gates declare</td></tr>
+          <tr><td class="mono">money, policy</td><td>Deposits and conversions reconcile; only named callers reach each port</td></tr>
+          <tr><td class="mono">chaos</td><td>Kills under traffic lose or duplicate no money</td></tr>
+          <tr><td class="mono">outage, monitoring</td><td>The alert fires, and Grafana stays up through every check</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="item"><h3>The chaos monkey ships paused</h3><p><code>./k8s/kube.sh chaos on | off | run | status</code>. When on, a random pod is killed every 10 minutes. It cannot reach the monitoring namespace or read Secrets.</p></div>
+  </div>
+  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-05-0.4.0-slack-sweep.log</code>. With the Slack webhook set, Grafana’s Slack notification counter rose 0 to 1 on the dead-letter alert; 0.3.2 captured the page in the channel. The compose fleet proved firing and resolved on 14 October.</p>
+</section>
+
+<section class="sheet" id="releases" data-tab="16">
+  <header class="head"><span class="acct">History</span><h2>Releases</h2><span class="folio">Fo. 16</span></header>
+  <p class="lede">Gitflow: feature branch, then dev, then rel-*, then main, tagged on the release merge.</p>
+  <div class="tl">
+    <div class="rel"><div class="v">0.1.0</div><div class="d">13 Oct</div><p>Tasks 1 and 2, observability, SAST, supply chain, CI definition.</p></div>
+    <div class="rel"><div class="v">0.2.0</div><div class="d">15 Oct</div><p>Gateway, gRPC to the ledger, Resilience4j, Kafka dead letters, Slack.</p></div>
+    <div class="rel"><div class="v">0.3.0</div><div class="d">16 Oct</div><p>Kubernetes on kind, HPA, chaos monkey, Eureka evidence.</p></div>
+    <div class="rel"><div class="v">0.3.1</div><div class="d">16 Oct</div><p>Base-image CVE fix (openssl), virtual threads with a gate.</p></div>
+    <div class="rel"><div class="v">0.3.2</div><div class="d">4 Nov</div><p>guava and snappy-java pinned for three HIGH CVEs, OpenAPI patterns, Slack proven on kind.</p></div>
+    <div class="rel last"><div class="v">0.4.0</div><div class="d">5 Nov</div><p>Continuous profiling with Pyroscope, G1 with compact object headers, Spring Boot 4.1.2.</p></div>
+  </div>
+  <p class="note"><b>Rules</b>Tags are digits only, pushed, and never moved. The qa/stg stage was skipped because no such environment exists yet. 0.3.1 fixed an openssl HIGH that 0.3.0 shipped in the Paketo base layer.</p>
+</section>
+
+<section class="sheet" id="tasks" data-tab="17">
+  <header class="head"><span class="acct">Next</span><h2>How Tasks 3 to 6 fit</h2><span class="folio">Fo. 17</span></header>
+  <p class="lede">None needs a change to the ledger’s model. Each is a new caller that posts journals.</p>
+  <div class="grid g2">
+    <div class="item"><h3>Task 3: withdrawals</h3><p>payout-svc moves money to a <code>PLATFORM_PAYOUT_PENDING</code> account under the same row lock. Success clears it; failure reverses it.</p></div>
+    <div class="item"><h3>Task 4: incoming crypto</h3><p>A chain listener keyed on (chain, transaction hash, log index) posts the Task 1 deposit after enough confirmations.</p></div>
+    <div class="item"><h3>Task 5: auto-settle</h3><p>A rule owned by conversion-svc reacts to ledger deposit events through a transactional outbox, then runs quote and accept.</p></div>
+    <div class="item"><h3>Task 6: payout routing</h3><p>Partners per country with limits and health, a breaker per partner, failover only before a partner accepts.</p></div>
+  </div>
+  <p class="note"><b>Invariant</b>Funds stay in a pending account until a terminal outcome, so a partner failure can never lose or duplicate money. Entries are never edited, only reversed.</p>
+</section>
+
+<section class="sheet" id="summary" data-tab="18">
+  <header class="head"><span class="acct">Balance</span><h2>Summary</h2><span class="folio">Fo. 18</span></header>
+  <p class="lede">What this journal presented, carried forward.</p>
+  <div class="scroll">
+    <table class="led">
+      <thead><tr><th>Line</th><th>Carried forward</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Scope</strong></td><td>Tasks 1 and 2, the core money model every other task posts through.</td></tr>
+        <tr><td><strong>Design</strong></td><td>Two domain services, each with its own database; only the ledger writes money.</td></tr>
+        <tr><td><strong>Correctness</strong></td><td>Balanced, insert-only journals; idempotent writes; amounts refused, never rounded.</td></tr>
+        <tr><td><strong>Decisions</strong></td><td>Every technology chosen against a named alternative, with its cost written down.</td></tr>
+        <tr><td><strong>Failure</strong></td><td>PENDING is resolved by a sweeper and paged, never guessed.</td></tr>
+        <tr><td><strong>CAP</strong></td><td>Money chooses consistency and refuses under a partition; routing, config and dead letters stay available.</td></tr>
+        <tr><td><strong>Proof</strong></td><td>831 tests, every key control seen red first; gates for SAST, CVEs, SBOMs and dependencies.</td></tr>
+        <tr><td><strong>Operations</strong></td><td>A rehearsed outage paged Slack in 27 s; the kind sweep passed 9 of 9 under chaos.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="sheet" id="lessons" data-tab="19">
+  <header class="head"><span class="acct">Corrections</span><h2>Lessons learnt</h2><span class="folio">Fo. 19</span></header>
+  <p class="lede">Each came from verification disagreeing with the first version.</p>
+  <div class="grid g3">
+    <div class="item"><h3>Green health checks are not routing</h3><p>Every probe was green while the gateway saw an empty registry for up to a minute. Found by stopping one service.</p></div>
+    <div class="item"><h3>A test must fail without its control</h3><p>A concurrency test stayed green with the lock removed, because a second lock serialised the requests.</p></div>
+    <div class="item"><h3>Test the wiring you ship</h3><p>Tests ran with Eureka off; live, a builder bean stopped conversion-svc reading the registry. A test now boots with Eureka on.</p></div>
+    <div class="item"><h3>Make a refusal durable first</h3><p>A retry could post after REJECTED was recorded. The ledger now commits the refusal before answering.</p></div>
+    <div class="item"><h3>Scan the base image too</h3><p>A service-layer gate passed while an openssl HIGH shipped in 0.3.0; fixed in 0.3.1.</p></div>
+    <div class="item"><h3>Read the command’s own exit</h3><p>A wrapper reported failure for a sweep whose own log ended <code>exit=0</code>, and success for a red build.</p></div>
+  </div>
+  <p class="note"><b>Method</b>An argument about the system is not an observation of it. Run the failure path, and read the number the command itself wrote.</p>
+</section>
+
+<section class="sheet" id="further" data-tab="20">
+  <header class="head"><span class="acct">Open items</span><h2>Potential further work</h2><span class="folio">Fo. 20</span></header>
+  <p class="lede">In priority order.</p>
+  <div class="scroll">
+    <table class="led">
+      <thead><tr><th class="num">#</th><th>Item</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="t num">1</td><td><strong>Scheduled reconciliation</strong></td><td>Every balance equals the sum of its entries, every journal sums to zero; alert on any difference.</td></tr>
+        <tr><td class="t num">2</td><td><strong>Security on internal paths</strong></td><td>Authentication on <code>/internal/**</code>, and mTLS on the gRPC seam with caller identity.</td></tr>
+        <tr><td class="t num">3</td><td><strong>Platform FX position</strong></td><td>The open position per currency as a metric and a panel.</td></tr>
+        <tr><td class="t num">4</td><td><strong>One home for currency scales</strong></td><td>A ledger currency endpoint, so conversion stops keeping its own copy.</td></tr>
+        <tr><td class="t num">5</td><td><strong>Two conversion-svc instances</strong></td><td>Prove the sweeper live across processes, not only in tests.</td></tr>
+        <tr><td class="t num">6</td><td><strong>Transactional outbox</strong></td><td>Ledger events for Task 5, then Tasks 3 to 6 on the same ledger.</td></tr>
+        <tr><td class="t num">7</td><td><strong>Retention and portability</strong></td><td>Quote retention, and the same suite on MySQL 8.</td></tr>
+        <tr><td class="t num">8</td><td><strong>Pipeline and base image</strong></td><td>Connect CircleCI, and clear the Go HIGHs in the buildpack binaries once Paketo ships a fix.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><b>Source</b>SOLUTION.md section 6 is the ordered list (its items 2 and 7 are merged here); section 7 holds every known gap, including the pipeline. Scheduled separately for December 2026: highly available PostgreSQL (CloudNativePG, PgBouncer), because one Postgres pod is still a single failure domain.</p>
+</section>
+
+<section class="sheet" id="memory" data-tab="21">
+  <header class="head"><span class="acct">Footprint</span><h2>Memory: observed, then derived</h2><span class="folio">Fo. 21</span></header>
+  <p class="lede">What Grafana showed on the kind fleet, idle at 8 pods, and the cuts those numbers point to. Measured lines are measured; projections are published ratios until one service is ported.</p>
+  <div class="split">
+    <div>
+      <div class="scroll">
+        <table class="led">
+          <thead><tr><th>MiB per pod</th><th>Working set</th><th>Heap committed</th><th>Class metadata</th></tr></thead>
+          <tbody>
+            <tr><td><strong>conversion-svc</strong></td><td class="mono">375 → 351</td><td class="mono">129 → 96</td><td class="mono">118 → 124</td></tr>
+            <tr><td>ledger-svc</td><td class="mono">367 → 348</td><td class="mono">123 → 93</td><td class="mono">117 → 122</td></tr>
+            <tr><td>gateway-svc</td><td class="mono">360 → 317</td><td class="mono">85 → 81</td><td class="mono">107 → 111</td></tr>
+            <tr><td>eureka-svc</td><td class="mono">360 → 329</td><td class="mono">97 → 87</td><td class="mono">96 → 100</td></tr>
+            <tr><td>config-svc</td><td class="mono">374 → 272</td><td class="mono">83 → 72</td><td class="mono">75 → 78</td></tr>
+            <tr><td><strong>8 pods</strong></td><td class="mono"><strong>2938 → 2633</strong></td><td colspan="2">−305 MiB, −10%, from G1 and compact object headers in 0.4.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note"><b>Observed</b>Each cell reads 0.3.2-era SerialGC → 0.4.0 G1. conversion-svc is the heaviest pod, and its heap is the smaller part: class metadata (Metaspace plus class space) is about as large as the heap and G1 did not move it. Of 351 MiB, about 96 is heap, 124 class metadata, 23 compiled code; the rest is threads, buffers and the profiler.</p>
+    </div>
+    <figure>
+      <span class="mount"><i></i><i></i><i></i><i></i><img src="img/memory.png" alt="Grafana panel Heap used and committed per service over 75 minutes; committed heap steps down when the G1 images roll out at 19:57" width="2400" height="1120"></span>
+      <figcaption>Grafana, heap committed per service (two pods summed): it steps down at the 19:57 rollout to the G1 images.</figcaption>
+    </figure>
+  </div>
+  <div class="scroll" style="margin-top:1.2rem">
+    <table class="led wide">
+      <thead><tr><th>Derived option</th><th>Targets</th><th>Per pod, estimated</th><th>Costs</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Spring AOT plus a JDK 25 AOT cache</strong> (Leyden)</td><td>bean wiring and class loading at start</td><td class="mono">−5 to −10%</td><td>Mostly startup, 40 to 60% faster. The bean graph is fixed at build time, so a served config value can no longer switch a bean on or off.</td></tr>
+        <tr><td><strong>Quarkus JVM, conversion-svc first</strong></td><td>class metadata: build-time wiring, no runtime reflection</td><td class="mono">351 → ~210 to 245</td><td>A port per service. The heaviest pod goes first, then ledger-svc. Gateway, Eureka and Config Server have no Quarkus twin.</td></tr>
+        <tr><td><strong>Kubernetes discovery and ConfigMaps</strong></td><td>eureka-svc and config-svc themselves</td><td class="mono">−601 MiB fleet</td><td>An architecture change, not a framework one: two pods gone, and with them the registry caches tuned for routing.</td></tr>
+        <tr><td><strong>Native image</strong> (Spring or Quarkus)</td><td>the whole JVM</td><td class="mono">~70 to 110 · ~40 to 70</td><td>Serial GC only on GraalVM CE, lower peak throughput, 3 to 6 min and 5 to 8 GB per build, native metadata for Resilience4j, Kafka and gRPC.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><b>Next</b>Port conversion-svc and compare its working set under the sweep's own traffic; only that turns the Quarkus line into a measurement. The 1 GiB limit is not under pressure today: the gain is pods per node, not stability. <b>Limits</b>Idle readings; the G1 pods were 13 minutes old against 3 to 19 hours for the baseline. Evidence: <code>docs/observability/verification/2026-11-05-memory-snapshots.txt</code>.</p>
+</section>
+
+<section class="board" id="close" data-tab="B" aria-label="Back cover">
+  <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+  <div class="eyebrow foil">Journal closed · balanced</div>
+  <h1 class="foil">Thank you</h1>
+  <p class="sub">Questions and discussion.</p>
+  <div class="meta">
+    <span>README.md · run it</span>
+    <span>SOLUTION.md · scope, trade-offs, gaps</span>
+    <span>ARCHITECTURE.md · design</span>
+    <span>EVIDENCE.md · screenshots and what they prove</span>
+    <span>docs/k8s.md · Kubernetes</span>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const sheets = [...document.querySelectorAll('#deck > section')];
+  const tabs = document.getElementById('tabs');
+  sheets.forEach(s => {
+    const a = document.createElement('a');
+    a.href = '#' + s.id;
+    a.textContent = s.dataset.tab;
+    a.title = (s.querySelector('h2, h1') || {}).textContent || s.id;
+    tabs.appendChild(a);
+  });
+  const links = [...tabs.children];
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in');
+      if (e.intersectionRatio > 0.45) { const i = sheets.indexOf(e.target); links.forEach((l, j) => l.classList.toggle('on', j === i)); }
+    });
+  }, { threshold: [0.2, 0.45, 0.7] });
+  sheets.forEach(s => io.observe(s));
+  const nearest = () => {
+    let best = 0, d = Infinity;
+    sheets.forEach((s, i) => { const t = Math.abs(s.getBoundingClientRect().top); if (t < d) { d = t; best = i; } });
+    return best;
+  };
+  const go = step => { const i = Math.max(0, Math.min(sheets.length - 1, nearest() + step)); sheets[i].scrollIntoView({ block: 'start' }); };
+  document.getElementById('prev').addEventListener('click', () => go(-1));
+  document.getElementById('next').addEventListener('click', () => go(1));
+  document.getElementById('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+    } catch (e) {}
+  });
+  document.addEventListener('keydown', e => {
+    if (e.target.closest('input, textarea, select, button') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(e.shiftKey && e.key === ' ' ? -1 : 1); }
+    else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
+    else if (e.key === 'Home') { e.preventDefault(); sheets[0].scrollIntoView(); }
+    else if (e.key === 'End') { e.preventDefault(); sheets[sheets.length - 1].scrollIntoView(); }
+  });
+})();
+</script>
+
+</body></html>

@@ -69,15 +69,17 @@ What exists:
   never arrives leaves the conversion PENDING (202), records a dead letter on a Kafka topic that pages
   Slack, and leaves the money to a sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
   in the ledger before it is answered, so money arriving later can never let that conversion post.
-- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3): two business services
+- **Five Spring Boot 4.1.2 services** (Java 25, Spring Cloud 2025.1.3): two business services
   (ledger-svc, conversion-svc) behind the gateway (gateway-svc), and config-svc and eureka-svc as the
   control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** **610 tests, 0 failures, 0 skipped**, summed from the JUnit Extensible Markup Language (XML)
-reports `services/*/build/test-results/*/*.xml` last written 2026-10-15 at 14:23 local (the build for
-release `0.2.0`; 538 on 2026-10-13, before the gRPC change). Those reports are not committed; a
-committed gate log with the counts arrives with release `0.3.0`. The
+**Tests.** **831 tests, 0 failures** at release `0.4.0`, summed from the JUnit Extensible Markup Language
+(XML) reports `services/*/build/test-results/*/*.xml` across the `test`, `integrationTest` and
+`acceptanceTest` tiers; the per-service count and the command are committed in
+[2026-11-05-0.4.0-tests.log](docs/evidence/2026-11-05-0.4.0-tests.log). Earlier counts: 641 at `0.3.2`
+([2026-11-05-0.3.2-tests.log](docs/evidence/2026-11-05-0.3.2-tests.log)), 610 at
+`0.2.0` (2026-10-15) and 538 on 2026-10-13, before the gRPC change; no log of those was committed. The
 [2026-10-14 gate log](docs/fleet/verification/2026-10-14-gate.log) records `BUILD SUCCESSFUL` for
 `./gradlew --no-build-cache --rerun-tasks clean build` at `3b92e9d`, but no test counts. Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected
@@ -242,10 +244,10 @@ This is the single list; the other documents link here.
   no autoscaler by the `replicas` build gate).
 - CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no
   check run or status exists on `origin/dev` (checked 2026-10-16; [docs/ci.md](docs/ci.md)).
-- Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
-  fixable Common Vulnerabilities and Exposures (CVEs); each override must be dropped once Boot catches up, or it will hold a version back.
-  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.10.1 by kafka-clients
-  4.2.1: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
+- Boot 4.1.2 manages fixed Tomcat, Jackson (3 and 2) and FreeMarker versions, so the overrides that cleared their
+  Common Vulnerabilities and Exposures (CVEs) under Boot 4.1.1 were dropped on 2026-11-04.
+  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.11.2 by kafka-clients
+  4.2.2: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 - trivy has no compose checks, so the misconfiguration stage reports rather than inspects.
 
 **Money correctness**
@@ -272,9 +274,9 @@ This is the single list; the other documents link here.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
 - RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
-  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 8 of the 12 rules (ServiceDown,
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 10 of the 14 rules (ServiceDown,
   RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken,
-  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent) and is run by hand, not by the
+  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent, ProfilingFailing, ProfilesAbsent) and is run by hand, not by the
   Gradle build or the CircleCI pipeline.
 - KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
   the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.

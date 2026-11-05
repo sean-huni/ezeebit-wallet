@@ -1,0 +1,1 @@
+{"label":"kind-nolock","start":"2026-11-04T17:53:57.406Z","end":"2026-11-04T17:58:57.325Z","startMs":1793814837406,"endMs":1793815137325,"units":3000,"codes":{"quote 201":3000,"convert 201":3000,"balances 200":3000},"clientP95ms":{"quote":9.6,"convert":14.7,"balances":5.3,"all":12.5}}

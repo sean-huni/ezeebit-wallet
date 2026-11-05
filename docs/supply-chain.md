@@ -12,12 +12,15 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 | `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
 
 ```sh
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.3.2, one per service, Paketo only
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.4.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
 
-Images come from Spring Boot's `bootBuildImage` with `BP_JVM_VERSION=25`. The Paketo builder and
+Images come from Spring Boot's `bootBuildImage` with `BP_JVM_VERSION=25`, and the image appends
+`-XX:+UseCompactObjectHeaders -XX:+UseG1GC` to `JAVA_TOOL_OPTIONS` at launch (Java 27's defaults,
+JEP 534 and JEP 523). Without the flag, a 1Gi pod sits under the JVM's 1792MB server-class line and
+ergonomics picks SerialGC; measured on the 0.3.2 image, 2026-11-04. The Paketo builder and
 its run image are both pinned by tag and digest in `gradle.properties` (`paketoBuilder`,
 `paketoRunImage`). The repository has no Dockerfile. Images are built for the Docker daemon's
 architecture.
@@ -66,7 +69,17 @@ quoting an older console.
 
 ## State
 
-Latest recorded verdict, release 0.3.2: PASSED on 2026-11-04 at `1945363`, 5 of 5 images scanned, trivy
+Latest recorded verdict, release 0.4.0: PASSED on 2026-11-05 on `rel-0.4.0` with the builder pin moved to
+0.0.198 (the newest tag at least two weeks old that day), 5 of 5 images scanned, trivy database
+2026-11-05T13:09Z, nothing suppressed. The same gate on builder 0.0.197 also passed, with 39 distinct SHARED
+findings, 9 of them HIGH rows; on 0.0.198 there are 26, 6 of them HIGH. **0.4.0 still ships fixable HIGH
+findings in the SHARED layers**, in the builder's helper binaries on all 5 images: Go `stdlib` 1.27.1 and
+1.27.2 (CVE-2026-111943, CVE-2026-78667, CVE-2026-78669, CVE-2026-97031) and `golang.org/x/net` 0.59.0
+(CVE-2026-78669). No builder clears them under the pin rule yet; the next bump past 0.0.198 is the fix. The
+SERVICE layers carry two MEDIUM findings, neither gating: httpclient 4.5.3 (CVE-2020-13956, 3 of 5 images) and
+opentelemetry-api 1.62.0 (CVE-2026-118259, 5 of 5).
+
+Previous verdict, release 0.3.2: PASSED on 2026-11-04 at `1945363`, 5 of 5 images scanned, trivy
 database 2026-11-04T07:16Z, nothing suppressed. The run before it, on `365e3d6`, failed on three HIGH, fixable
 SERVICE findings published after 0.3.1: CVE-2026-102554 (guava 33.6.0 via grpc-java, 33.0.0-jre via the Eureka
 server) and CVE-2026-108106 and CVE-2026-93451 (snappy-java 1.1.10.7 via kafka-clients 4.2.1). Commit `2eda9a4`
@@ -91,11 +104,18 @@ of Boot's own properties in the root `build.gradle` (`tomcat.version`, `jackson-
 `jackson-2-bom.version`, `freemarker.version`), each pinned in `gradle.properties`: Tomcat 11.0.26,
 Jackson 3.1.7 and 2.21.7, FreeMarker 2.3.35 (the Eureka dashboard renders with it, so it is
 overridden, not excluded). Each override must be dropped once Boot manages that version or newer.
+All four were dropped on 2026-11-04 with the bump to Boot 4.1.2, which manages Tomcat 11.0.27, Jackson
+3.1.7 and 2.21.7, and FreeMarker 2.3.35 (spring-boot-dependencies-4.1.2.pom).
 Since 2026-10-15 conversion-svc also pins lz4-java 1.11.4 (`lz4JavaVersion` in `gradle.properties`,
 a dependency constraint in its `build.gradle`) for CVE-2026-106451. It is a transitive override of
-kafka-clients 4.2.1, not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
+kafka-clients 4.2.2 (which brings lz4 1.11.2), not a Boot property, and must be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 
-One SERVICE finding remains and does not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images.
+Two SERVICE findings remain and do not gate: `httpclient` 4.5.3, MEDIUM, via the Eureka client, in 3 of the 5 images;
+and `opentelemetry-api` 1.62.0, CVE-2026-118259, MEDIUM, fixed in 1.67.0, in 5 of the 5 images (supply-chain run of
+2026-11-05, `docs/k8s/verification/2026-11-05-profiling-gates-supplychain.log`). The second arrives through
+`spring-boot-starter-opentelemetry` at Boot's managed `opentelemetry.version` (1.62.0 in Boot 4.1.1 and 4.1.2), so it
+predates the profiling branch. It is parked for Sean and not bumped: `otelLogbackAppenderVersion` in
+`gradle.properties` must match Boot's opentelemetry-api.
 The SHARED HIGH findings (OpenSSL in the run image, Go `stdlib` and `x/net` in buildpack helpers)
 belong to the builder and run-image pins. trivy has no compose checks, so the misconfiguration stage
 recognises none of the files it reads and reports zero checks rather than a clean bill.
@@ -106,7 +126,7 @@ Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) fil
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.3.2 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.4.0 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

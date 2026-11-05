@@ -50,10 +50,10 @@ migration belongs.
 | Java Development Kit (JDK) 25 | `.sdkmanrc` pins `java=25-tem`; with sdkman run `sdk env install` |
 | Docker, running | Postgres, WireMock, Redis, Kafka and the Grafana LGTM image (`grafana/otel-lgtm`: Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector) for the fleet; Testcontainers (Postgres, Redis, Kafka) and the secrets scanners during the build |
 | zsh, curl, jq and lsof | `./fleet.sh` is a zsh script (default shell on macOS); jq ships with macOS 15 and later, otherwise `brew install jq`. Without zsh, use the manual commands below |
-| Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 9092 (Kafka), 3000, 4317, 4318 (Grafana LGTM), 8080, 8081, 8082, 8761, 8888, 9081 (ledger-svc's gRPC port). Kafka's internal listener 29092 is not published, so it needs no free host port |
+| Free ports | 5432 (Postgres), 6379 (Redis), 8089 (WireMock), 9092 (Kafka), 3000, 4317, 4318, 4040 (Grafana LGTM; 4040 is Pyroscope, which compose binds on loopback only), 8080, 8081, 8082, 8761, 8888, 9081 (ledger-svc's gRPC port). Kafka's internal listener 29092 is not published, so it needs no free host port |
 
 No Gradle install is needed: the repository ships the Gradle 9.8.1 wrapper. Stack: Java 25, Spring
-Boot 4.1.1, Spring Cloud 2025.1.3.
+Boot 4.1.2, Spring Cloud 2025.1.3.
 
 ## Build and test
 
@@ -334,7 +334,7 @@ Without that, `OpenApiContractIT` fails `./gradlew build` and names the file tha
 | wiremock | 8089 | Stand-in for the exchange-rate service (`docker/wiremock/mappings/rates.json`) |
 | redis | 6379 | The gateway's rate-limit buckets, shared by every gateway replica |
 | kafka | 9092 | One Kafka broker (`apache/kafka:4.3.1`, in KRaft (Kafka Raft) mode, so no ZooKeeper): the dead-letter topic `ezeebit.conversion.ledger.deadletter`, record and alert only. Data on volume `kafkadata` |
-| lgtm | 3000, 4317, 4318 | Grafana, Prometheus, Loki, Tempo, Pyroscope and an OTLP collector |
+| lgtm | 3000, 4317, 4318, 4040 | Grafana, Prometheus, Loki, Tempo, Pyroscope and an OTLP collector |
 
 Each service port is defined once, in that service's `src/main/resources/application.yml` as
 `${SERVER_PORT:<n>}`; `fleet.sh` reads it from there. ledger-svc's gRPC port is
@@ -474,6 +474,9 @@ optional root `.env` (gitignored); `fleet.sh` sources it and `docker compose` re
 | `RATES_URL` | `http://localhost:${RATES_PORT}` | Base URL of the exchange-rate service |
 | `EUREKA_URL` | http://localhost:8761/eureka/ | Registry address for the clients |
 | `OTLP_URL` | http://localhost:4318 | OTLP/HTTP base URL for metrics, traces and logs |
+| `PYROSCOPE_URL` | http://localhost:4040 | Where each service pushes its profiles (`observability/src/main/resources/config/application.yml`); the kind manifests set `http://lgtm.ezeebit-obs:4040` |
+| `PYROSCOPE_INTERVAL` | 10ms | The profiler's sampling interval. Zero or less stops the service at startup (`ProfilingProperties`) |
+| `EZEEBIT_PROFILING_ENABLED` | true | Set to `false` to start a service without the profiler; no manifest sets it |
 | `OPENAPI_PUBLIC_URL` | http://localhost:8080/api | The server named in each public OpenAPI spec, where Swagger UI "Try it out" sends calls |
 | `REDIS_PORT` | 6379 | Host port for Redis, and the port the gateway dials |
 | `REDIS_HOST` | localhost | Where the gateway's rate limiter finds Redis |
@@ -562,7 +565,7 @@ header, the two Swagger UI spec routes, the proxy read timeout, and the rate lim
 | Build fails in ledger, conversion or gateway tests | Docker is not running (Testcontainers) |
 | Quotes answer 503 `RATE_UNAVAILABLE` | The `wiremock` container is not running: `docker compose up -d --wait wiremock` |
 | Quote accepted after 15 s answers 409 `QUOTE_EXPIRED` | Expected: re-quote and accept within 15 s |
-| Port 3000, 4317 or 4318 already in use | Stop the other Grafana or collector; these ports are fixed |
+| Port 3000, 4317, 4318 or 4040 already in use | Stop the other Grafana or collector; these ports are fixed |
 | A dashboard shows no data right after `up` | Metrics export every 10 s; wait one step |
 | `./fleet.sh status` shows any row not `UP` or `HEALTHY` | `./fleet.sh up` bounces the whole stack once; the row's DETAIL says what failed |
 | `./fleet.sh status` shows a container `UNHEALTHY` | Read `docker compose logs <name>` |

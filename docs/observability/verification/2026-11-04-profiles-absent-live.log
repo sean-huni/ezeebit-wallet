@@ -1,0 +1,26 @@
+# ProfilesAbsent live on kind (kind-ezeebit), 2026-11-04, local time (UTC+2). Rule state polled every 10s from
+# /api/prometheus/grafana/api/v1/rules; lines list every non-Normal ProfilesAbsent/ProfilingFailing instance.
+# Healthy fleet first, 18:40:58: both rules inactive, health ok; the ProfilesAbsent expression returned [].
+# Then EZEEBIT_PROFILING_ENABLED=false on deploy/gateway-svc only, and reverted.
+set env 18:41:02
+rolled out 18:41:14
+18:41:22 none
+18:41:32 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:41:42 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:41:52 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:42:02 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:42:12 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:42:22 ProfilesAbsent gateway-svc=Pending val=1e+00
+18:42:32 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:42:43 the expression itself: {job=gateway-svc} 2 (both gateway pods; the alert's value field still read its first evaluation, 1)
+revert env 18:42:52
+rolled out 18:43:04
+18:43:04 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:43:15 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:43:25 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:43:35 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:43:45 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:43:55 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:44:05 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:44:15 ProfilesAbsent gateway-svc=Alerting val=1e+00
+18:44:25 none

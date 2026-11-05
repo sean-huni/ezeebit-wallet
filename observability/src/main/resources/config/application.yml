@@ -45,3 +45,13 @@ management:
       # An exact 500 ms bucket (le="500.0"): LatencySLOBurn counts requests slower than the SLO against it.
       slo:
         http.server.requests: 500ms
+ezeebit:
+  profiling:
+    enabled: true
+    server-address: ${PYROSCOPE_URL:http://localhost:4040}
+    application-name: ${spring.application.name}
+    instance: ${management.opentelemetry.resource-attributes.service.instance.id}
+    event: wall
+    alloc: 512KB
+    lock: 10ms
+    interval: ${PYROSCOPE_INTERVAL:10ms}

@@ -1,0 +1,16 @@
+001-currency-table 9:6beddd7d76f5a6fa8baeecd74025cdc2
+001-currency-checks 9:23ab15e93e0e0228fc412d54acb062c0
+001-currency-seed 9:0f17d477788ba5d45e15ff63a414173f
+002-account-table 9:70eb2d2b0fd7ab80f8f570d803d4a4c8
+002-account-platform-unique 9:1549b20ae7c167c02afce9d620e3c322
+002-account-checks 9:0c4baa04d230f576d691e63133285572
+002-account-seed-clearing 9:7cafba3f1426bfc2db30f89c1eb53de8
+003-journal-table 9:f4fd80a3abd2da4dcbd39cca97f40af3
+003-journal-checks 9:901dd12b29fe7cead25081c058120f73
+004-entry-table 9:3a72ab9baaa2282effcb13112a00e055
+004-entry-checks 9:d032707cf69c1981476545e1968b4929
+005-account-type-fx 9:c7d24fd4b78210f537953830cb4645cb
+005-journal-checks-conversion 9:0bc6d98142838a2b844ae7ffd675e730
+005-account-seed-fx 9:6489cd61b15a1fef5253916ca07a0999
+006-journal-reason-column 9:e059bf1493e9ece6b89f15e906b0081f
+006-journal-status-refused 9:0c50bdccd16009809a1b8f956e4f5e4d

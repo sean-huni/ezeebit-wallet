@@ -1,0 +1,19 @@
+# Overlay on the image's otelcol-config.yaml, loaded by start.sh through OTELCOL_EXTRA_ARGS (compose and kind).
+# Micrometer client spans carry only http.url, and Tempo's service graph names a peer that sends no spans (the rate
+# feed) only from peer.service, so without this the edge is dropped. A paired call keeps the callee's service name.
+# The traces processor list below replaces the image's ([batch] in 0.39.0): re-check it on every image bump.
+processors:
+  transform/peer:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        conditions:
+          - kind == SPAN_KIND_CLIENT and attributes["peer.service"] == nil and attributes["http.url"] != nil and IsMatch(attributes["http.url"], "^https?://[^/]+")
+        statements:
+          - merge_maps(cache, ExtractPatterns(attributes["http.url"], "^https?://(?:[^@/?#]*@)?(?P<peer>[^/?#]+)"), "upsert")
+          - set(attributes["peer.service"], cache["peer"])
+
+service:
+  pipelines:
+    traces:
+      processors: [transform/peer, batch]

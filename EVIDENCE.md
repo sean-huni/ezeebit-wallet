@@ -188,11 +188,15 @@ services" found all three names rendered, and the trace's 8 spans come from thos
 
 ![Service map](docs/observability/evidence/traces-service-map.png)
 
-The Traces board's Service map after one zoom-out click. Six nodes: user; gateway-svc 6.41 ms/r;
-conversion-svc 14.49 ms/r; ledger-svc 4.60 ms/r; config-svc 6.05 ms/r; eureka-svc 1.24 ms/r. Edges run
-user to gateway-svc, config-svc, eureka-svc and conversion-svc; gateway-svc to eureka-svc,
-conversion-svc and ledger-svc; conversion-svc to ledger-svc. Every node ring is green. Below it, span
-rate by service and status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate committed script, [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs), not the suite.
+The Traces board's Service map over the last 6 hours, recaptured 2026-11-06 00:25Z after the map was
+narrowed to the request path. Five nodes: user; gateway-svc 5.52 ms/r; conversion-svc 2.16 ms/r;
+ledger-svc 2.72 ms/r; eureka-svc 0.65 ms/r. Edges run user to gateway-svc, conversion-svc and
+ledger-svc; gateway-svc to eureka-svc, conversion-svc and ledger-svc; conversion-svc to ledger-svc.
+The `user` edges into eureka-svc and config-svc (other services' untraced heartbeats and config
+fetches) are filtered out, so config-svc has no node. The rate feed's node is not in this capture: the
+fleet's collector did not yet run `docker/lgtm/otelcol-peer.yml`. Captured by
+[2026-11-06-logs-service-map-playwright.mjs](docs/observability/verification/2026-11-06-logs-service-map-playwright.mjs)
+([run log](docs/observability/verification/2026-11-06-logs-service-map-playwright-run.log)).
 
 **Proves** Tempo derives the call graph from spans (gateway to conversion and ledger, conversion to
 ledger), and its span metrics give rates and status per service as a cross-check on the services' own
@@ -207,23 +211,40 @@ Over gRPC (2026-10-14): one demo conversion is one trace, `f9b98a426a168f23f9bbc
 
 ### Logs
 
-![A log line and its trace](docs/observability/evidence/logs-trace-correlated.png)
+![The Logs board in triage order](docs/observability/evidence/2026-11-06-logs-triage.png)
 
-The Logs board filtered to conversion-svc and "conversion accepted", last 15 minutes. The line
-`2026-10-13 21:10:08.642 INFO conversion accepted for ZAR/USDT: COMPLETED` is expanded, and its Links
-section shows `Trace: d39007b360f71551887726931a623902`. Captured 21:18:21.
+The Logs board over the last hour, captured 2026-11-06 08:14 (UTC+2). Section 1 Errors holds three
+lines at 08:05:30 to 08:05:31, one each from eureka-svc, conversion-svc and gateway-svc
+(`java.io.IOException`, failed to export logs), so the legend reads 1, 1, 1. Section 2 Warnings reads
+eureka-svc 6 (its ten-minute empty-replica notice) and gateway-svc 1. Each row names the service and
+the exception class right after the level. Info and All logs are below the fold. Over a 3-hour window
+the earlier suite checked that the service follows the level on 16 of 16 error rows and 25 of 25 All
+logs rows, and that a trace id in the box reaches 6 of 6 Loki queries
+([run log](docs/observability/verification/2026-11-06-logs-service-map-playwright-run.log)).
 
-**Proves** a log line written inside a request carries its trace id: the same trace the trace view shows
-across three services. Loki's derived field turns it into a link.
+**Proves** a support engineer reads errors first, sees which service and which exception without
+expanding a line, and narrows every section to one request with one box.
 
-![The log line's trace opened in Tempo](docs/observability/evidence/logs-trace-opened-in-tempo.png)
+![A log line and its trace](docs/observability/evidence/2026-11-06-logs-trace-correlated.png)
 
-Explore on Tempo with a TraceQL query for `d39007b360f71551887726931a623902`. The rendered trace is the
-same gateway-svc conversion: start 21:10:08.626, 17.44 ms, 3 services, 8 spans. Captured 21:18:36.
+The Logs board filtered to conversion-svc and "conversion accepted", last 15 minutes, scrolled to
+section 3 Info. The suite first drove one demo conversion through the gateway (deposit, quote and
+convert each 201, status COMPLETED). Its line `2026-11-06 08:14:24.278 INFO conversion-svc conversion
+accepted for ZAR/USDT: COMPLETED` is expanded, and the Links section shows
+`Trace: 6f4bd66b0395e98f750cfb258e0e13ae`.
 
-**Proves** clicking the log line's trace link opens Explore on Tempo with that trace id and renders the
-trace. Suite checks "trace_id opens the trace in Tempo" and "the opened trace shows its services"
-passed.
+**Proves** a log line written inside a request carries its trace id, and Loki's derived field turns
+that id into a link.
+
+![The log line's trace opened in Tempo](docs/observability/evidence/2026-11-06-logs-trace-opened-in-tempo.png)
+
+Following that link opens Explore on Tempo with a TraceQL query for `6f4bd66b0395e98f750cfb258e0e13ae`.
+The rendered trace is the same gateway-svc conversion: start 08:14:24.246, 33.8 ms, 3 services, 8 spans.
+
+**Proves** clicking the log line's trace link opens Explore on Tempo with that trace id, and renders the
+trace across gateway-svc, conversion-svc and ledger-svc. All three captures and their 7 checks come
+from [2026-11-06-logs-screenshots-playwright.mjs](docs/observability/verification/2026-11-06-logs-screenshots-playwright.mjs)
+([run log](docs/observability/verification/2026-11-06-logs-screenshots-playwright-run.log), exit 0).
 
 ### Alerts
 

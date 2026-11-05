@@ -226,7 +226,7 @@
     {
       "type": "stat",
       "title": "JVMs per service",
-      "description": "Metric identity: each JVM is its own series (instance = host:port:pid), so this counts the JVMs that exported under each service in the last 30s. A number below the replicas running means two JVMs share one series and every rate panel above is wrong.",
+      "description": "Metric identity: each JVM is its own series (instance = host:port:pid), so this counts the JVMs that exported under each service in the last 30s. A number below the replicas running means two JVMs share one series and every rate panel on this board is wrong.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -283,7 +283,7 @@
     {
       "type": "alertlist",
       "title": "Firing and pending now",
-      "description": "Rules currently Pending or Firing. Empty is the healthy state. Every rule is on the Alerts dashboard with its input plotted.",
+      "description": "Rules currently Pending, Firing or in Error (the rule could not evaluate). Empty is the healthy state. Every rule is on the Alerts dashboard with its input plotted.",
       "options": {
         "viewMode": "list",
         "showInstances": false,
@@ -389,7 +389,7 @@
     {
       "type": "timeseries",
       "title": "5xx ratio by service",
-      "description": "Share of each service's answers that were 5xx. HighErrorRate fires above 5% for 2 minutes. Empty means no request was answered with 5xx.",
+      "description": "Share of each service's answers in the rate window that were 5xx, health polls excluded. HighErrorRate pages above 5% for 2 minutes, but counts every answer, health polls included, over 1m, so the two can differ. Empty: no 5xx since the JVM started; a gap: no requests in the window. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -401,7 +401,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"}[$interval])) / sum by (job) (rate(http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"}[$interval]))",
+          "expr": "sum by (job) (((http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} - http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} offset $interval) >= 0) or (http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} unless http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} offset $interval) or (http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} < http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\", status=~\"5..\"} offset $interval)) / sum by (job) (((http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} - http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} offset $interval) >= 0) or (http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} unless http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} offset $interval) or (http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} < http_server_requests_milliseconds_count{job=~\"$service\", uri!~\"/actuator.*\"} offset $interval))",
           "legendFormat": "{{job}}",
           "range": true
         }
@@ -470,7 +470,7 @@
     {
       "type": "timeseries",
       "title": "p95 latency by service",
-      "description": "95th percentile answer time. The diamonds are exemplars: one real request each, click one to open its trace in Tempo.",
+      "description": "95th percentile answer time. The diamonds are exemplars: one real request each, click one to open its trace in Tempo. The 500 ms line is the SLO's limit, but the SLO is on the 99th percentile: a p95 under the line does not mean the budget is safe.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -617,7 +617,7 @@
     {
       "type": "timeseries",
       "title": "p95 latency by endpoint",
-      "description": "Per route template, with exemplars linking to the trace of a real request. The 500 ms line is the latency SLO LatencySLOBurn watches.",
+      "description": "Per route template, with exemplars linking to the trace of a real request. The 500 ms line is the limit of the SLO LatencySLOBurn watches, which is on the 99th percentile: a p95 under the line does not mean the budget is safe.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -711,8 +711,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Outbound calls by target and status",
-      "description": "HTTP calls a service makes: the gateway to ledger-svc and conversion-svc, conversion-svc to ledger-svc and the rate feed. client_name is the host called.",
+      "title": "Outbound calls by host and status",
+      "description": "HTTP calls a service makes, by the host it dialled (client_name). gateway-svc: 127.0.0.1 is both upstream services (ledger-svc and conversion-svc are not told apart here), localhost is the Eureka registry. conversion-svc: localhost is the rate feed. conversion-svc calls ledger-svc over gRPC: see the Ledger gRPC row.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -776,8 +776,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Outbound p95 by target",
-      "description": "Time to the dependency's answer, with exemplars. The gateway's line includes the upstream service's own time.",
+      "title": "Outbound p95 by host",
+      "description": "Time to the answer, by the host dialled, with exemplars. gateway-svc's 127.0.0.1 line mixes ledger-svc and conversion-svc and includes their own time.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -854,7 +854,7 @@
         {
           "type": "timeseries",
           "title": "Calls by method and status",
-          "description": "Each attempt conversion-svc made to ledger-svc over gRPC, so a retried call shows once per attempt. Empty: conversion-svc made no gRPC call to the ledger in the window.",
+          "description": "Each attempt conversion-svc made to ledger-svc over gRPC, so a retried call shows once per attempt. Empty: conversion-svc made no gRPC call to the ledger in the window. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -866,14 +866,14 @@
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (rpc_method, grpc_status_code) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval]))",
+              "expr": "sum by (rpc_method, grpc_status_code) (((grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} - grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) >= 0) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} unless grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} < grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval))",
               "legendFormat": "{{rpc_method}} {{grpc_status_code}}",
               "range": true
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "reqps",
+              "unit": "short",
               "custom": {
                 "lineWidth": 2,
                 "fillOpacity": 12,
@@ -913,7 +913,7 @@
         {
           "type": "timeseries",
           "title": "Error ratio by method",
-          "description": "Share of attempts per method that ended in any status but OK (UNAVAILABLE and DEADLINE_EXCEEDED are retried). 0 is the healthy state; empty: no gRPC call in the window.",
+          "description": "Share of attempts per method that ended in any status but OK (UNAVAILABLE and DEADLINE_EXCEEDED are retried). 0 is the healthy state; empty: no gRPC call in the window. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -925,7 +925,7 @@
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "(sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"}[$interval])) or sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval])) * 0) / sum by (rpc_method) (rate(grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"}[$interval]))",
+              "expr": "(sum by (rpc_method) (((grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} - grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} offset $interval) >= 0) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} unless grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} offset $interval) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} < grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\", grpc_status_code!=\"OK\"} offset $interval)) or sum by (rpc_method) (((grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} - grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) >= 0) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} unless grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} < grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval)) * 0) / sum by (rpc_method) (((grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} - grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) >= 0) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} unless grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval) or (grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} < grpc_client_milliseconds_count{job=\"conversion-svc\", net_peer_name=\"ledger-svc\"} offset $interval))",
               "legendFormat": "{{rpc_method}}",
               "range": true
             }
@@ -1035,7 +1035,7 @@
         {
           "type": "stat",
           "title": "Circuit breakers",
-          "description": "Each ledger breaker's state, the worst across conversion-svc JVMs: CLOSED passes calls, OPEN refuses them for 10s, HALF_OPEN lets 3 through to test. Empty: no conversion-svc exported in 30s.",
+          "description": "Each ledger breaker's state, the worst across conversion-svc JVMs (FORCED_OPEN, OPEN, HALF_OPEN, then the rest): CLOSED passes calls, OPEN refuses them for 10s, HALF_OPEN lets 3 through to test. Empty: no conversion-svc exported in 30s.",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -1047,7 +1047,7 @@
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "max by (name) (last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"closed\"}[30s]) * 0 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"half_open\"}[30s]) * 1 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"open\"}[30s]) * 2 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"forced_open\"}[30s]) * 3 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"disabled\"}[30s]) * 4 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"metrics_only\"}[30s]) * 5)",
+              "expr": "max by (name) (last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"closed\"}[30s]) * 0 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"metrics_only\"}[30s]) * 1 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"disabled\"}[30s]) * 2 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"half_open\"}[30s]) * 3 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"open\"}[30s]) * 4 or last_over_time(resilience4j_circuitbreaker_state{job=\"conversion-svc\", name=~\"ledger.*\", state=\"forced_open\"}[30s]) * 5)",
               "legendFormat": "{{name}}",
               "instant": true,
               "range": false
@@ -1065,24 +1065,24 @@
                       "color": "green"
                     },
                     "1": {
-                      "text": "HALF_OPEN",
-                      "color": "orange"
+                      "text": "METRICS_ONLY",
+                      "color": "blue"
                     },
                     "2": {
-                      "text": "OPEN",
-                      "color": "red"
-                    },
-                    "3": {
-                      "text": "FORCED_OPEN",
-                      "color": "red"
-                    },
-                    "4": {
                       "text": "DISABLED",
                       "color": "blue"
                     },
+                    "3": {
+                      "text": "HALF_OPEN",
+                      "color": "orange"
+                    },
+                    "4": {
+                      "text": "OPEN",
+                      "color": "red"
+                    },
                     "5": {
-                      "text": "METRICS_ONLY",
-                      "color": "blue"
+                      "text": "FORCED_OPEN",
+                      "color": "red"
                     }
                   }
                 }
@@ -1592,8 +1592,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Connection acquire p95 and timeouts",
-      "description": "Time to get a connection from the pool, and connections that timed out (each one a failed request). Timeouts empty is the healthy state.",
+      "title": "Connection acquire mean and timeouts",
+      "description": "Mean time to get a connection from the pool (sum over count), and connections that timed out (each one a failed request), on the right axis. Timeouts empty is the healthy state.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1605,8 +1605,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (job, le) (rate(hikaricp_connections_acquire_milliseconds_bucket{job=~\"$service\"}[$interval])))",
-          "legendFormat": "{{job}} acquire p95",
+          "expr": "sum by (job) (rate(hikaricp_connections_acquire_milliseconds_sum{job=~\"$service\"}[$interval])) / sum by (job) (rate(hikaricp_connections_acquire_milliseconds_count{job=~\"$service\"}[$interval]))",
+          "legendFormat": "{{job}} acquire mean",
           "range": true
         },
         {
@@ -1641,7 +1641,24 @@
             }
           ]
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".* timeouts"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {

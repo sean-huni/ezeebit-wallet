@@ -1,0 +1,22 @@
+# security/dast.sh control at 66c42f4 (Act on the DAST branch review: HEAD on the routes, a reach probe, red evidence), uncommitted paths before this log: 1
+dast control: target http://dast-target:64963 (host port 64963), 2026-11-05T23:03:40Z
+reached /api/v1/merchants/792e550f-9470-4b35-93fe-08c9d22ac052/entries: 200
+zap 2.17.0: 2 High alert(s)
+  HIGH conversion-svc [40018] SQL Injection: http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/conversions, http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/quotes, http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/quotes
+  HIGH ledger-svc [40018] SQL Injection: http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/entries?currency=ZAR&from=2026-10-01T00%3A00%3A00Z&to=2026-11-01T00%3A00%3A00Z&limit=100&after=%27, http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/entries?currency=%27&from=2026-10-01T00%3A00%3A00Z&to=2026-11-01T00%3A00%3A00Z&limit=100&after=10, http://dast-target:64963/api/v1/merchants/3f2c8a10-5b7e-4c1d-9a2e-6d4f8b0c1e27/entries?currency=ZAR&from=%27&to=2026-11-01T00%3A00%3A00Z&limit=100&after=10
+PASS zap control: planted SQL injection [40018] found
+schemathesis conversion-svc: 524 generated, 4 found 4 unique failures, 11 skipped
+     4 - ST101 Server error
+     1 [500] Internal Server Error:
+     3 [501] Not Implemented:
+schemathesis ledger-svc: 85 generated, 3 found 3 unique failures
+     3 - ST101 Server error
+     1 [500] Internal Server Error:
+     2 [501] Not Implemented:
+PASS schemathesis control: planted server error found
+nuclei: 1536 templates, 1 finding(s) at low or above
+  LOW springboot-env: http://dast-target:64963/actuator/env
+PASS nuclei control: planted /actuator/env found
+reached /api/v1/merchants/dca8c7a5-0ce9-412d-a21a-3d536959da50/entries: 200
+dast control exit=0
+exit=0 in 433s

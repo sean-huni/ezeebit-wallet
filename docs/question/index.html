@@ -549,7 +549,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <p class="lede">Every concurrency, idempotency and currency test was seen failing with its control removed.</p>
   <div class="split">
     <div>
-      <div class="stat big"><span class="n">641</span><span class="l">tests, 0 failures, at release 0.3.2: unit, integration and Cucumber acceptance scenarios</span></div>
+      <div class="stat big"><span class="n">831</span><span class="l">tests, 0 failures, at release 0.4.0: unit, integration and Cucumber acceptance scenarios</span></div>
       <p class="after">conversion-svc’s scenarios run against the real ledger jar, with WireMock and a gRPC proxy scripting faults.</p>
     </div>
     <div class="grid g2">
@@ -621,12 +621,12 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 
 <section class="sheet" id="chaos" data-tab="15">
   <header class="head"><span class="acct">Resilience</span><h2>Chaos and resilience</h2><span class="folio">Fo. 15</span></header>
-  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.3.2.</p>
-  <span class="stamp green pass">9 / 9 pass<small>kind sweep · 0.3.2</small></span>
+  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.4.0.</p>
+  <span class="stamp green pass">9 / 9 pass<small>kind sweep · 0.4.0</small></span>
   <div class="grid g4">
-    <div class="stat"><span class="n">1581</span><span class="l">merchant requests during 3 pod kills; 2 failed, within the 20 s budget</span></div>
-    <div class="stat"><span class="n">789 / 789</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
-    <div class="stat"><span class="n">61 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
+    <div class="stat"><span class="n">1609</span><span class="l">merchant requests during 3 pod kills; 3 failed, within the 20 s budget</span></div>
+    <div class="stat"><span class="n">803 / 803</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
+    <div class="stat"><span class="n">50 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
     <div class="stat red"><span class="n">5 s</span><span class="l">from the dead letter to a firing alert, with the ledger scaled to zero</span></div>
   </div>
   <div class="split" style="margin-top:1.6rem">
@@ -643,7 +643,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="item"><h3>The chaos monkey ships paused</h3><p><code>./k8s/kube.sh chaos on | off | run | status</code>. When on, a random pod is killed every 10 minutes. It cannot reach the monitoring namespace or read Secrets.</p></div>
   </div>
-  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-04-0.3.2-sweep.log</code>. 0.3.2 is the first kind run with the Slack webhook set: the dead-letter page reached the alerts channel (<code>2026-11-04-0.3.2-slack-delivery.jpg</code>). The compose fleet proved firing and resolved on 14 October.</p>
+  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-05-0.4.0-slack-sweep.log</code>. With the Slack webhook set, Grafana’s Slack notification counter rose 0 to 1 on the dead-letter alert; 0.3.2 captured the page in the channel. The compose fleet proved firing and resolved on 14 October.</p>
 </section>
 
 <section class="sheet" id="releases" data-tab="16">
@@ -685,7 +685,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
         <tr><td><strong>Decisions</strong></td><td>Every technology chosen against a named alternative, with its cost written down.</td></tr>
         <tr><td><strong>Failure</strong></td><td>PENDING is resolved by a sweeper and paged, never guessed.</td></tr>
         <tr><td><strong>CAP</strong></td><td>Money chooses consistency and refuses under a partition; routing, config and dead letters stay available.</td></tr>
-        <tr><td><strong>Proof</strong></td><td>641 tests, every key control seen red first; gates for SAST, CVEs, SBOMs and dependencies.</td></tr>
+        <tr><td><strong>Proof</strong></td><td>831 tests, every key control seen red first; gates for SAST, CVEs, SBOMs and dependencies.</td></tr>
         <tr><td><strong>Operations</strong></td><td>A rehearsed outage paged Slack in 27 s; the kind sweep passed 9 of 9 under chaos.</td></tr>
       </tbody>
     </table>

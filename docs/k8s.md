@@ -444,6 +444,17 @@ from 00:09:01 to 00:23:40 +0200, the logs were last written at 00:14:20 and 00:1
 and 1 m 33 s, and gitleaks counted 278 commits, one fewer than the repository holds with `5fe4d69`. Whether
 the working tree was clean during them is not recorded.
 
+**Release 0.4.0** (Pyroscope profiling, G1 with compact object headers, Spring Boot 4.1.2, Paketo builder
+0.0.198): two runs on `rel-0.4.0`, each from a clean tree and ending `sweep exit=0`, 9 of 9 checks. The first,
+started 18:33:51Z at `9ec4107` ([2026-11-05-0.4.0-sweep.log](k8s/verification/2026-11-05-0.4.0-sweep.log)),
+ran without the Slack Secret: 3 kills, 1598 requests, 2 merchant failures, 798 COMPLETED against 798 POSTED,
+the outage alert firing 10 s after the dead letter. The second, started 18:41:40Z at `6a5d791` with
+`SLACK_WEBHOOK_URL` set ([2026-11-05-0.4.0-slack-sweep.log](k8s/verification/2026-11-05-0.4.0-slack-sweep.log)):
+3 kills, 1609 requests, 3 merchant failures (a quote 504 and two quote 503s, 3.5 to 8.2 s after the
+conversion-svc kill, inside the 20 s budget), 803 COMPLETED conversions against 803 POSTED journals, none posted
+twice; 50 of 200 burst requests admitted against a bound of 120; the outage alert fired 5 s after the first dead
+letter, and `grafana_alerting_notifications_total{integration="slack"}` rose 0 to 1.
+
 **Release 0.3.2** (guava 33.7.2 and snappy-java 1.1.10.9 pinned, OpenAPI patterns fixed): one run started
 09:03:04Z on `rel-0.3.2` at `1945363` with a clean tree, ending `sweep exit=0`
 ([2026-11-04-0.3.2-sweep.log](k8s/verification/2026-11-04-0.3.2-sweep.log)): 3 kills, 1581 requests,

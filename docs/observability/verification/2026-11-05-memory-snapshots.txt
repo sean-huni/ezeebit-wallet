@@ -1,0 +1,172 @@
+Memory on kind, idle, 8 app pods, read through Grafana's Prometheus proxy by 2026-11-05-memory-snapshot.sh.
+Baseline pods: 3 h to 19 h old. G1 pods: rebuilt from d454c01 and rolled at 17:57Z, read about 13 min later.
+Baseline images were built before the G1 merge (gc Copy / MarkSweepCompact = SerialGC); the rollout's GC is G1 Young Generation on every service.
+
+== baseline: 0.3.2-tagged images with profiling, SerialGC 2026-11-05T17:52:44Z
+-- kubectl top pods -n ezeebit-app (working set)
+config-svc-846f987794-f9htx       12m   374Mi   
+conversion-svc-86b9c87cd4-6q6br   15m   372Mi   
+conversion-svc-86b9c87cd4-lcn4w   13m   378Mi   
+eureka-svc-6f9bf8559d-snh9r       16m   360Mi   
+gateway-svc-86d655c4b6-4ssx7      13m   364Mi   
+gateway-svc-86d655c4b6-kjdzq      14m   356Mi   
+ledger-svc-846c96f847-cnqn2       22m   366Mi   
+ledger-svc-846c96f847-jqwxx       14m   368Mi   
+-- gc: count by (job, gc) (jvm_gc_pause_milliseconds_count)
+   config-svc  Copy 1.0
+   config-svc  MarkSweepCompact 1.0
+   conversion-svc  Copy 2.0
+   conversion-svc  MarkSweepCompact 2.0
+   eureka-svc  Copy 1.0
+   gateway-svc  Copy 2.0
+   ledger-svc  Copy 2.0
+   ledger-svc  MarkSweepCompact 2.0
+-- heap_used_MiB: sum by (job, instance) (jvm_memory_used_bytes{area="heap"}) / 1048576
+   config-svc config-svc-846f987794-f9htx:8888:1  47.3
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1  47.9
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1  48.1
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1  56.2
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1  60.9
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1  62.1
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1  76.8
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1  42.6
+-- heap_committed_MiB: sum by (job, instance) (jvm_memory_committed_bytes{area="heap"}) / 1048576
+   config-svc config-svc-846f987794-f9htx:8888:1  83.3
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1  129.4
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1  129.3
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1  96.6
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1  85.3
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1  85.4
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1  123.5
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1  123.2
+-- nonheap_used_MiB: sum by (job, instance, id) (jvm_memory_used_bytes{area="nonheap"}) / 1048576
+   config-svc config-svc-846f987794-f9htx:8888:1 CodeHeap 'non-nmethods' 1.3
+   config-svc config-svc-846f987794-f9htx:8888:1 CodeHeap 'non-profiled nmethods' 4.0
+   config-svc config-svc-846f987794-f9htx:8888:1 CodeHeap 'profiled nmethods' 21.6
+   config-svc config-svc-846f987794-f9htx:8888:1 Compressed Class Space 8.2
+   config-svc config-svc-846f987794-f9htx:8888:1 Metaspace 66.8
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1 CodeHeap 'non-nmethods' 1.4
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1 CodeHeap 'non-profiled nmethods' 3.7
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1 CodeHeap 'profiled nmethods' 13.2
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1 Compressed Class Space 13.1
+   conversion-svc conversion-svc-86b9c87cd4-6q6br:8082:1 Metaspace 105.1
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1 CodeHeap 'non-nmethods' 1.4
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1 CodeHeap 'non-profiled nmethods' 4.3
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1 CodeHeap 'profiled nmethods' 15.3
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1 Compressed Class Space 13.1
+   conversion-svc conversion-svc-86b9c87cd4-lcn4w:8082:1 Metaspace 105.1
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1 CodeHeap 'non-nmethods' 1.4
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1 CodeHeap 'non-profiled nmethods' 6.8
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1 CodeHeap 'profiled nmethods' 25.7
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1 Compressed Class Space 10.6
+   eureka-svc eureka-svc-6f9bf8559d-snh9r:8761:1 Metaspace 85.3
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1 CodeHeap 'non-nmethods' 1.4
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1 CodeHeap 'non-profiled nmethods' 5.2
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1 CodeHeap 'profiled nmethods' 26.9
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1 Compressed Class Space 11.8
+   gateway-svc gateway-svc-86d655c4b6-4ssx7:8080:1 Metaspace 94.9
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1 CodeHeap 'non-nmethods' 1.4
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1 CodeHeap 'non-profiled nmethods' 5.5
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1 CodeHeap 'profiled nmethods' 27.4
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1 Compressed Class Space 11.8
+   gateway-svc gateway-svc-86d655c4b6-kjdzq:8080:1 Metaspace 95.0
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1 CodeHeap 'non-nmethods' 1.4
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1 CodeHeap 'non-profiled nmethods' 4.1
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1 CodeHeap 'profiled nmethods' 15.1
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1 Compressed Class Space 13.0
+   ledger-svc ledger-svc-846c96f847-cnqn2:8081:1 Metaspace 104.1
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1 CodeHeap 'non-nmethods' 1.4
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1 CodeHeap 'non-profiled nmethods' 4.1
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1 CodeHeap 'profiled nmethods' 15.5
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1 Compressed Class Space 13.0
+   ledger-svc ledger-svc-846c96f847-jqwxx:8081:1 Metaspace 104.2
+-- threads: max by (job) (jvm_threads_live_threads)
+-- profiling_running: sum by (job) (ezeebit_profiling_running)
+   config-svc   1.0
+   conversion-svc   2.0
+   eureka-svc   1.0
+   gateway-svc   2.0
+   ledger-svc   2.0
+
+== 0.4.0 candidate d454c01: profiling, G1 + compact object headers, ~14 min after rollout 2026-11-05T18:09:53Z
+-- kubectl top pods -n ezeebit-app (working set)
+config-svc-78659c5f7d-tk589       14m   272Mi   
+conversion-svc-5bb9f5b69d-dmxqb   17m   352Mi   
+conversion-svc-5bb9f5b69d-xvg4p   19m   350Mi   
+eureka-svc-5b8b9dcf56-x4g96       23m   329Mi   
+gateway-svc-564f6fb6d4-ncgc7      21m   313Mi   
+gateway-svc-564f6fb6d4-zszl4      17m   321Mi   
+ledger-svc-77687848dc-bst7d       19m   354Mi   
+ledger-svc-77687848dc-fj6bn       17m   342Mi   
+-- gc: count by (job, gc) (jvm_gc_pause_milliseconds_count)
+   config-svc  G1 Young Generation 1.0
+   conversion-svc  G1 Young Generation 2.0
+   eureka-svc  G1 Young Generation 1.0
+   gateway-svc  G1 Young Generation 2.0
+   ledger-svc  G1 Young Generation 2.0
+-- heap_used_MiB: sum by (job, instance) (jvm_memory_used_bytes{area="heap"}) / 1048576
+   config-svc config-svc-78659c5f7d-tk589:8888:1  64.3
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1  79.3
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1  55.5
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1  49.6
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1  72.8
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1  53.5
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1  64.6
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1  60.5
+-- heap_committed_MiB: sum by (job, instance) (jvm_memory_committed_bytes{area="heap"}) / 1048576
+   config-svc config-svc-78659c5f7d-tk589:8888:1  72.0
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1  97.0
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1  95.0
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1  87.0
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1  82.0
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1  80.0
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1  97.0
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1  89.0
+-- nonheap_used_MiB: sum by (job, instance, id) (jvm_memory_used_bytes{area="nonheap"}) / 1048576
+   config-svc config-svc-78659c5f7d-tk589:8888:1 CodeHeap 'non-nmethods' 1.5
+   config-svc config-svc-78659c5f7d-tk589:8888:1 CodeHeap 'non-profiled nmethods' 2.7
+   config-svc config-svc-78659c5f7d-tk589:8888:1 CodeHeap 'profiled nmethods' 14.0
+   config-svc config-svc-78659c5f7d-tk589:8888:1 Compressed Class Space 13.5
+   config-svc config-svc-78659c5f7d-tk589:8888:1 Metaspace 64.3
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1 CodeHeap 'non-nmethods' 1.6
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1 CodeHeap 'non-profiled nmethods' 3.8
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1 CodeHeap 'profiled nmethods' 18.1
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1 Compressed Class Space 21.6
+   conversion-svc conversion-svc-5bb9f5b69d-dmxqb:8082:1 Metaspace 102.3
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1 CodeHeap 'non-nmethods' 1.6
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1 CodeHeap 'non-profiled nmethods' 3.5
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1 CodeHeap 'profiled nmethods' 17.0
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1 Compressed Class Space 21.4
+   conversion-svc conversion-svc-5bb9f5b69d-xvg4p:8082:1 Metaspace 101.8
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1 CodeHeap 'non-nmethods' 1.5
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1 CodeHeap 'non-profiled nmethods' 3.6
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1 CodeHeap 'profiled nmethods' 15.7
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1 Compressed Class Space 17.3
+   eureka-svc eureka-svc-5b8b9dcf56-x4g96:8761:1 Metaspace 83.1
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1 CodeHeap 'non-nmethods' 1.6
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1 CodeHeap 'non-profiled nmethods' 3.5
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1 CodeHeap 'profiled nmethods' 16.9
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1 Compressed Class Space 19.1
+   gateway-svc gateway-svc-564f6fb6d4-ncgc7:8080:1 Metaspace 91.7
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1 CodeHeap 'non-nmethods' 1.6
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1 CodeHeap 'non-profiled nmethods' 3.3
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1 CodeHeap 'profiled nmethods' 17.0
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1 Compressed Class Space 19.0
+   gateway-svc gateway-svc-564f6fb6d4-zszl4:8080:1 Metaspace 91.4
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1 CodeHeap 'non-nmethods' 1.6
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1 CodeHeap 'non-profiled nmethods' 3.5
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1 CodeHeap 'profiled nmethods' 17.9
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1 Compressed Class Space 21.2
+   ledger-svc ledger-svc-77687848dc-bst7d:8081:1 Metaspace 101.2
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1 CodeHeap 'non-nmethods' 1.6
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1 CodeHeap 'non-profiled nmethods' 3.7
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1 CodeHeap 'profiled nmethods' 18.2
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1 Compressed Class Space 21.2
+   ledger-svc ledger-svc-77687848dc-fj6bn:8081:1 Metaspace 101.2
+-- threads: max by (job) (jvm_threads_live_threads)
+-- profiling_running: sum by (job) (ezeebit_profiling_running)
+   config-svc   1.0
+   conversion-svc   2.0
+   eureka-svc   1.0
+   gateway-svc   2.0
+   ledger-svc   2.0

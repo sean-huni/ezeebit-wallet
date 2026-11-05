@@ -69,7 +69,17 @@ quoting an older console.
 
 ## State
 
-Latest recorded verdict, release 0.3.2: PASSED on 2026-11-04 at `1945363`, 5 of 5 images scanned, trivy
+Latest recorded verdict, release 0.4.0: PASSED on 2026-11-05 on `rel-0.4.0` with the builder pin moved to
+0.0.198 (the newest tag at least two weeks old that day), 5 of 5 images scanned, trivy database
+2026-11-05T13:09Z, nothing suppressed. The same gate on builder 0.0.197 also passed, with 39 distinct SHARED
+findings, 9 of them HIGH rows; on 0.0.198 there are 26, 6 of them HIGH. **0.4.0 still ships fixable HIGH
+findings in the SHARED layers**, in the builder's helper binaries on all 5 images: Go `stdlib` 1.27.1 and
+1.27.2 (CVE-2026-111943, CVE-2026-78667, CVE-2026-78669, CVE-2026-97031) and `golang.org/x/net` 0.59.0
+(CVE-2026-78669). No builder clears them under the pin rule yet; the next bump past 0.0.198 is the fix. The
+SERVICE layers carry two MEDIUM findings, neither gating: httpclient 4.5.3 (CVE-2020-13956, 3 of 5 images) and
+opentelemetry-api 1.62.0 (CVE-2026-118259, 5 of 5).
+
+Previous verdict, release 0.3.2: PASSED on 2026-11-04 at `1945363`, 5 of 5 images scanned, trivy
 database 2026-11-04T07:16Z, nothing suppressed. The run before it, on `365e3d6`, failed on three HIGH, fixable
 SERVICE findings published after 0.3.1: CVE-2026-102554 (guava 33.6.0 via grpc-java, 33.0.0-jre via the Eureka
 server) and CVE-2026-108106 and CVE-2026-93451 (snappy-java 1.1.10.7 via kafka-clients 4.2.1). Commit `2eda9a4`

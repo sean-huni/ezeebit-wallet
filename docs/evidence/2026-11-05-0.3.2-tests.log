@@ -1,0 +1,22 @@
+Test count for release 0.3.2, measured 2026-11-05 on feat-presentation (code identical to tag 0.3.2:
+`git diff --quiet 0.3.2 HEAD -- . ':!docs/question'` exit 0).
+
+Commands:
+  ./gradlew --console=plain --no-build-cache --continue clean test               BUILD SUCCESSFUL in 53s, gradle_exit=0
+  ./gradlew --console=plain --no-build-cache --continue integrationTest acceptanceTest   BUILD SUCCESSFUL in 3m 49s, gradle_exit=0
+Count: tests, failures, errors, skipped summed from every <testsuite> in services/*/build/test-results/*/TEST-*.xml
+
+service          tier             tests failures errors skipped
+config-svc       test                17        0      0       0
+conversion-svc   test               173        0      0       0
+conversion-svc   integrationTest     32        0      0       0
+conversion-svc   acceptanceTest      49        0      0       0
+eureka-svc       test                16        0      0       0
+gateway-svc      test                69        0      0       0
+gateway-svc      integrationTest     60        0      0       0
+ledger-svc       test               112        0      0       0
+ledger-svc       integrationTest     52        0      0       0
+ledger-svc       acceptanceTest      61        0      0       0
+TOTAL                               641        0      0       0
+
+The `test` tier alone is 387: a count taken from it reads as a full suite and is not one.

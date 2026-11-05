@@ -74,10 +74,11 @@ What exists:
   control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** **610 tests, 0 failures, 0 skipped**, summed from the JUnit Extensible Markup Language (XML)
-reports `services/*/build/test-results/*/*.xml` last written 2026-10-15 at 14:23 local (the build for
-release `0.2.0`; 538 on 2026-10-13, before the gRPC change). Those reports are not committed; a
-committed gate log with the counts arrives with release `0.3.0`. The
+**Tests.** **641 tests, 0 failures, 0 skipped** at release `0.3.2`, summed from the JUnit Extensible
+Markup Language (XML) reports `services/*/build/test-results/*/*.xml` across the `test`,
+`integrationTest` and `acceptanceTest` tiers; the per-service count and the commands are committed in
+[2026-11-05-0.3.2-tests.log](docs/evidence/2026-11-05-0.3.2-tests.log). Earlier counts: 610 at
+`0.2.0` (2026-10-15) and 538 on 2026-10-13, before the gRPC change; no log of those was committed. The
 [2026-10-14 gate log](docs/fleet/verification/2026-10-14-gate.log) records `BUILD SUCCESSFUL` for
 `./gradlew --no-build-cache --rerun-tasks clean build` at `3b92e9d`, but no test counts. Each unit count includes the 13 tests of the shared
 dependency-injection gate, which fails the build when any bean takes more than 3 injected

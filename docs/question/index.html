@@ -151,7 +151,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 .step p { font-size: .95rem; color: var(--ink-soft) }
 
 /* timeline (releases) */
-.tl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
+.tl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
 .tl::before { content: ""; position: absolute; top: 1.05rem; left: .6rem; right: .6rem; height: 3px; background: var(--green-ink); opacity: .55 }
 .rel { position: relative }
 .rel::before { content: ""; position: absolute; top: -2.05rem; left: 0; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--green-ink); box-shadow: 0 0 0 3px var(--paper) }
@@ -283,7 +283,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <div class="meta">
     <strong>Kudzai Sean Huni</strong>
     <span>Senior Software Engineer (Java &amp; Spring)</span>
-    <span>Release 0.3.1 · Java 25 · Spring Boot 4.1.1 · 16 October 2026</span>
+    <span>Release 0.3.2 · Java 25 · Spring Boot 4.1.1 · 4 November 2026</span>
   </div>
   <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 20 folios</span></div>
 </section>
@@ -325,7 +325,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="grid g2">
       <div class="stat"><span class="n">~3 h</span><span class="l">of my own attention, directing AI agents (Claude Code) under review gates</span></div>
-      <div class="stat red"><span class="n">13 to 16</span><span class="l">October: the agent working window</span></div>
+      <div class="stat red"><span class="n">23 days</span><span class="l">13 October to 4 November: the agent working window, releases 0.1.0 to 0.3.2</span></div>
       <div class="stat"><span class="n">2 of 6</span><span class="l">tasks in scope; extras beyond the brief are listed as optional in SOLUTION.md</span></div>
       <div class="stat"><span class="n">5</span><span class="l">currencies: ZAR, NGN, KES, USDT, USDC</span></div>
     </div>
@@ -515,7 +515,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <div class="dec-row hd"><div>Choice</div><div>Chosen over</div><div>Buys</div><div>Costs</div></div>
     <div class="dec-row"><div class="ch">Two domain services; only the ledger writes money</div><div class="alt"><span class="lbl">Over: </span>One service with two modules</div><div class="dr">Different invariants, rates of change and failure domains. A slow rate feed cannot stall deposits or balance reads.</div><div class="cr">A network hop. One modular service was also defensible at this volume.</div></div>
     <div class="dec-row"><div class="ch">gRPC from conversion to ledger, one <code>.proto</code> compiled by both</div><div class="alt"><span class="lbl">Over: </span>Internal REST with hand-written DTOs</div><div class="dr">One contract that cannot drift (a build check fails on a second copy). Deadlines and status codes on the wire.</div><div class="cr">HTTP/2 pins a client to one replica: a Eureka name resolver, round-robin, and 30 s connection ageing fix it.</div></div>
-    <div class="dec-row"><div class="ch">Resilience4j: a retry and a breaker per operation</div><div class="alt"><span class="lbl">Over: </span>One shared breaker, or no retries</div><div class="dr">Only UNAVAILABLE and DEADLINE_EXCEEDED retry. Post’s worst case, 6.6 s, fits the gateway’s 10 s. A failing Void cannot block Post.</div><div class="cr">Breakers are per replica. Correctness never depends on them; the sweeper settles every PENDING.</div></div>
+    <div class="dec-row"><div class="ch">Resilience4j: a retry and a breaker per operation</div><div class="alt"><span class="lbl">Over: </span>One shared breaker, or no retries</div><div class="dr">Only UNAVAILABLE and DEADLINE_EXCEEDED retry, 3 attempts. A breaker opens at 50% failures over 20 calls. Post’s worst case, 6.6 s, fits the gateway’s 10 s. A failing Void cannot block Post.</div><div class="cr">Breakers are per replica. Correctness never depends on them; the sweeper settles every PENDING.</div></div>
     <div class="dec-row"><div class="ch">Kafka dead-letter topic, record and alert only</div><div class="alt"><span class="lbl">Over: </span>A consumer that replays</div><div class="dr">An unknown outcome is visible and paged, never retried into a race. Publishing is asynchronous, so a dead broker never slows a merchant.</div><div class="cr">A broker to run, for a topic nothing consumes by design.</div></div>
     <div class="dec-row"><div class="ch">Gateway, Eureka and Config Server</div><div class="alt"><span class="lbl">Over: </span>Fixed URLs, no gateway</div><div class="dr">One route table, and one place that keeps <code>/internal/**</code> unreachable. Room for payouts and settlement.</div><div class="cr">Three extra processes, a boot order, registry caches to tune. The first to go if the fleet stays small.</div></div>
     <div class="dec-row"><div class="ch">Redis rate limit per merchant, failing closed</div><div class="alt"><span class="lbl">Over: </span>No limiter, or buckets in each pod</div><div class="dr">A payday burst from one merchant cannot starve the rest. Every gateway replica shares the same buckets.</div><div class="cr">Redis is on the edge’s critical path: without it, no merchant call succeeds.</div></div>
@@ -545,7 +545,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <p class="lede">Every concurrency, idempotency and currency test was seen failing with its control removed.</p>
   <div class="split">
     <div>
-      <div class="stat big"><span class="n">639</span><span class="l">tests, 0 failures, at release 0.3.1: unit, integration and Cucumber acceptance scenarios</span></div>
+      <div class="stat big"><span class="n">641</span><span class="l">tests, 0 failures, at release 0.3.2: unit, integration and Cucumber acceptance scenarios</span></div>
       <p class="after">conversion-svc’s scenarios run against the real ledger jar, with WireMock and a gRPC proxy scripting faults.</p>
     </div>
     <div class="grid g2">
@@ -617,12 +617,12 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 
 <section class="sheet" id="chaos" data-tab="15">
   <header class="head"><span class="acct">Resilience</span><h2>Chaos and resilience</h2><span class="folio">Fo. 15</span></header>
-  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.3.1.</p>
-  <span class="stamp green pass">9 / 9 pass<small>kind sweep · 0.3.1</small></span>
+  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.3.2.</p>
+  <span class="stamp green pass">9 / 9 pass<small>kind sweep · 0.3.2</small></span>
   <div class="grid g4">
-    <div class="stat"><span class="n">1634</span><span class="l">merchant requests during 3 pod kills; 4 failed, within the 20 s budget</span></div>
-    <div class="stat"><span class="n">814 / 814</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
-    <div class="stat"><span class="n">72 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
+    <div class="stat"><span class="n">1581</span><span class="l">merchant requests during 3 pod kills; 2 failed, within the 20 s budget</span></div>
+    <div class="stat"><span class="n">789 / 789</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
+    <div class="stat"><span class="n">61 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
     <div class="stat red"><span class="n">5 s</span><span class="l">from the dead letter to a firing alert, with the ledger scaled to zero</span></div>
   </div>
   <div class="split" style="margin-top:1.6rem">
@@ -639,7 +639,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="item"><h3>The chaos monkey ships paused</h3><p><code>./k8s/kube.sh chaos on | off | run | status</code>. When on, a random pod is killed every 10 minutes. It cannot reach the monitoring namespace or read Secrets.</p></div>
   </div>
-  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-10-16-0.3.1-sweep.log</code>. Slack delivery was not asserted on kind because no webhook was set there; it was proven on the compose fleet on 14 October.</p>
+  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-04-0.3.2-sweep.log</code>. 0.3.2 is the first kind run with the Slack webhook set: the dead-letter page reached the alerts channel (<code>2026-11-04-0.3.2-slack-delivery.jpg</code>). The compose fleet proved firing and resolved on 14 October.</p>
 </section>
 
 <section class="sheet" id="releases" data-tab="16">
@@ -649,7 +649,8 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <div class="rel"><div class="v">0.1.0</div><div class="d">13 Oct</div><p>Tasks 1 and 2, observability, SAST, supply chain, CI definition.</p></div>
     <div class="rel"><div class="v">0.2.0</div><div class="d">15 Oct</div><p>Gateway, gRPC to the ledger, Resilience4j, Kafka dead letters, Slack.</p></div>
     <div class="rel"><div class="v">0.3.0</div><div class="d">16 Oct</div><p>Kubernetes on kind, HPA, chaos monkey, Eureka evidence.</p></div>
-    <div class="rel last"><div class="v">0.3.1</div><div class="d">16 Oct</div><p>Base-image CVE fix (openssl), virtual threads with a gate.</p></div>
+    <div class="rel"><div class="v">0.3.1</div><div class="d">16 Oct</div><p>Base-image CVE fix (openssl), virtual threads with a gate.</p></div>
+    <div class="rel last"><div class="v">0.3.2</div><div class="d">4 Nov</div><p>guava and snappy-java pinned for three HIGH CVEs, OpenAPI patterns, Slack proven on kind.</p></div>
   </div>
   <p class="note"><b>Rules</b>Tags are digits only, pushed, and never moved. The qa/stg stage was skipped because no such environment exists yet. 0.3.1 fixed an openssl HIGH that 0.3.0 shipped in the Paketo base layer.</p>
 </section>
@@ -679,7 +680,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
         <tr><td><strong>Decisions</strong></td><td>Every technology chosen against a named alternative, with its cost written down.</td></tr>
         <tr><td><strong>Failure</strong></td><td>PENDING is resolved by a sweeper and paged, never guessed.</td></tr>
         <tr><td><strong>CAP</strong></td><td>Money chooses consistency and refuses under a partition; routing, config and dead letters stay available.</td></tr>
-        <tr><td><strong>Proof</strong></td><td>639 tests, every key control seen red first; gates for SAST, CVEs, SBOMs and dependencies.</td></tr>
+        <tr><td><strong>Proof</strong></td><td>641 tests, every key control seen red first; gates for SAST, CVEs, SBOMs and dependencies.</td></tr>
         <tr><td><strong>Operations</strong></td><td>A rehearsed outage paged Slack in 27 s; the kind sweep passed 9 of 9 under chaos.</td></tr>
       </tbody>
     </table>
@@ -718,7 +719,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
       </tbody>
     </table>
   </div>
-  <p class="note"><b>Source</b>SOLUTION.md section 6 is the ordered list (its items 2 and 7 are merged here); section 7 holds every known gap, including the pipeline.</p>
+  <p class="note"><b>Source</b>SOLUTION.md section 6 is the ordered list (its items 2 and 7 are merged here); section 7 holds every known gap, including the pipeline. Scheduled separately for December 2026: highly available PostgreSQL (CloudNativePG, PgBouncer), because one Postgres pod is still a single failure domain.</p>
 </section>
 
 <section class="board" id="close" data-tab="B" aria-label="Back cover">

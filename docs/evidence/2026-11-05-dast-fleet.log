@@ -1,5 +1,7 @@
-# security/dast.sh fleet at f11f9b1 (Add a DAST release gate: ZAP, Schemathesis and Nuclei through the gateway), uncommitted paths: 1
-dast fleet: target http://dast-target:8080 (host port 8080), 2026-11-05T22:12:47Z
+# security/dast.sh fleet at 66c42f4 (Act on the DAST branch review: HEAD on the routes, a reach probe, red evidence), uncommitted paths before this log: 0
+dast fleet: target http://dast-target:8080 (host port 8080), 2026-11-05T22:57:40Z
+reached /api/v1/merchants/dab94a7b-e8be-4a84-adf4-d373189673c0/balances: 200
+reached /api/v1/merchants/52a9daeb-64bd-4300-bca3-31631a5d53f2/conversions/c15c6de4-a2d3-46ce-9b36-446d8843aad1: 404
 zap 2.17.0: 0 High alert(s)
 PASS zap
 schemathesis conversion-svc: 593 generated, 593 passed
@@ -7,5 +9,7 @@ schemathesis ledger-svc: 190 generated, 190 passed
 PASS schemathesis
 nuclei: 1536 templates, 0 finding(s) at low or above
 PASS nuclei
+reached /api/v1/merchants/fc39dbf6-de54-4193-aa0d-cfe30f15f9c4/balances: 200
+reached /api/v1/merchants/08a8ba67-e374-44dd-8333-026c46c5d828/conversions/b2269f27-4bef-4269-8398-c5b527ad0d37: 404
 dast fleet exit=0
-exit=0 in 379s
+exit=0 in 359s

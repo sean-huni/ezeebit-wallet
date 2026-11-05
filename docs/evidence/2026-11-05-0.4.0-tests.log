@@ -1,0 +1,22 @@
+Test count for release 0.4.0, measured 2026-11-05 on rel-0.4.0 at cc57462 (the version bump; the later
+release commits change only gradle.properties' builder pin and documentation).
+
+Command:
+  ./gradlew --console=plain --no-build-cache clean build      BUILD SUCCESSFUL in 5m 8s, 110 of 110 tasks executed, gradle_exit=0
+Count: tests and failures summed from every <testsuite> in services/*/build/test-results/*/TEST-*.xml
+
+service          tier             tests failures
+config-svc       test                55        0
+conversion-svc   test               211        0
+conversion-svc   integrationTest     32        0
+conversion-svc   acceptanceTest      49        0
+eureka-svc       test                54        0
+gateway-svc      test               107        0
+gateway-svc      integrationTest     60        0
+ledger-svc       test               150        0
+ledger-svc       integrationTest     52        0
+ledger-svc       acceptanceTest      61        0
+TOTAL                               831        0
+
+Against 641 at 0.3.2: +190, which is the 38 tests of the shared observability module (profiling) compiled
+into each of the 5 services' test task.

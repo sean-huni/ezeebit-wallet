@@ -69,6 +69,13 @@ Design rules, not security findings, so they are not SAST. They run inside `test
 | Ports before adapters (`ServiceImportsNoOutboundTest`, conversion-svc `test`) | every main source file under `service/` | one imports `io.ezeebit.conversion.outbound.`: the use cases call `service/port/` interfaces, never an adapter |
 | One contract (`checkSingleProto`, root `check`) | every `.proto` in the repository outside `contracts/`, `build/`, `.gradle/`, `node_modules/` and `.superpowers/` | any `.proto` outside `contracts/`, or none inside it |
 
+One gate runs before a release rather than inside the build: `scripts/verify-topology.sh` compares, by
+name, the `*-svc` services drawn in `docs/fleet/fleet-architecture.html` with the directories under
+`services/` that hold a `build.gradle` and with the `services:*` includes in `settings.gradle`. It exits
+0 when the three sets match, 1 naming each service missing from a set, and 2 when an input cannot be
+read. Each of its four directions was seen failing (a service removed from the diagram, the
+directories and `settings.gradle` in turn) on 2026-11-05.
+
 What counts as one injected dependency:
 
 - each parameter of the constructor Spring selects (the `@Autowired` one, the greediest of several

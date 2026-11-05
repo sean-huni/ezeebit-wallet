@@ -151,7 +151,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 .step p { font-size: .95rem; color: var(--ink-soft) }
 
 /* timeline (releases) */
-.tl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
+.tl { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
 .tl::before { content: ""; position: absolute; top: 1.05rem; left: .6rem; right: .6rem; height: 3px; background: var(--green-ink); opacity: .55 }
 .rel { position: relative }
 .rel::before { content: ""; position: absolute; top: -2.05rem; left: 0; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--green-ink); box-shadow: 0 0 0 3px var(--paper) }
@@ -283,7 +283,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <div class="meta">
     <strong>Kudzai Sean Huni</strong>
     <span>Senior Software Engineer (Java &amp; Spring)</span>
-    <span>Release 0.3.2 · Java 25 · Spring Boot 4.1.1 · 4 November 2026</span>
+    <span>Release 0.4.0 · Java 25 · Spring Boot 4.1.2 · 5 November 2026</span>
   </div>
   <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 20 folios</span></div>
 </section>
@@ -325,7 +325,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="grid g2">
       <div class="stat"><span class="n">~3 h</span><span class="l">of my own attention, directing AI agents (Claude Code) under review gates</span></div>
-      <div class="stat red"><span class="n">23 days</span><span class="l">13 October to 4 November: the agent working window, releases 0.1.0 to 0.3.2</span></div>
+      <div class="stat red"><span class="n">24 days</span><span class="l">13 October to 5 November: the agent working window, releases 0.1.0 to 0.4.0</span></div>
       <div class="stat"><span class="n">2 of 6</span><span class="l">tasks in scope; extras beyond the brief are listed as optional in SOLUTION.md</span></div>
       <div class="stat"><span class="n">5</span><span class="l">currencies: ZAR, NGN, KES, USDT, USDC</span></div>
     </div>
@@ -368,7 +368,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
       <g class="cap ap"><rect x="772" y="203" width="168" height="18" rx="2"/><text x="779" y="216">AP · signal, not state</text></g>
       <rect class="box" x="760" y="248" width="220" height="96" rx="3"/><text class="t" x="870" y="271" text-anchor="middle">Control plane</text><text class="s" x="870" y="290" text-anchor="middle">config-svc :8888</text><text class="s" x="870" y="306" text-anchor="middle">eureka-svc :8761</text>
       <g class="cap ap"><rect x="772" y="316" width="160" height="18" rx="2"/><text x="779" y="329">AP · last known state</text></g>
-      <rect class="box" x="760" y="362" width="220" height="96" rx="3"/><text class="t" x="870" y="385" text-anchor="middle">Telemetry · LGTM</text><text class="s" x="870" y="404" text-anchor="middle">metrics, logs, traces</text><text class="s" x="870" y="420" text-anchor="middle">OTLP from every service</text>
+      <rect class="box" x="760" y="362" width="220" height="96" rx="3"/><text class="t" x="870" y="385" text-anchor="middle">Telemetry · LGTM</text><text class="s" x="870" y="404" text-anchor="middle">metrics, logs, traces, profiles</text><text class="s" x="870" y="420" text-anchor="middle">OTLP from every service</text>
       <g class="cap na"><rect x="772" y="430" width="160" height="18" rx="2"/><text x="779" y="443">off the request path</text></g>
 
       <path class="ln" d="M120 243H156"/>
@@ -528,11 +528,11 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <p class="lede">The platform under the code, and how it gets built, shipped and watched.</p>
   <div class="dec">
     <div class="dec-row hd"><div>Choice</div><div>Chosen over</div><div>Buys</div><div>Costs</div></div>
-    <div class="dec-row"><div class="ch">Java 25 with virtual threads</div><div class="alt"><span class="lbl">Over: </span>Platform thread pools, or reactive code</div><div class="dr">Plain blocking code with cheap concurrency. The bound is the database pool (70 of 100 connections at full scale), not the CPU count.</div><div class="cr">Needs 2 CPUs per pod: at 1 CPU a single pinned thread stalls every request. A build gate holds it.</div></div>
-    <div class="dec-row"><div class="ch">Spring Boot 4.1.1, Spring Cloud 2025.1.3</div><div class="alt"><span class="lbl">Over: </span>Quarkus</div><div class="dr">The role is Java and Spring. Gateway, registry, config server and gRPC come as first-party parts.</div><div class="cr">More memory per pod than a leaner runtime.</div></div>
+    <div class="dec-row"><div class="ch">Java 25 with virtual threads, G1 and compact object headers</div><div class="alt"><span class="lbl">Over: </span>Platform thread pools, or reactive code</div><div class="dr">Plain blocking code with cheap concurrency. The bound is the database pool (70 of 100 connections at full scale), not the CPU count.</div><div class="cr">Needs 2 CPUs per pod: at 1 CPU a single pinned thread stalls every request. A build gate holds it.</div></div>
+    <div class="dec-row"><div class="ch">Spring Boot 4.1.2, Spring Cloud 2025.1.3</div><div class="alt"><span class="lbl">Over: </span>Quarkus</div><div class="dr">The role is Java and Spring. Gateway, registry, config server and gRPC come as first-party parts.</div><div class="cr">More memory per pod than a leaner runtime.</div></div>
     <div class="dec-row"><div class="ch">Liquibase with a PostgreSQL session advisory lock</div><div class="alt"><span class="lbl">Over: </span>Liquibase’s default lock row</div><div class="dr">A lock row outlives a SIGKILLed migrator and blocks every later pod. A session lock dies with its connection.</div><div class="cr">A small custom lock service, shared by both database-owning services.</div></div>
     <div class="dec-row"><div class="ch">Paketo buildpacks pinned by digest, an SBOM per image, trivy</div><div class="alt"><span class="lbl">Over: </span>A hand-written Dockerfile</div><div class="dr">Reproducible images, base layers maintained by the builder; fixable HIGH and CRITICAL CVEs in the service layers fail the build.</div><div class="cr">Less control over layers. A base-layer CVE waits for a builder bump: 0.3.1 fixed openssl this way.</div></div>
-    <div class="dec-row"><div class="ch">OpenTelemetry to one LGTM stack; dashboards generated and provisioned</div><div class="alt"><span class="lbl">Over: </span>Separate tools; dashboards clicked together</div><div class="dr">Metrics, logs and traces link to each other. Dashboards are a reviewable diff; 8 alert rules are unit-tested by promtool.</div><div class="cr">The all-in-one container is a development stack, not a highly available one.</div></div>
+    <div class="dec-row"><div class="ch">OpenTelemetry to one LGTM stack; dashboards generated and provisioned</div><div class="alt"><span class="lbl">Over: </span>Separate tools; dashboards clicked together</div><div class="dr">Metrics, logs, traces and profiles link to each other: a span opens its flame graph. Dashboards are a reviewable diff; 10 alert rules are unit-tested by promtool.</div><div class="cr">The all-in-one container is a development stack, not a highly available one.</div></div>
     <div class="dec-row"><div class="ch">kind, Kubernetes v1.36.1 in Docker</div><div class="alt"><span class="lbl">Over: </span>A cloud cluster</div><div class="dr">The same images and config names as compose, 2+ replicas, built and deleted in one command, at no cost.</div><div class="cr">Not a cloud: one machine, no real load balancer.</div></div>
     <div class="dec-row"><div class="ch">Chaos by script, plus a paused CronJob</div><div class="alt"><span class="lbl">Over: </span>Chaos Mesh, LitmusChaos</div><div class="dr">A named kill at a known moment, with traffic, a kill counter and a money audit. No CRDs to install.</div><div class="cr">Pod kills and scale-to-zero only; no network or clock faults.</div></div>
     <div class="dec-row"><div class="ch">WireMock, Testcontainers and Cucumber against the real ledger jar</div><div class="alt"><span class="lbl">Over: </span>Mocks inside unit tests</div><div class="dr">The acceptance tier speaks real HTTP and gRPC to real processes, with faults scripted at the wire.</div><div class="cr">Slower suites, and Docker is required to run them.</div></div>
@@ -574,7 +574,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 
 <section class="sheet" id="observability" data-tab="13">
   <header class="head"><span class="acct">Watch</span><h2>Observability and alerting</h2><span class="folio">Fo. 13</span></header>
-  <p class="lede">Metrics, logs and traces to one LGTM stack. Delivery proven by breaking something, not by the rule existing.</p>
+  <p class="lede">Metrics, logs, traces and continuous profiles to one LGTM stack. Delivery proven by breaking something, not by the rule existing.</p>
   <div class="split">
     <figure>
       <span class="mount"><i></i><i></i><i></i><i></i><img src="img/trace.png" alt="Grafana trace of one merchant conversion across gateway-svc, conversion-svc and ledger-svc, 17.44 ms" width="1440" height="900"></span>
@@ -582,7 +582,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </figure>
     <div class="grid">
       <div class="grid g2">
-        <div class="stat"><span class="n">12</span><span class="l">alert rules; 8 unit-tested with promtool</span></div>
+        <div class="stat"><span class="n">14</span><span class="l">alert rules; 10 unit-tested with promtool</span></div>
         <div class="stat red"><span class="n">27 s</span><span class="l">from the kill to the Slack page</span></div>
       </div>
       <figure>
@@ -591,7 +591,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
       </figure>
     </div>
   </div>
-  <p class="note"><b>Limits</b>EVIDENCE.md holds every screenshot with what it proves, and what it does not: one Slack channel is not an on-call rota.</p>
+  <p class="note"><b>Profiles</b>Since 0.4.0 every service streams wall-clock, allocation and lock profiles to Pyroscope at a 10 ms interval, at most 12 millicores per JVM; ProfilingFailing and ProfilesAbsent page when a profile stops arriving. <b>Limits</b>EVIDENCE.md holds every screenshot with what it proves, and what it does not: one Slack channel is not an on-call rota.</p>
 </section>
 
 <section class="sheet" id="kubernetes" data-tab="14">
@@ -650,7 +650,8 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <div class="rel"><div class="v">0.2.0</div><div class="d">15 Oct</div><p>Gateway, gRPC to the ledger, Resilience4j, Kafka dead letters, Slack.</p></div>
     <div class="rel"><div class="v">0.3.0</div><div class="d">16 Oct</div><p>Kubernetes on kind, HPA, chaos monkey, Eureka evidence.</p></div>
     <div class="rel"><div class="v">0.3.1</div><div class="d">16 Oct</div><p>Base-image CVE fix (openssl), virtual threads with a gate.</p></div>
-    <div class="rel last"><div class="v">0.3.2</div><div class="d">4 Nov</div><p>guava and snappy-java pinned for three HIGH CVEs, OpenAPI patterns, Slack proven on kind.</p></div>
+    <div class="rel"><div class="v">0.3.2</div><div class="d">4 Nov</div><p>guava and snappy-java pinned for three HIGH CVEs, OpenAPI patterns, Slack proven on kind.</p></div>
+    <div class="rel last"><div class="v">0.4.0</div><div class="d">5 Nov</div><p>Continuous profiling with Pyroscope, G1 with compact object headers, Spring Boot 4.1.2.</p></div>
   </div>
   <p class="note"><b>Rules</b>Tags are digits only, pushed, and never moved. The qa/stg stage was skipped because no such environment exists yet. 0.3.1 fixed an openssl HIGH that 0.3.0 shipped in the Paketo base layer.</p>
 </section>

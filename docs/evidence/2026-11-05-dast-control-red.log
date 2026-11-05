@@ -1,0 +1,15 @@
+# security/dast.sh control, red: the gate at f11f9b1 plus its PLANTED_SERVER_ERROR check (then uncommitted, committed in 0bd3173), with all three plants removed from security/dast-fixture.py (an uncommitted mutation, reverted with git checkout afterwards). Every arm must report MISSED.
+dast control: target http://dast-target:52770 (host port 52770), 2026-11-05T22:25:16Z
+zap 2.17.0: 0 High alert(s)
+FAIL zap control: planted SQL injection [40018] MISSED
+schemathesis conversion-svc: 492 generated, 3 found 3 unique failures
+     3 - ST101 Server error
+     3 [501] Not Implemented:
+schemathesis ledger-svc: 134 generated, 2 found 2 unique failures
+     2 - ST101 Server error
+     2 [501] Not Implemented:
+FAIL schemathesis control: planted server error MISSED
+nuclei: 1536 templates, 0 finding(s) at low or above
+FAIL nuclei control: planted /actuator/env MISSED
+dast control exit=1
+exit=1

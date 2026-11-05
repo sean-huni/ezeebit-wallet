@@ -55,6 +55,33 @@ target() {
   TARGET="http://dast-target:$PORT"
 }
 
+# Asked from a container through dast-target, as the scanners ask, for answers only a service produces: a 404 from the
+# edge, a 429 or a host-only route would let every scanner pass having tested nothing (review, 2026-11-05).
+reach() {
+  local checks
+  case "$MODE" in
+    fleet) checks="/api/v1/merchants/$(uuid)/balances 200 \"data\" /api/v1/merchants/$(uuid)/conversions/$(uuid) 404 CONVERSION_NOT_FOUND" ;;
+    control) checks="/api/v1/merchants/$(uuid)/entries 200 \"data\"" ;;
+  esac
+  "${RUN[@]}" --entrypoint python3 "$ST_IMAGE" -I -c '
+import sys, urllib.error, urllib.request
+base, args = sys.argv[1], sys.argv[2:]
+for path, status, marker in zip(args[0::3], args[1::3], args[2::3]):
+    try:
+        reply = urllib.request.urlopen(base + path, timeout=10)
+        code, body = reply.status, reply.read().decode()
+    except urllib.error.HTTPError as error:
+        code, body = error.code, error.read().decode()
+    except OSError as error:
+        sys.exit(f"{path}: unreachable ({error})")
+    if str(code) != status or marker not in body:
+        sys.exit(f"{path}: {code} {body[:120]!r}, want {status} with {marker}")
+    print(f"reached {path}: {code}")
+' "$TARGET" $checks
+}
+
+uuid() { python3 -I -c 'import uuid; print(uuid.uuid4())'; }
+
 # Throttled under the gateway's 20/s per-merchant refill: ZAP reuses one merchant id, and its SQL-injection rule read
 # the 429s of an unthrottled run as High (measured 2026-11-05).
 zap() {
@@ -75,6 +102,9 @@ high, version = [], "?"
 for report in sorted(glob.glob(f"{out}/*-report.json")):
     spec = report.rsplit("/", 1)[1].removesuffix("-report.json")
     data = json.load(open(report))
+    if "site" not in data:
+        print(f"ERROR zap {spec}: the report lists no site, so nothing was scanned")
+        sys.exit(2)
     version = data["@version"]
     for site in data["site"]:
         for alert in site["alerts"]:
@@ -125,9 +155,6 @@ nuclei() {
   rc=$?
   [ "$rc" -eq 0 ] || { echo "ERROR nuclei: exit $rc, see $OUT/nuclei/nuclei.log"; return 2; }
   grep -Eq 'Templates loaded for current scan: [1-9]' "$OUT/nuclei/nuclei.log" || { echo "ERROR nuclei: loaded no templates"; return 2; }
-  # -nmhe keeps Nuclei on a target that times out on a malformed probe, so a target that died must be caught here.
-  [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/actuator/health")" = 200 ] \
-    || { echo "ERROR nuclei: the target stopped answering during the scan"; return 2; }
   touch "$OUT/nuclei/findings.jsonl"
   python3 -I - "$OUT/nuclei" "$MODE" <<'PY'
 import json, re, sys
@@ -150,6 +177,7 @@ docker info > /dev/null 2>&1 || die "Docker unavailable: every scanner runs as a
 rm -rf "$OUT" && mkdir -p "$OUT/zap" "$OUT/schemathesis" "$OUT/nuclei" && chmod 777 "$OUT/zap" || die "cannot prepare $OUT."
 target
 echo "dast $MODE: target $TARGET (host port $PORT), $(date -u +%FT%TZ)"
+reach || die "the scanners' route to $TARGET does not reach a service; nothing would be tested."
 verdict=0
 for scanner in zap schemathesis nuclei; do
   "$scanner"
@@ -157,5 +185,7 @@ for scanner in zap schemathesis nuclei; do
   echo "$scanner exit=$rc" >> "$OUT/status.txt"
   [ "$rc" -gt "$verdict" ] && verdict=$rc
 done
+# Nuclei runs with -nmhe so a malformed probe's timeout cannot drop the target; a target that died is caught here.
+reach || { echo "ERROR the target stopped answering during the scans"; verdict=2; }
 echo "dast $MODE exit=$verdict"
 exit "$verdict"

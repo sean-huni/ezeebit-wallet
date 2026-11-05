@@ -136,11 +136,17 @@ security/dast.sh control    # the same scans against security/dast-fixture.py, w
 |---|---|---|
 | ZAP 2.17.0, API scan | imports `docs/openapi/{conversion-svc,ledger-svc}.json` and actively attacks every operation: injection, path traversal, error disclosure, Spring4Shell, Log4Shell and the rest of its active rules | any High alert, read from its JSON report (the console calls some Highs WARN) |
 | Schemathesis 4.32.4 | generates requests from the same specs, valid and invalid, including methods and content types the specs do not declare | any 5xx answer |
-| Nuclei v3.11.1 | its `springboot`, `spring`, `actuator`, `exposure` and `misconfig` templates against the gateway's root | any finding at low or above: an exposed actuator endpoint is a defect whatever its template's rating |
+| Nuclei v3.11.1 | its `springboot`, `spring`, `actuator`, `exposure` and `misconfig` templates against the gateway's root | any finding rated low or above (info is reported only): an exposed `/actuator/env` is a defect although its template rates it low |
 
 - **Exit codes**: 0 clean, 1 a finding (in `control`, a missed plant), 2 a scanner could not run
-  (Docker absent, the target not answering 200 on `/actuator/health` before or after the scan, an
-  import of zero operations, zero templates loaded). A 2 means nothing was learned.
+  (Docker absent, an import of zero operations, zero templates loaded, a report naming no site, or the
+  reach probe failing). A 2 means nothing was learned.
+- **The reach probe** asks, from a container through the same `dast-target` route the scanners use,
+  before and after the scans, for answers only the services produce: ledger's balances (200 with
+  `data`) and conversion's `CONVERSION_NOT_FOUND`. Without it, a renamed route (every request a 404 from
+  the edge), a wall of 429s, or a host the containers cannot reach would pass every scanner having
+  tested nothing. Seen failing: aimed at config-svc, which answers its own health check, the run
+  stops at exit 2 before any scan.
 - **It refuses any target that is not loopback.** The scanners send attack payloads and write rows
   (quotes, rejected conversions); they never run against a shared environment.
 - **ZAP is throttled** to one thread and 100 ms between requests. It reuses one example merchant id,
@@ -158,13 +164,27 @@ What the first runs found, 2026-11-05, both fixed with a red test first:
 
 | Finding | Where | Fix |
 |---|---|---|
-| Any method reached the proxy client: QUERY and FOO answered 500 with an ERROR stack trace per request; PATCH and DELETE were forwarded | gateway-svc routes, `Path` predicate only | `Method=GET,POST` on both merchant routes; an unserved method answers 404 like any unpublished path (`EdgeHeadersIT`, `RouteCoverageIT`) |
+| Any method reached the proxy client: QUERY and FOO answered 500 with an ERROR stack trace per request; PATCH and DELETE were forwarded | gateway-svc routes, `Path` predicate only | `Method=GET,HEAD,POST` on both merchant routes (HEAD with GET, RFC 9110); any other method stops at the edge, never forwarded: 404 like any unpublished path, TRACE 405 from Tomcat (`EdgeHeadersIT`, `RouteCoverageIT`) |
 | A `multipart/*` Content-Type without a boundary answered 500 on every route | ledger-svc and conversion-svc; the same class in config-svc and eureka-svc, found by sweeping every service | `spring.servlet.multipart.enabled: false` (nothing takes multipart): reads ignore the header, JSON writes answer 415 (`MultipartRequestIT`, config and eureka boot tests) |
 
 The second finding was hidden behind the first: Schemathesis reports one failure per operation, so it
-appeared only once the method fix had landed. Evidence: the gate red on the unfixed fleet (5 QUERY 500s),
-then [the fleet run](evidence/2026-11-05-dast-fleet.log) and [the control run](evidence/2026-11-05-dast-control.log)
-at the committed fix.
+appeared only once the method fix had landed. Evidence: [the gate red on the unfixed fleet](evidence/2026-11-05-dast-fleet-red.log)
+(5 QUERY 500s), [the control red with its plants removed](evidence/2026-11-05-dast-control-red.log), then
+[the fleet run](evidence/2026-11-05-dast-fleet.log) and [the control run](evidence/2026-11-05-dast-control.log)
+at the committed fix. The first version of the method fix left HEAD out; the independent review caught it.
+
+Known and accepted, from the same review:
+
+- A refused method still costs the merchant a rate-limit token: the limiter runs before routing, so
+  probing leaves a trace, as for a malformed path.
+- An `OPTIONS` request is answered by the gateway itself with an `Allow` header listing every method
+  (Spring's default), including ones the routes refuse. It is never forwarded.
+- The gateway's own 404 for an unpublished path or method is Spring's default body, not the services'
+  problem format with a `code`.
+- Each route allows GET, HEAD and POST as a set, so `POST /balances` is forwarded and answered 405 by
+  ledger-svc rather than stopped at the edge.
+- Nothing runs the gate automatically: it needs a live fleet, so CI cannot run it, and the release
+  checklist must.
 
 What it does not cover: authenticated flows (the API has none at the gateway yet), the internal
 `/internal/**` and gRPC surfaces (not routed, so not reachable by a caller), and business-logic abuse

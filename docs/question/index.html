@@ -793,12 +793,12 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <table class="led wide">
       <thead><tr><th>Found by DAST, 5 November</th><th>Where</th><th>Fixed, red test first</th></tr></thead>
       <tbody>
-        <tr><td>QUERY or FOO answered <strong>500</strong> with a stack trace per request; PATCH and DELETE were forwarded</td><td>gateway routes matched on path only</td><td><code>Method=GET,POST</code>; anything else is 404, like any unpublished path</td></tr>
+        <tr><td>QUERY or FOO answered <strong>500</strong> with a stack trace per request; PATCH and DELETE were forwarded</td><td>gateway routes matched on path only</td><td><code>Method=GET,HEAD,POST</code>; anything else stops at the edge, never forwarded</td></tr>
         <tr><td>A <code>multipart/*</code> Content-Type without a boundary answered <strong>500</strong> on every route</td><td>ledger and conversion; the same class in config and eureka</td><td>multipart parsing off: reads ignore it, JSON writes answer 415</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note"><b>Pinned</b>The scanners are pinned by tag and digest in <code>security/scanners.lock</code>, each the newest release at least two weeks old; every verdict prints its vulnerability database date, because the data changes daily. <b>Split</b>SAST finds defects nobody has catalogued in this repository’s code; SCA finds catalogued CVEs in code nobody here wrote; DAST finds what both missed, on the running edge. <b>Control</b><code>dast.sh control</code> scans a stub with one planted defect per scanner and fails unless each is found, so a clean run is not a blind one. Detail: <code>docs/quality-gates.md</code> and <code>docs/supply-chain.md</code>.</p>
+  <p class="note"><b>Pinned</b>The scanners are pinned by tag and digest in <code>security/scanners.lock</code>, each the newest release at least two weeks old; every SCA verdict prints its vulnerability database date and every DAST run its Nuclei template count, because the data changes daily. <b>Split</b>SAST finds defects nobody has catalogued in this repository’s code; SCA finds catalogued CVEs in code nobody here wrote; DAST finds what both missed, on the running edge. <b>Control</b><code>dast.sh control</code> scans a stub with one planted defect per scanner and fails unless each is found, so a clean run is not a blind one; a reach probe through the scanners' own route fails the run if no service answered. Detail: <code>docs/quality-gates.md</code> and <code>docs/supply-chain.md</code>.</p>
 </section>
 
 <section class="board" id="close" data-tab="B" aria-label="Back cover">

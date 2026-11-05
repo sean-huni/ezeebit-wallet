@@ -71,6 +71,18 @@ class EdgeHeadersIT {
 		assertThat(upstream.hits()).isEqualTo(forwarded);
 	}
 
+	// RFC 9110 section 9.1: a server supports HEAD wherever it supports GET. The method fix first left it out (review, 2026-11-05).
+	@ParameterizedTest
+	@ValueSource(strings = { "balances", "entries", "conversions/c-1" })
+	void headIsForwardedWhereverGetIs(final String resource) {
+		int forwarded = upstream.hits();
+
+		ResponseEntity<String> response = send(gateway, "HEAD", "/api/v1/merchants/%s/%s".formatted(UUID.randomUUID(), resource));
+
+		assertThat(response.getStatusCode().value()).isEqualTo(200);
+		assertThat(upstream.hits()).isEqualTo(forwarded + 1);
+	}
+
 	@ParameterizedTest
 	@ValueSource(strings = { "/internal/v1/deposits", "/api/v1/internal/v1/deposits", "/v1/merchants/%s/balances" })
 	void nothingOutsideThePublishedRoutesIsForwarded(final String template) {

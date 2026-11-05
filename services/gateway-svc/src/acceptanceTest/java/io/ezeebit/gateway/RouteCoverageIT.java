@@ -59,11 +59,11 @@ class RouteCoverageIT {
 				.isEqualTo(new MerchantPath(MerchantPath.Kind.MERCHANT, "merchant:%s".formatted(MERCHANT))));
 	}
 
-	// The services serve GET and POST only; any other method must stop at the edge rather than reach the proxy client.
+	// The services serve GET (with HEAD, RFC 9110) and POST only; any other method must stop at the edge, before the proxy client.
 	@Test
-	void everyMerchantRouteServesGetAndPostOnly() {
+	void everyMerchantRouteServesGetHeadAndPostOnly() {
 		assertThat(merchantRoutes().toList()).isNotEmpty().allSatisfy(route ->
-				assertThat(predicate(route, "Method")).as(route.getId()).containsExactlyInAnyOrder("GET", "POST"));
+				assertThat(predicate(route, "Method")).as(route.getId()).containsExactlyInAnyOrder("GET", "HEAD", "POST"));
 	}
 
 	@Test

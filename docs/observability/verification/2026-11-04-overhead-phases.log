@@ -1,0 +1,259 @@
+######## phase kind-on (scratch phase.sh, before the fail-closed rewrite)
+deployment.apps/config-svc restarted
+deployment.apps/eureka-svc restarted
+deployment.apps/ledger-svc restarted
+deployment.apps/conversion-svc restarted
+deployment.apps/gateway-svc restarted
+2026-11-04T17:25:04Z config-svc rollout exit=0
+2026-11-04T17:25:04Z eureka-svc rollout exit=0
+2026-11-04T17:25:18Z ledger-svc rollout exit=0
+2026-11-04T17:25:18Z conversion-svc rollout exit=0
+2026-11-04T17:25:19Z gateway-svc rollout exit=0
+2026-11-04T17:25:38Z old pods gone exit=0
+2026-11-04T17:25:38Z rolled
+config-svc host-manifest=8af5792cd005 node-manifest=8af5792cd005 config=c06f20761bbf running=1 containers on [c06f20761bbf ] match=1
+eureka-svc host-manifest=27ee18e251a3 node-manifest=27ee18e251a3 config=660dde1a6b34 running=1 containers on [660dde1a6b34 ] match=1
+ledger-svc host-manifest=1c1c21679127 node-manifest=1c1c21679127 config=600d2e8b6679 running=2 containers on [600d2e8b6679 600d2e8b6679 ] match=1
+conversion-svc host-manifest=425cc0e4c676 node-manifest=425cc0e4c676 config=501f0788bf4d running=2 containers on [501f0788bf4d 501f0788bf4d ] match=1
+gateway-svc host-manifest=e60a5260afd5 node-manifest=e60a5260afd5 config=097bfc5aadc2 running=2 containers on [097bfc5aadc2 097bfc5aadc2 ] match=1
+imgcheck exit=0
+2026-11-04T17:25:39Z imgcheck exit=0
+config-svc []
+conversion-svc []
+eureka-svc []
+gateway-svc []
+ledger-svc []
+wiremock []
+2026-11-04T17:29:42Z settled: HPAs at min, 8 app pods, 244s after rollout
+2026-11-04T17:29:45Z deposits ok=1
+2026-11-04T17:30:45Z warm exit=0
+2026-11-04T17:35:45Z load exit=0
+2026-11-04T17:36:05Z phase kind-on done
+phase exit=0
+######## phase kind-off (scratch phase.sh, before the fail-closed rewrite)
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T17:36:22Z config-svc rollout exit=0
+2026-11-04T17:36:22Z eureka-svc rollout exit=0
+2026-11-04T17:36:37Z ledger-svc rollout exit=0
+2026-11-04T17:36:37Z conversion-svc rollout exit=0
+2026-11-04T17:36:37Z gateway-svc rollout exit=0
+2026-11-04T17:36:56Z old pods gone exit=0
+2026-11-04T17:36:56Z rolled
+config-svc host-manifest=8af5792cd005 node-manifest=8af5792cd005 config=c06f20761bbf running=1 containers on [c06f20761bbf ] match=1
+eureka-svc host-manifest=27ee18e251a3 node-manifest=27ee18e251a3 config=660dde1a6b34 running=1 containers on [660dde1a6b34 ] match=1
+ledger-svc host-manifest=1c1c21679127 node-manifest=1c1c21679127 config=600d2e8b6679 running=2 containers on [600d2e8b6679 600d2e8b6679 ] match=1
+conversion-svc host-manifest=425cc0e4c676 node-manifest=425cc0e4c676 config=501f0788bf4d running=2 containers on [501f0788bf4d 501f0788bf4d ] match=1
+gateway-svc host-manifest=e60a5260afd5 node-manifest=e60a5260afd5 config=097bfc5aadc2 running=2 containers on [097bfc5aadc2 097bfc5aadc2 ] match=1
+imgcheck exit=0
+2026-11-04T17:36:57Z imgcheck exit=0
+config-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+conversion-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+eureka-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+gateway-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+ledger-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+wiremock []
+2026-11-04T17:41:00Z settled: HPAs at min, 8 app pods, 244s after rollout
+2026-11-04T17:41:01Z deposits ok=1
+2026-11-04T17:42:01Z warm exit=0
+2026-11-04T17:47:01Z load exit=0
+2026-11-04T17:47:21Z phase kind-off done
+phase exit=0
+######## phase kind-nolock (scratch phase.sh, before the fail-closed rewrite)
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T17:48:16Z config-svc rollout exit=0
+2026-11-04T17:48:16Z eureka-svc rollout exit=0
+2026-11-04T17:48:31Z ledger-svc rollout exit=0
+2026-11-04T17:48:31Z conversion-svc rollout exit=0
+2026-11-04T17:48:31Z gateway-svc rollout exit=0
+2026-11-04T17:48:51Z old pods gone exit=0
+2026-11-04T17:48:51Z rolled
+config-svc host-manifest=8af5792cd005 node-manifest=8af5792cd005 config=c06f20761bbf running=1 containers on [c06f20761bbf ] match=1
+eureka-svc host-manifest=27ee18e251a3 node-manifest=27ee18e251a3 config=660dde1a6b34 running=1 containers on [660dde1a6b34 ] match=1
+ledger-svc host-manifest=1c1c21679127 node-manifest=1c1c21679127 config=600d2e8b6679 running=2 containers on [600d2e8b6679 600d2e8b6679 ] match=1
+conversion-svc host-manifest=425cc0e4c676 node-manifest=425cc0e4c676 config=501f0788bf4d running=2 containers on [501f0788bf4d 501f0788bf4d ] match=1
+gateway-svc host-manifest=e60a5260afd5 node-manifest=e60a5260afd5 config=097bfc5aadc2 running=2 containers on [097bfc5aadc2 097bfc5aadc2 ] match=1
+imgcheck exit=0
+2026-11-04T17:48:51Z imgcheck exit=0
+config-svc ["EZEEBIT_PROFILING_LOCK=1h"]
+conversion-svc ["EZEEBIT_PROFILING_LOCK=1h"]
+eureka-svc ["EZEEBIT_PROFILING_LOCK=1h"]
+gateway-svc ["EZEEBIT_PROFILING_LOCK=1h"]
+ledger-svc ["EZEEBIT_PROFILING_LOCK=1h"]
+wiremock []
+2026-11-04T17:52:54Z settled: HPAs at min, 8 app pods, 243s after rollout
+2026-11-04T17:52:57Z deposits ok=1
+2026-11-04T17:53:57Z warm exit=0
+2026-11-04T17:58:57Z load exit=0
+2026-11-04T17:59:17Z phase kind-nolock done
+phase exit=0
+######## phase kind-noalloc (scratch phase.sh, before the fail-closed rewrite)
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T17:59:27Z config-svc rollout exit=0
+2026-11-04T17:59:28Z eureka-svc rollout exit=0
+2026-11-04T17:59:43Z ledger-svc rollout exit=0
+2026-11-04T17:59:43Z conversion-svc rollout exit=0
+2026-11-04T17:59:43Z gateway-svc rollout exit=0
+2026-11-04T18:00:02Z old pods gone exit=0
+2026-11-04T18:00:02Z rolled
+config-svc host-manifest=8af5792cd005 node-manifest=8af5792cd005 config=c06f20761bbf running=1 containers on [c06f20761bbf ] match=1
+eureka-svc host-manifest=27ee18e251a3 node-manifest=27ee18e251a3 config=660dde1a6b34 running=1 containers on [660dde1a6b34 ] match=1
+ledger-svc host-manifest=1c1c21679127 node-manifest=1c1c21679127 config=600d2e8b6679 running=2 containers on [600d2e8b6679 600d2e8b6679 ] match=1
+conversion-svc host-manifest=425cc0e4c676 node-manifest=425cc0e4c676 config=501f0788bf4d running=2 containers on [501f0788bf4d 501f0788bf4d ] match=1
+gateway-svc host-manifest=e60a5260afd5 node-manifest=e60a5260afd5 config=097bfc5aadc2 running=2 containers on [097bfc5aadc2 097bfc5aadc2 ] match=1
+imgcheck exit=0
+2026-11-04T18:00:03Z imgcheck exit=0
+config-svc ["EZEEBIT_PROFILING_LOCK=1h","EZEEBIT_PROFILING_ALLOC=1GB"]
+conversion-svc ["EZEEBIT_PROFILING_LOCK=1h","EZEEBIT_PROFILING_ALLOC=1GB"]
+eureka-svc ["EZEEBIT_PROFILING_LOCK=1h","EZEEBIT_PROFILING_ALLOC=1GB"]
+gateway-svc ["EZEEBIT_PROFILING_LOCK=1h","EZEEBIT_PROFILING_ALLOC=1GB"]
+ledger-svc ["EZEEBIT_PROFILING_LOCK=1h","EZEEBIT_PROFILING_ALLOC=1GB"]
+wiremock []
+2026-11-04T18:04:06Z settled: HPAs at min, 8 app pods, 244s after rollout
+2026-11-04T18:04:08Z deposits ok=1
+2026-11-04T18:05:08Z warm exit=0
+2026-11-04T18:10:08Z load exit=0
+2026-11-04T18:10:28Z phase kind-noalloc done
+phase exit=0
+######## phase r1-off (2026-11-04-overhead-phase.sh as committed in c96cf0f)
+2026-11-04T18:32:23Z HPAs pinned at maxReplicas 2
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T18:32:29Z config-svc rollout exit=0
+2026-11-04T18:32:29Z eureka-svc rollout exit=0
+2026-11-04T18:32:44Z ledger-svc rollout exit=0
+2026-11-04T18:32:44Z conversion-svc rollout exit=0
+2026-11-04T18:32:44Z gateway-svc rollout exit=0
+2026-11-04T18:33:03Z old pods gone exit=0
+2026-11-04T18:33:03Z rolled
+config-svc host-manifest=4883868c67cd node-manifest=4883868c67cd config=808667dda157 running=1 match=1
+eureka-svc host-manifest=3acf066f69c3 node-manifest=3acf066f69c3 config=e097104d8e9d running=1 match=1
+ledger-svc host-manifest=f845b6e24c7c node-manifest=f845b6e24c7c config=7c467558c407 running=2 match=1
+conversion-svc host-manifest=64c68bfc6d42 node-manifest=64c68bfc6d42 config=4dff3999ad54 running=2 match=1
+gateway-svc host-manifest=639c215a912f node-manifest=639c215a912f config=ae85d30b0b6f running=2 match=1
+imgcheck exit=0
+2026-11-04T18:33:04Z imgcheck exit=0
+config-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+conversion-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+eureka-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+gateway-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+ledger-svc ["EZEEBIT_PROFILING_ENABLED=false"]
+wiremock []
+2026-11-04T18:37:08Z settled: HPAs at min, 8 app pods, 245s after rollout
+2026-11-04T18:37:11Z deposits ok=1
+2026-11-04T18:38:11Z warm exit=0
+2026-11-04T18:43:11Z load exit=0
+2026-11-04T18:43:32Z phase r1-off done
+2026-11-04T18:43:32Z HPAs restored to 3/3/4 (conversion/ledger/gateway)
+phase exit=0
+######## phase r1-20ms (2026-11-04-overhead-phase.sh as committed in c96cf0f)
+2026-11-04T18:43:45Z HPAs pinned at maxReplicas 2
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T18:43:51Z config-svc rollout exit=0
+2026-11-04T18:43:51Z eureka-svc rollout exit=0
+2026-11-04T18:44:06Z ledger-svc rollout exit=0
+2026-11-04T18:44:07Z conversion-svc rollout exit=0
+2026-11-04T18:44:07Z gateway-svc rollout exit=0
+2026-11-04T18:44:25Z old pods gone exit=0
+2026-11-04T18:44:25Z rolled
+config-svc host-manifest=4883868c67cd node-manifest=4883868c67cd config=808667dda157 running=1 match=1
+eureka-svc host-manifest=3acf066f69c3 node-manifest=3acf066f69c3 config=e097104d8e9d running=1 match=1
+ledger-svc host-manifest=f845b6e24c7c node-manifest=f845b6e24c7c config=7c467558c407 running=2 match=1
+conversion-svc host-manifest=64c68bfc6d42 node-manifest=64c68bfc6d42 config=4dff3999ad54 running=2 match=1
+gateway-svc host-manifest=639c215a912f node-manifest=639c215a912f config=ae85d30b0b6f running=2 match=1
+imgcheck exit=0
+2026-11-04T18:44:26Z imgcheck exit=0
+config-svc ["PYROSCOPE_INTERVAL=20ms"]
+conversion-svc ["PYROSCOPE_INTERVAL=20ms"]
+eureka-svc ["PYROSCOPE_INTERVAL=20ms"]
+gateway-svc ["PYROSCOPE_INTERVAL=20ms"]
+ledger-svc ["PYROSCOPE_INTERVAL=20ms"]
+wiremock []
+2026-11-04T18:48:30Z settled: HPAs at min, 8 app pods, 245s after rollout
+2026-11-04T18:48:31Z deposits ok=1
+2026-11-04T18:49:31Z warm exit=0
+2026-11-04T18:54:31Z load exit=0
+2026-11-04T18:54:51Z phase r1-20ms done
+2026-11-04T18:54:51Z HPAs restored to 3/3/4 (conversion/ledger/gateway)
+phase exit=0
+######## phase r1-50ms (2026-11-04-overhead-phase.sh as committed in c96cf0f)
+2026-11-04T18:54:57Z HPAs pinned at maxReplicas 2
+deployment.apps/config-svc env updated
+deployment.apps/eureka-svc env updated
+deployment.apps/ledger-svc env updated
+deployment.apps/conversion-svc env updated
+deployment.apps/gateway-svc env updated
+2026-11-04T18:55:02Z config-svc rollout exit=0
+2026-11-04T18:55:03Z eureka-svc rollout exit=0
+2026-11-04T18:55:18Z ledger-svc rollout exit=0
+2026-11-04T18:55:18Z conversion-svc rollout exit=0
+2026-11-04T18:55:18Z gateway-svc rollout exit=0
+2026-11-04T18:55:37Z old pods gone exit=0
+2026-11-04T18:55:37Z rolled
+config-svc host-manifest=4883868c67cd node-manifest=4883868c67cd config=808667dda157 running=1 match=1
+eureka-svc host-manifest=3acf066f69c3 node-manifest=3acf066f69c3 config=e097104d8e9d running=1 match=1
+ledger-svc host-manifest=f845b6e24c7c node-manifest=f845b6e24c7c config=7c467558c407 running=2 match=1
+conversion-svc host-manifest=64c68bfc6d42 node-manifest=64c68bfc6d42 config=4dff3999ad54 running=2 match=1
+gateway-svc host-manifest=639c215a912f node-manifest=639c215a912f config=ae85d30b0b6f running=2 match=1
+imgcheck exit=0
+2026-11-04T18:55:38Z imgcheck exit=0
+config-svc ["PYROSCOPE_INTERVAL=50ms"]
+conversion-svc ["PYROSCOPE_INTERVAL=50ms"]
+eureka-svc ["PYROSCOPE_INTERVAL=50ms"]
+gateway-svc ["PYROSCOPE_INTERVAL=50ms"]
+ledger-svc ["PYROSCOPE_INTERVAL=50ms"]
+wiremock []
+2026-11-04T18:59:41Z settled: HPAs at min, 8 app pods, 244s after rollout
+2026-11-04T18:59:43Z deposits ok=1
+2026-11-04T19:00:43Z warm exit=0
+2026-11-04T19:05:43Z load exit=0
+2026-11-04T19:06:03Z phase r1-50ms done
+2026-11-04T19:06:03Z HPAs restored to 3/3/4 (conversion/ledger/gateway)
+phase exit=0
+######## void attempt 2 (HPA scaled ledger to 3 during warm-up; killed)
+deployment.apps/config-svc restarted
+deployment.apps/eureka-svc restarted
+deployment.apps/ledger-svc restarted
+deployment.apps/conversion-svc restarted
+deployment.apps/gateway-svc restarted
+2026-11-04T17:15:25Z config-svc rollout exit=0
+2026-11-04T17:15:25Z eureka-svc rollout exit=0
+2026-11-04T17:15:40Z ledger-svc rollout exit=0
+2026-11-04T17:15:41Z conversion-svc rollout exit=0
+2026-11-04T17:15:41Z gateway-svc rollout exit=0
+2026-11-04T17:16:01Z old pods gone exit=0
+2026-11-04T17:16:01Z rolled
+config-svc host-manifest=8af5792cd005 node-manifest=8af5792cd005 config=c06f20761bbf running=1 containers on [c06f20761bbf ] match=1
+eureka-svc host-manifest=27ee18e251a3 node-manifest=27ee18e251a3 config=660dde1a6b34 running=1 containers on [660dde1a6b34 ] match=1
+ledger-svc host-manifest=1c1c21679127 node-manifest=1c1c21679127 config=600d2e8b6679 running=2 containers on [600d2e8b6679 600d2e8b6679 ] match=1
+conversion-svc host-manifest=425cc0e4c676 node-manifest=425cc0e4c676 config=501f0788bf4d running=2 containers on [501f0788bf4d 501f0788bf4d ] match=1
+gateway-svc host-manifest=e60a5260afd5 node-manifest=e60a5260afd5 config=097bfc5aadc2 running=2 containers on [097bfc5aadc2 097bfc5aadc2 ] match=1
+imgcheck exit=0
+2026-11-04T17:16:02Z imgcheck exit=0
+config-svc []
+conversion-svc []
+eureka-svc []
+gateway-svc []
+ledger-svc []
+wiremock []
+2026-11-04T17:22:36Z settled: HPAs at min, 8 app pods, 395s after rollout
+2026-11-04T17:22:38Z deposits ok=1
+2026-11-04T17:23:38Z warm exit=0

@@ -69,7 +69,7 @@ What exists:
   never arrives leaves the conversion PENDING (202), records a dead letter on a Kafka topic that pages
   Slack, and leaves the money to a sweeper, which finds the posting or voids it so a late arrival is refused. A refusal is recorded
   in the ledger before it is answered, so money arriving later can never let that conversion post.
-- **Five Spring Boot 4.1.1 services** (Java 25, Spring Cloud 2025.1.3): two business services
+- **Five Spring Boot 4.1.2 services** (Java 25, Spring Cloud 2025.1.3): two business services
   (ledger-svc, conversion-svc) behind the gateway (gateway-svc), and config-svc and eureka-svc as the
   control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
@@ -243,10 +243,10 @@ This is the single list; the other documents link here.
   no autoscaler by the `replicas` build gate).
 - CircleCI has never run: the repository is pushed to GitHub but not connected to CircleCI, and no
   check run or status exists on `origin/dev` (checked 2026-10-16; [docs/ci.md](docs/ci.md)).
-- Tomcat, Jackson (3 and 2) and FreeMarker are pinned above Boot 4.1.1's managed versions to clear
-  fixable Common Vulnerabilities and Exposures (CVEs); each override must be dropped once Boot catches up, or it will hold a version back.
-  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.10.1 by kafka-clients
-  4.2.1: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
+- Boot 4.1.2 manages fixed Tomcat, Jackson (3 and 2) and FreeMarker versions, so the overrides that cleared their
+  Common Vulnerabilities and Exposures (CVEs) under Boot 4.1.1 were dropped on 2026-11-04.
+  lz4-java is pinned at 1.11.4 in conversion-svc for CVE-2026-106451, pulled at 1.11.2 by kafka-clients
+  4.2.2: a transitive override rather than a Boot property, to be dropped once Boot manages a kafka-clients that brings a fixed lz4.
 - trivy has no compose checks, so the misconfiguration stage reports rather than inspects.
 
 **Money correctness**
@@ -273,9 +273,9 @@ This is the single list; the other documents link here.
 - Nothing reports the age of the oldest PENDING conversion.
 - Alerts reach one Slack channel, not an on-call rota; nothing watches the monitoring stack itself.
 - RateLimiterUnavailable and RateLimiterStoreDown were each rehearsed once locally; neither has a
-  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 8 of the 12 rules (ServiceDown,
+  `promtool` case. `docker/lgtm/test-rules.sh` unit-tests 10 of the 14 rules (ServiceDown,
   RateFeedRefusing, LatencySLOBurn, DbPoolSaturated, LedgerInvariantBroken,
-  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent) and is run by hand, not by the
+  ConversionLedgerDeadLettered, DeadLetterPublishFailing, KafkaAbsent, ProfilingFailing, ProfilesAbsent) and is run by hand, not by the
   Gradle build or the CircleCI pipeline.
 - KafkaAbsent cannot see a broker that is down before conversion-svc's first dead letter, because
   the producer starts with that record; `./fleet.sh status` (the `kafka` row) is the check then.

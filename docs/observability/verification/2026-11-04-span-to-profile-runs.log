@@ -1,0 +1,92 @@
+######## click-kind
+delay mapping POST 201 id=4517cf0e-8c8e-432e-8bc7-6d99177436bf
+PASS WireMock delay mapping created
+delay mapping DELETE 200; mappings now 39, with fixedDelayMilliseconds 0
+PASS delay removed, 0 delayed mappings remain
+drive 2026-11-04T17:04:32.654Z..2026-11-04T17:04:42.689Z quotes {"201 slow":48}
+tempo search HTTP 200: 48 slow traces
+PASS a slow trace was found
+trace cae9bcfa41894c81f9483229f2b60fc3: conversion-svc SERVER span c8b811cf1387b313 "http post /{version:v\d+}/merchants/{merchantId}/quotes" 808 ms, pyroscope.profile.id=c8b811cf1387b313
+PASS the SERVER span carries its own id as pyroscope.profile.id
+span rows named "http post /{version:v\d+}/merchants/{merchantId}/quotes": 1
+PASS the SERVER span is shown in the trace view
+PASS "Profiles for this span" offered once
+link query: wall:wall:nanoseconds:wall:nanoseconds {service_name="conversion-svc"} spanSelector=["c8b811cf1387b313"] range=1793811817584..1793811938392
+PASS (a) the link's datasource request names conversion-svc and spanSelector [c8b811cf1387b313]
+link flame graph: 41 rows in the response, canvas 343x682
+PASS (b) the span flame graph renders non-empty
+(info) RateCall.get in the span-filtered response: false
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793811862584..1793811893392 rows=2396 has RateCall.get=true
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793811862584..1793811893392 rows=2396 has RateCall.get=true
+PASS (c) the service-window view over the trace +/- 15s holds RateCall.get
+span to profile PASS (0 failed checks)
+exit=0
+######## click-10ms-2
+delay mapping POST 201 id=ab1329be-f055-4fba-a910-c073d3fd0a07
+PASS WireMock delay mapping created
+delay mapping DELETE 200; mappings now 39, with fixedDelayMilliseconds 0
+PASS delay removed, 0 delayed mappings remain
+drive 2026-11-04T19:35:00.639Z..2026-11-04T19:35:11.077Z quotes {"201 slow":48}
+tempo search HTTP 200: 48 slow traces
+PASS a slow trace was found
+trace 428ec6a0d1fe8a3910e926fc50688374: conversion-svc SERVER span e8ee9d117ec35639 "http post /{version:v\d+}/merchants/{merchantId}/quotes" 807 ms, pyroscope.profile.id=e8ee9d117ec35639
+PASS the SERVER span carries its own id as pyroscope.profile.id
+span rows named "http post /{version:v\d+}/merchants/{merchantId}/quotes": 1
+PASS the SERVER span is shown in the trace view
+PASS "Profiles for this span" offered once
+link query: wall:wall:nanoseconds:wall:nanoseconds {service_name="conversion-svc"} spanSelector=["e8ee9d117ec35639"] range=1793820846165..1793820966972
+PASS (a) the link's datasource request names conversion-svc and spanSelector [e8ee9d117ec35639]
+link flame graph: 60 rows, root 10 ms in the response, canvas 343x1320
+PASS (b) the span flame graph renders non-empty
+(info) RateCall.get in the span-filtered response: false
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793820891165..1793820921972 rows=4577 has RateCall.get=true
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793820891165..1793820921972 rows=4577 has RateCall.get=true
+PASS (c) the service-window view over the trace +/- 15s holds RateCall.get
+span to profile PASS (0 failed checks)
+exit=0
+######## click-50ms
+delay mapping POST 201 id=e22adb5d-938a-4e12-92db-49cc9aa29abc
+PASS WireMock delay mapping created
+delay mapping DELETE 200; mappings now 39, with fixedDelayMilliseconds 0
+PASS delay removed, 0 delayed mappings remain
+drive 2026-11-04T19:06:20.731Z..2026-11-04T19:06:30.482Z quotes {"201 slow":48}
+tempo search HTTP 200: 48 slow traces
+PASS a slow trace was found
+trace 77d8821c4ffd113019a9e94b76412dd: conversion-svc SERVER span 65e5d347b1a5d1b7 "http post /{version:v\d+}/merchants/{merchantId}/quotes" 805 ms, pyroscope.profile.id=65e5d347b1a5d1b7
+PASS the SERVER span carries its own id as pyroscope.profile.id
+span rows named "http post /{version:v\d+}/merchants/{merchantId}/quotes": 1
+PASS the SERVER span is shown in the trace view
+PASS "Profiles for this span" offered once
+link query: wall:wall:nanoseconds:wall:nanoseconds {service_name="conversion-svc"} spanSelector=["65e5d347b1a5d1b7"] range=1793819125603..1793819246408
+PASS (a) the link's datasource request names conversion-svc and spanSelector [65e5d347b1a5d1b7]
+link flame graph: 11 rows, root 800 ms in the response, canvas 343x242
+PASS (b) the span flame graph renders non-empty
+(info) RateCall.get in the span-filtered response: false
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793819170603..1793819201408 rows=797 has RateCall.get=false
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793819170603..1793819201408 rows=797 has RateCall.get=false
+FAIL (c) the service-window view over the trace +/- 15s holds RateCall.get
+span to profile FAIL (1 failed checks)
+exit=1
+######## click-50ms-2
+delay mapping POST 201 id=6cf8cf30-bf9a-4f4c-b6f6-19f9c6a8e0e9
+PASS WireMock delay mapping created
+delay mapping DELETE 200; mappings now 39, with fixedDelayMilliseconds 0
+PASS delay removed, 0 delayed mappings remain
+drive 2026-11-04T19:08:13.940Z..2026-11-04T19:08:23.694Z quotes {"201 slow":48}
+tempo search HTTP 200: 48 slow traces
+PASS a slow trace was found
+trace 8ce8d6a86fa683b12ae702cf56cb7811: conversion-svc SERVER span b079309c92f2dd28 "http post /{version:v\d+}/merchants/{merchantId}/quotes" 806 ms, pyroscope.profile.id=b079309c92f2dd28
+PASS the SERVER span carries its own id as pyroscope.profile.id
+span rows named "http post /{version:v\d+}/merchants/{merchantId}/quotes": 1
+PASS the SERVER span is shown in the trace view
+PASS "Profiles for this span" offered once
+link query: wall:wall:nanoseconds:wall:nanoseconds {service_name="conversion-svc"} spanSelector=["b079309c92f2dd28"] range=1793819238817..1793819359623
+PASS (a) the link's datasource request names conversion-svc and spanSelector [b079309c92f2dd28]
+link flame graph: 11 rows, root 800 ms in the response, canvas 343x242
+PASS (b) the span flame graph renders non-empty
+(info) RateCall.get in the span-filtered response: false
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793819283817..1793819314623 rows=750 has RateCall.get=true
+row query: {service_name=~"conversion-svc"} spanSelector=[] range=1793819283817..1793819314623 rows=750 has RateCall.get=true
+PASS (c) the service-window view over the trace +/- 15s holds RateCall.get
+span to profile PASS (0 failed checks)
+exit=0

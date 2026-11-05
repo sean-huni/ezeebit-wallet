@@ -1,0 +1,744 @@
+> Task :clean
+> Task :services:config-svc:clean
+> Task :services:conversion-svc:clean
+> Task :services:eureka-svc:clean
+> Task :services:gateway-svc:clean
+> Task :services:ledger-svc:clean
+> Task :assemble UP-TO-DATE
+
+> Task :checkChaosMonkey
+ok    happy path: one kill
+ok    one namespace cannot be listed: refused
+ok    one namespace cannot be listed: nothing killed
+ok    no service at all: KILLED 0
+ok    service with no Running pod: a miss
+ok    service with no Running pod: KILLED 0
+ok    fewer kills than asked: exit 1
+ok    fewer kills than asked: the second draw finds no pod
+ok    fewer kills than asked: total counted
+ok    delete answers NotFound: not counted
+ok    delete answers NotFound: reported
+ok    ezeebit-obs: refused
+ok    ezeebit-obs: nothing killed
+ok    another context: refused
+PASS 14/14
+
+> Task :checkDashboards
+generate.py --check: 7 files match the generator (5 dashboards, 14 rules, 1 promtool mirror)
+
+> Task :checkEnvGuard
+ok    k8s refused while compose containers run (working_dir label)
+ok    a refused acquire drops the lease it took
+ok    k8s refused while compose containers run (project label)
+ok    k8s refused while a fleet JVM lives with no containers
+ok    a pid file naming a foreign process is not a fleet JVM
+ok    ps failing on a live fleet pid fails closed
+ok    a blind JVM probe drops the lease it took
+ok    ps failing on a dead fleet pid is no JVM
+ok    lsof failing with stderr fails closed
+ok    k8s refused while a foreign listener holds 8080
+ok    a foreign holder of 8080 is named foreign
+ok    a foreign holder is never reported as the compose fleet running
+ok    k8s refused while a foreign listener holds 3000
+ok    foreign holders of ports kind does not bind do not block k8s
+ok    a port inside a published range names its container, not the Docker backend
+ok    a compose container on 8080 is the compose fleet
+ok    a compose container on 8080 is not named foreign
+ok    a fleet JVM on 8080 is the compose fleet
+ok    a fleet JVM on 8080 is not named foreign
+ok    a foreign 8080 holder is not the stale compose lease still running
+ok    a foreign holder does not keep a stale compose lease alive
+ok    k8s acquire ignores its own kind node on 8080 and 3000
+ok    compose refused while the kind node runs
+ok    compose refused while the kind node is stopped
+ok    a stale k8s lease is reclaimed by compose
+ok    the reclaimed lease names compose
+ok    a finished reclaim removes its lock
+ok    a stale lease another acquire is reclaiming is left to it
+ok    the lease being reclaimed by another is untouched
+ok    another acquire's reclaim lock is untouched
+ok    a k8s lease whose kind node runs refuses compose
+ok    the live lease is left with k8s
+ok    a k8s lease whose up is still running refuses compose
+ok    the in-progress lease is left with k8s
+ok    the same owner acquiring again is idempotent
+ok    a lease held by an unknown owner fails closed
+ok    the unknown-owner refusal says how to recover
+ok    Docker unreachable fails closed
+ok    a blind acquire drops the lease it took
+ok    release by the wrong owner is refused
+ok    the wrong owner's release leaves the lease
+ok    release by the owner
+ok    the owner's release removes the lease
+ok    state reads every fact
+ok    state prints one line per fact
+ok    concurrent acquires, round 1: one 0, one 1
+ok    concurrent acquires, round 2: one 0, one 1
+ok    concurrent acquires, round 3: one 0, one 1
+PASS 48/48
+
+> Task :checkK8s
+scanned: 51 files under k8s/ for /docker compose|docker-compose|fleet[.]sh|pgdata|kafkadata|lgtmdata/; fleet.sh compose.yaml for /kind|kubectl|[.]kube-fleet|kind-ezeebit|ezeebit-control-plane/
+PASS fleet-separation
+excepted: alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00
+excepted: registry.k8s.io/metrics-server/metrics-server:v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0
+compared: 5 k8s third-party images, 5 compose images
+PASS image-parity
+build.gradle version: 0.3.2; ezeebit image refs checked: 5
+PASS app-image-version
+config-svc      replicas=1 hpas=0 (want replicas=1 hpas=0)
+eureka-svc      replicas=1 hpas=0 (want replicas=1 hpas=0)
+gateway-svc     replicas=2 hpa=[2 4 70] (want replicas=2 hpa=[2 4 70])
+ledger-svc      replicas=2 hpa=[2 3 70] (want replicas=2 hpa=[2 3 70])
+conversion-svc  replicas=2 hpa=[2 3 70] (want replicas=2 hpa=[2 3 70])
+PASS replicas
+conversion-svc  maxReplicas=3 x pool=10 = 30
+ledger-svc      maxReplicas=3 x pool=10 = 30
+reserve=10; total=70; postgres max_connections=100
+PASS pool-budget
+config-svc      cpu limit=2     spring.threads.virtual.enabled=true
+conversion-svc  cpu limit=2     spring.threads.virtual.enabled=true
+eureka-svc      cpu limit=2     spring.threads.virtual.enabled=true
+gateway-svc     cpu limit=2     spring.threads.virtual.enabled=true
+ledger-svc      cpu limit=2     spring.threads.virtual.enabled=true
+PASS virtual-threads (5 JVM services)
+PASS sweep-log-name: 3 names and 8 refusals as expected
+checkK8s exit=0
+
+> Task :checkSecrets
+==============================================================================
+EZEEBIT SUPPLY CHAIN   trivy 0.74.0, gitleaks v8.30.1, pinned in security/scanners.lock
+==============================================================================
+
+STAGES REQUIRED BY THIS RUN  [secrets]
+  secrets  3/3 scanner(s) completed   4/4 report file(s) usable   OK
+
+SECRETS  [any finding fails; values are redacted and never printed]
+  gitleaks history : 0 finding(s)  [278 of 278 commits with changes, all refs, merges by first parent; 278 in all]
+  gitleaks tree    : 0 finding(s)  [634 files: tracked plus untracked, .gitignore honoured]
+  trivy secret     : 0 finding(s)  [the same 634 files, second instrument]
+
+SUPPRESSIONS  security/trivy-ignore.yaml holds 0 vulnerability entries
+
+==============================================================================
+SUPPLY CHAIN GATE: PASSED  (stages secrets only; no image verdict is claimed)
+
+> Task :checkSingleProto
+checkSingleProto: 1 contract(s), 0 strays
+
+> Task :check
+> Task :build
+> Task :services:config-svc:compileJava
+> Task :services:config-svc:processResources
+> Task :services:config-svc:classes
+> Task :services:config-svc:resolveMainClassName
+> Task :services:config-svc:bootJar
+> Task :services:config-svc:jar SKIPPED
+> Task :services:config-svc:assemble
+> Task :services:config-svc:compileTestJava
+> Task :services:config-svc:processTestResources NO-SOURCE
+> Task :services:config-svc:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module (file:/Users/sean/.gradle/caches/modules-2/files-2.1/io.pyroscope/agent/2.9.2/22b5457e884f2baef2e5fdd3dbed26f4d1147ba4/agent-2.9.2.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-11-05T00:09:37.400+02:00  INFO 83964 --- [config-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:09:37.403+02:00  INFO 83964 --- [config-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+> Task :services:config-svc:test
+> Task :services:config-svc:spotbugsTest SKIPPED
+> Task :services:conversion-svc:protobufDummy UP-TO-DATE
+> Task :services:config-svc:jacocoTestCoverageVerification
+> Task :services:config-svc:jacocoTestReport
+> Task :services:conversion-svc:extractIncludeProto
+
+> Task :services:config-svc:checkCoverageFloors
+checkCoverageFloors(config-svc): LINE measured 0.9308, floor 0.90
+checkCoverageFloors(config-svc): BRANCH measured 1.0000, floor 0.97
+
+> Task :services:conversion-svc:extractProto
+> Task :services:conversion-svc:generateProto
+> Task :services:config-svc:checkstyleMain
+> Task :services:config-svc:checkstyleTest
+
+> Task :services:conversion-svc:compileJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet/services/conversion-svc/src/main/java/io/ezeebit/conversion/api/doc/ProblemSchemas.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:conversion-svc:processProtoResources
+> Task :services:conversion-svc:processResources
+> Task :services:conversion-svc:classes
+> Task :services:conversion-svc:resolveMainClassName
+> Task :services:conversion-svc:bootJar
+> Task :services:conversion-svc:jar SKIPPED
+> Task :services:conversion-svc:assemble
+> Task :services:config-svc:spotbugsMain
+> Task :services:conversion-svc:extractIncludeTestProto
+
+> Task :services:config-svc:checkSpotbugsReport
+spotbugs(config-svc): 13 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:config-svc:check
+> Task :services:config-svc:build
+> Task :services:conversion-svc:extractTestProto
+> Task :services:conversion-svc:generateTestProto NO-SOURCE
+
+> Task :services:conversion-svc:compileTestJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet/services/conversion-svc/src/test/java/io/ezeebit/conversion/scheduler/PendingConversionSweeperTest.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:conversion-svc:processTestProtoResources
+> Task :services:conversion-svc:processTestResources NO-SOURCE
+> Task :services:conversion-svc:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module (file:/Users/sean/.gradle/caches/modules-2/files-2.1/io.pyroscope/agent/2.9.2/22b5457e884f2baef2e5fdd3dbed26f4d1147ba4/agent-2.9.2.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :services:conversion-svc:test
+> Task :services:conversion-svc:extractAcceptanceTestProto
+> Task :services:conversion-svc:extractIncludeAcceptanceTestProto
+> Task :services:conversion-svc:generateAcceptanceTestProto NO-SOURCE
+> Task :services:conversion-svc:compileAcceptanceTestJava
+> Task :services:conversion-svc:processAcceptanceTestProtoResources
+> Task :services:conversion-svc:processAcceptanceTestResources
+> Task :services:conversion-svc:acceptanceTestClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-05T00:10:27.802+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-05T00:10:27.803+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-11-05T00:10:27.882+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:27.932+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:27.983+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:27.991+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:10:27.993+02:00  INFO 84116 --- [conversion-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-11-05T00:10:27.995+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown initiated...
+2026-11-05T00:10:27.996+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown completed.
+2026-11-05T00:10:28.035+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:28.035+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:28.035+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:28.191+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.s.EurekaServiceRegistry        : Unregistering application CONVERSION-SVC with eureka with status DOWN
+2026-11-05T00:10:28.192+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.s.EurekaServiceRegistry        : Unregistering application CONVERSION-SVC with eureka with status DOWN
+2026-11-05T00:10:28.192+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] i.e.discovery.DeregisterBeforeDrain      : Deregistered from Eureka; serving for 10000 ms more before the graceful drain
+2026-11-05T00:10:28.430+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:28.430+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:28.430+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:28.534+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.585+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.637+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.688+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.739+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.790+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.842+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.893+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.945+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:28.997+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:29.048+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:29.099+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:29.150+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:29.202+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:29.253+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:29.254+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:29.254+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+> Task :services:conversion-svc:integrationTest
+
+2026-11-05T00:10:30.017+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:30.068+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:30.120+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:30.175+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:30.225+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:30.277+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:30.277+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:30.277+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:30.674+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Disable delta property : false
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Single vip registry refresh property : null
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Force full registry fetch : false
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Application is null : false
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Registered Applications size is zero : true
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Application version is -1: false
+2026-11-05T00:10:30.675+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Getting all instance registry info from the eureka server
+2026-11-05T00:10:30.679+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] c.n.d.s.t.d.RedirectingEurekaHttpClient  : Request execution error. endpoint=DefaultEndpoint{ serviceUrl='http://localhost:58094/eureka/}, exception=I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+
+org.springframework.web.client.ResourceAccessException: I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntityInternal(DefaultRestClient.java:870)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntity(DefaultRestClient.java:859)
+	at org.springframework.cloud.netflix.eureka.http.RestClientEurekaHttpClient.getApplicationsInternal(RestClientEurekaHttpClient.java:201)
+	at org.springframework.cloud.netflix.eureka.http.RestClientEurekaHttpClient.getApplications(RestClientEurekaHttpClient.java:137)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.RedirectingEurekaHttpClient.executeOnNewServer(RedirectingEurekaHttpClient.java:120)
+	at com.netflix.discovery.shared.transport.decorator.RedirectingEurekaHttpClient.execute(RedirectingEurekaHttpClient.java:79)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.RetryableEurekaHttpClient.execute(RetryableEurekaHttpClient.java:120)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.SessionedEurekaHttpClient.execute(SessionedEurekaHttpClient.java:76)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.DiscoveryClient.getAndStoreFullRegistry(DiscoveryClient.java:1061)
+	at com.netflix.discovery.DiscoveryClient.fetchRegistry(DiscoveryClient.java:976)
+	at com.netflix.discovery.DiscoveryClient.refreshRegistry(DiscoveryClient.java:1489)
+	at com.netflix.discovery.DiscoveryClient$CacheRefreshThread.run(DiscoveryClient.java:1457)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+Caused by: org.apache.hc.client5.http.HttpHostConnectException: Connect to http://localhost:58094 failed: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:550)
+	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594)
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284)
+	at java.base/java.net.Socket.connect(Socket.java:659)
+	at org.apache.hc.client5.http.impl.io.DefaultHttpClientConnectionOperator.connect(DefaultHttpClientConnectionOperator.java:219)
+	at org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager.connect(PoolingHttpClientConnectionManager.java:547)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:164)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:174)
+	at org.apache.hc.client5.http.impl.classic.ConnectExec.execute(ConnectExec.java:144)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ProtocolExec.execute(ProtocolExec.java:192)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ContentCompressionExec.execute(ContentCompressionExec.java:138)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.HttpRequestRetryExec.execute(HttpRequestRetryExec.java:112)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.RedirectExec.execute(RedirectExec.java:110)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.InternalHttpClient.doExecute(InternalHttpClient.java:186)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:87)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:55)
+	at org.apache.hc.client5.http.classic.HttpClient.executeOpen(HttpClient.java:183)
+	at org.springframework.http.client.HttpComponentsClientHttpRequest.executeInternal(HttpComponentsClientHttpRequest.java:99)
+	at org.springframework.http.client.AbstractStreamingClientHttpRequest.executeInternal(AbstractStreamingClientHttpRequest.java:87)
+	at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:80)
+	at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeWithRequestAndBody(AbstractBufferingClientHttpRequest.java:89)
+	at org.springframework.http.client.InterceptingClientHttpRequest$EndOfChainRequestExecution.execute(InterceptingClientHttpRequest.java:102)
+	at org.springframework.cloud.netflix.eureka.http.RestClientTransportClientFactory.lambda$newClient$2(RestClientTransportClientFactory.java:98)
+	at org.springframework.http.client.ClientHttpRequestInterceptor.lambda$apply$0(ClientHttpRequestInterceptor.java:89)
+	at org.springframework.http.client.InterceptingClientHttpRequest.executeInternal(InterceptingClientHttpRequest.java:73)
+	at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeInternal(AbstractBufferingClientHttpRequest.java:50)
+	at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:80)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:614)
+	... 26 common frames omitted
+
+2026-11-05T00:10:30.679+02:00  WARN 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] c.n.d.s.t.d.RetryableEurekaHttpClient    : Request execution failed with message: I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+2026-11-05T00:10:30.679+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : DiscoveryClient_CONVERSION-SVC/192-168-0-22.local:conversion-svc:8082 - was unable to refresh its cache! This periodic background refresh will be retried in 5 seconds. status = Cannot execute request on any known server
+
+com.netflix.discovery.shared.transport.TransportException: Cannot execute request on any known server
+	at com.netflix.discovery.shared.transport.decorator.RetryableEurekaHttpClient.execute(RetryableEurekaHttpClient.java:112)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.SessionedEurekaHttpClient.execute(SessionedEurekaHttpClient.java:76)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.DiscoveryClient.getAndStoreFullRegistry(DiscoveryClient.java:1061)
+	at com.netflix.discovery.DiscoveryClient.fetchRegistry(DiscoveryClient.java:976)
+	at com.netflix.discovery.DiscoveryClient.refreshRegistry(DiscoveryClient.java:1489)
+	at com.netflix.discovery.DiscoveryClient$CacheRefreshThread.run(DiscoveryClient.java:1457)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-11-05T00:10:31.279+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:31.279+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:31.279+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:32.096+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:32.097+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:32.097+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:32.202+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.254+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.305+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.357+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.409+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.460+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.512+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.563+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.614+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.665+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.716+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.767+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.818+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.870+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:32.922+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:32.922+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:32.922+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:33.924+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:33.924+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:33.924+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:34.897+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:34.898+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:34.898+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:35.002+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.052+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.104+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.155+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.206+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.257+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.308+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.360+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.411+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.463+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.515+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.566+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.617+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.668+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Disable delta property : false
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Single vip registry refresh property : null
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Force full registry fetch : false
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Application is null : false
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Registered Applications size is zero : true
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Application version is -1: false
+2026-11-05T00:10:35.680+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : Getting all instance registry info from the eureka server
+2026-11-05T00:10:35.683+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] c.n.d.s.t.d.RedirectingEurekaHttpClient  : Request execution error. endpoint=DefaultEndpoint{ serviceUrl='http://localhost:58094/eureka/}, exception=I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+
+org.springframework.web.client.ResourceAccessException: I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.createResourceAccessException(DefaultRestClient.java:779)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:624)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchange(DefaultRestClient.java:572)
+	at org.springframework.web.client.RestClient$RequestHeadersSpec.exchange(RestClient.java:747)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.executeAndExtract(DefaultRestClient.java:924)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntityInternal(DefaultRestClient.java:870)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntity(DefaultRestClient.java:859)
+	at org.springframework.cloud.netflix.eureka.http.RestClientEurekaHttpClient.getApplicationsInternal(RestClientEurekaHttpClient.java:201)
+	at org.springframework.cloud.netflix.eureka.http.RestClientEurekaHttpClient.getApplications(RestClientEurekaHttpClient.java:137)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.RedirectingEurekaHttpClient.executeOnNewServer(RedirectingEurekaHttpClient.java:120)
+	at com.netflix.discovery.shared.transport.decorator.RedirectingEurekaHttpClient.execute(RedirectingEurekaHttpClient.java:79)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.RetryableEurekaHttpClient.execute(RetryableEurekaHttpClient.java:120)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.SessionedEurekaHttpClient.execute(SessionedEurekaHttpClient.java:76)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.DiscoveryClient.getAndStoreFullRegistry(DiscoveryClient.java:1061)
+	at com.netflix.discovery.DiscoveryClient.fetchRegistry(DiscoveryClient.java:976)
+	at com.netflix.discovery.DiscoveryClient.refreshRegistry(DiscoveryClient.java:1489)
+	at com.netflix.discovery.DiscoveryClient$CacheRefreshThread.run(DiscoveryClient.java:1457)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+Caused by: org.apache.hc.client5.http.HttpHostConnectException: Connect to http://localhost:58094 failed: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639)
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(NioSocketImpl.java:550)
+	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:594)
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:284)
+	at java.base/java.net.Socket.connect(Socket.java:659)
+	at org.apache.hc.client5.http.impl.io.DefaultHttpClientConnectionOperator.connect(DefaultHttpClientConnectionOperator.java:219)
+	at org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager.connect(PoolingHttpClientConnectionManager.java:547)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:164)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:174)
+	at org.apache.hc.client5.http.impl.classic.ConnectExec.execute(ConnectExec.java:144)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ProtocolExec.execute(ProtocolExec.java:192)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ContentCompressionExec.execute(ContentCompressionExec.java:138)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.HttpRequestRetryExec.execute(HttpRequestRetryExec.java:112)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.RedirectExec.execute(RedirectExec.java:110)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.InternalHttpClient.doExecute(InternalHttpClient.java:186)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:87)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:55)
+	at org.apache.hc.client5.http.classic.HttpClient.executeOpen(HttpClient.java:183)
+	at org.springframework.http.client.HttpComponentsClientHttpRequest.executeInternal(HttpComponentsClientHttpRequest.java:99)
+	at org.springframework.http.client.AbstractStreamingClientHttpRequest.executeInternal(AbstractStreamingClientHttpRequest.java:87)
+	at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:80)
+	at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeWithRequestAndBody(AbstractBufferingClientHttpRequest.java:89)
+	at org.springframework.http.client.InterceptingClientHttpRequest$EndOfChainRequestExecution.execute(InterceptingClientHttpRequest.java:102)
+	at org.springframework.cloud.netflix.eureka.http.RestClientTransportClientFactory.lambda$newClient$2(RestClientTransportClientFactory.java:98)
+	at org.springframework.http.client.ClientHttpRequestInterceptor.lambda$apply$0(ClientHttpRequestInterceptor.java:89)
+	at org.springframework.http.client.InterceptingClientHttpRequest.executeInternal(InterceptingClientHttpRequest.java:73)
+	at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeInternal(AbstractBufferingClientHttpRequest.java:50)
+	at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:80)
+	at org.springframework.web.client.DefaultRestClient$DefaultRequestBodyUriSpec.exchangeInternal(DefaultRestClient.java:614)
+	... 26 common frames omitted
+
+2026-11-05T00:10:35.683+02:00  WARN 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] c.n.d.s.t.d.RetryableEurekaHttpClient    : Request execution failed with message: I/O error on GET request for "http://localhost:58094/eureka/apps/": Connect to http://localhost:58094 failed: Connection refused
+2026-11-05T00:10:35.684+02:00  INFO 84116 --- [conversion-svc] [reshExecutor-%d] [                                                 ] com.netflix.discovery.DiscoveryClient    : DiscoveryClient_CONVERSION-SVC/192-168-0-22.local:conversion-svc:8082 - was unable to refresh its cache! This periodic background refresh will be retried in 5 seconds. status = Cannot execute request on any known server
+
+com.netflix.discovery.shared.transport.TransportException: Cannot execute request on any known server
+	at com.netflix.discovery.shared.transport.decorator.RetryableEurekaHttpClient.execute(RetryableEurekaHttpClient.java:112)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator$6.execute(EurekaHttpClientDecorator.java:137)
+	at com.netflix.discovery.shared.transport.decorator.SessionedEurekaHttpClient.execute(SessionedEurekaHttpClient.java:76)
+	at com.netflix.discovery.shared.transport.decorator.EurekaHttpClientDecorator.getApplications(EurekaHttpClientDecorator.java:134)
+	at com.netflix.discovery.DiscoveryClient.getAndStoreFullRegistry(DiscoveryClient.java:1061)
+	at com.netflix.discovery.DiscoveryClient.fetchRegistry(DiscoveryClient.java:976)
+	at com.netflix.discovery.DiscoveryClient.refreshRegistry(DiscoveryClient.java:1489)
+	at com.netflix.discovery.DiscoveryClient$CacheRefreshThread.run(DiscoveryClient.java:1457)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:328)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+2026-11-05T00:10:35.720+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.771+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:35.823+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:35.823+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:35.824+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:36.643+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:36.694+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:36.746+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:36.746+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:36.746+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:36.851+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:36.902+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:36.953+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.004+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.056+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.107+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.158+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.210+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.261+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.312+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.363+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.415+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.466+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.517+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.569+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.620+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.671+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.722+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-2] Rebootstrapping with [localhost/127.0.0.1:58109]
+2026-11-05T00:10:37.775+02:00  INFO 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Node -1 disconnected.
+2026-11-05T00:10:37.775+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Connection to node -1 (localhost/127.0.0.1:58109) could not be established. Node may not be available.
+2026-11-05T00:10:37.775+02:00  WARN 84116 --- [conversion-svc] [-svc-producer-2] [                                                 ] org.apache.kafka.clients.NetworkClient   : [Producer clientId=conversion-svc-producer-2] Bootstrap broker localhost:58109 (id: -1 rack: null isFenced: false) disconnected
+2026-11-05T00:10:38.196+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2026-11-05T00:10:38.197+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+2026-11-05T00:10:38.398+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Shutting down DiscoveryClient ...
+2026-11-05T00:10:38.399+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Completed shut down of DiscoveryClient
+2026-11-05T00:10:38.400+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=conversion-svc-producer-2] Closing the Kafka producer with timeoutMillis = 30000 ms.
+2026-11-05T00:10:38.401+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-11-05T00:10:38.401+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-11-05T00:10:38.401+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-11-05T00:10:38.401+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-11-05T00:10:38.401+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.kafka.common.utils.AppInfoParser     : App info kafka.producer for conversion-svc-producer-2 unregistered
+2026-11-05T00:10:38.403+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown initiated...
+2026-11-05T00:10:38.404+02:00  INFO 84116 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Shutdown completed.
+
+> Task :services:ledger-svc:protobufDummy UP-TO-DATE
+> Task :services:ledger-svc:extractIncludeProto
+> Task :services:ledger-svc:extractProto
+> Task :services:ledger-svc:generateProto
+
+> Task :services:ledger-svc:compileJava
+Note: /Users/sean/env/repo/be/java/spring/ezeebit-wallet/services/ledger-svc/src/main/java/io/ezeebit/ledger/api/doc/ProblemSchemas.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :services:ledger-svc:processProtoResources
+> Task :services:ledger-svc:processResources
+> Task :services:ledger-svc:classes
+> Task :services:ledger-svc:resolveMainClassName
+> Task :services:ledger-svc:bootJar
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :services:conversion-svc:acceptanceTest
+
+2026-11-05T00:12:22.803+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:12:22.803+02:00  INFO 84203 --- [conversion-svc] [-svc-producer-1] [                                                 ] org.apache.kafka.clients.Metadata        : [Producer clientId=conversion-svc-producer-1] Rebootstrapping with [localhost/127.0.0.1:9092]
+2026-11-05T00:12:22.810+02:00  INFO 84203 --- [conversion-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-11-05T00:12:22.811+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=conversion-svc-producer-1] Closing the Kafka producer with timeoutMillis = 30000 ms.
+2026-11-05T00:12:22.813+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-11-05T00:12:22.813+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-11-05T00:12:22.813+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-11-05T00:12:22.813+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-11-05T00:12:22.813+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] o.a.kafka.common.utils.AppInfoParser     : App info kafka.producer for conversion-svc-producer-1 unregistered
+2026-11-05T00:12:22.824+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-05T00:12:22.825+02:00  INFO 84203 --- [conversion-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+
+> Task :services:conversion-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:conversion-svc:spotbugsTest SKIPPED
+> Task :services:conversion-svc:jacocoTestCoverageVerification
+> Task :services:eureka-svc:compileJava
+> Task :services:eureka-svc:processResources
+> Task :services:eureka-svc:classes
+> Task :services:eureka-svc:resolveMainClassName
+> Task :services:conversion-svc:jacocoTestReport
+> Task :services:conversion-svc:checkstyleAcceptanceTest
+> Task :services:eureka-svc:bootJar
+> Task :services:conversion-svc:checkstyleMain
+
+> Task :services:conversion-svc:checkCoverageFloors
+checkCoverageFloors(conversion-svc): LINE measured 0.9517, floor 0.92
+checkCoverageFloors(conversion-svc): BRANCH measured 0.8685, floor 0.84
+
+> Task :services:eureka-svc:jar SKIPPED
+> Task :services:eureka-svc:assemble
+> Task :services:eureka-svc:compileTestJava
+> Task :services:eureka-svc:processTestResources NO-SOURCE
+> Task :services:eureka-svc:testClasses
+> Task :services:conversion-svc:checkstyleTest
+> Task :services:conversion-svc:spotbugsMain
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/Users/sean/.gradle/caches/modules-2/files-2.1/com.thoughtworks.xstream/xstream/1.4.21/65cb3e7f809b18b9aab43f2338ee5b320f72d7bd/xstream-1.4.21.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module (file:/Users/sean/.gradle/caches/modules-2/files-2.1/io.pyroscope/agent/2.9.2/22b5457e884f2baef2e5fdd3dbed26f4d1147ba4/agent-2.9.2.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-11-05T00:12:32.553+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.s.EurekaServiceRegistry        : Unregistering application EUREKA-SVC with eureka with status DOWN
+2026-11-05T00:12:32.554+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.server.EurekaServerBootstrap   : Shutting down Eureka Server..
+2026-11-05T00:12:32.554+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shutting down ...
+2026-11-05T00:12:32.554+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shut down
+2026-11-05T00:12:32.554+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] o.s.c.n.e.server.EurekaServerBootstrap   : Eureka Service is now shutdown...
+2026-11-05T00:12:32.555+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shutting down ...
+2026-11-05T00:12:32.555+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] c.n.eureka.DefaultEurekaServerContext    : Shut down
+2026-11-05T00:12:32.557+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Shutting down DiscoveryClient ...
+2026-11-05T00:12:32.558+02:00  INFO 84590 --- [eureka-svc] [ionShutdownHook] [                                                 ] com.netflix.discovery.DiscoveryClient    : Completed shut down of DiscoveryClient
+> Task :services:eureka-svc:test
+
+> Task :services:conversion-svc:checkSpotbugsReport
+spotbugs(conversion-svc): 171 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:conversion-svc:check
+> Task :services:conversion-svc:build
+> Task :services:eureka-svc:spotbugsTest SKIPPED
+> Task :services:eureka-svc:jacocoTestReport
+> Task :services:eureka-svc:jacocoTestCoverageVerification
+> Task :services:eureka-svc:checkstyleMain
+> Task :services:eureka-svc:checkstyleTest
+> Task :services:gateway-svc:compileJava
+
+> Task :services:eureka-svc:checkCoverageFloors
+checkCoverageFloors(eureka-svc): LINE measured 0.9308, floor 0.90
+checkCoverageFloors(eureka-svc): BRANCH measured 1.0000, floor 0.97
+
+> Task :services:gateway-svc:processResources
+> Task :services:gateway-svc:classes
+> Task :services:gateway-svc:resolveMainClassName
+> Task :services:gateway-svc:bootJar
+> Task :services:gateway-svc:jar SKIPPED
+> Task :services:gateway-svc:assemble
+> Task :services:gateway-svc:compileTestJava
+> Task :services:gateway-svc:processTestResources NO-SOURCE
+> Task :services:gateway-svc:testClasses
+> Task :services:eureka-svc:spotbugsMain
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module (file:/Users/sean/.gradle/caches/modules-2/files-2.1/io.pyroscope/agent/2.9.2/22b5457e884f2baef2e5fdd3dbed26f4d1147ba4/agent-2.9.2.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :services:gateway-svc:test
+
+> Task :services:eureka-svc:checkSpotbugsReport
+spotbugs(eureka-svc): 13 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:eureka-svc:check
+> Task :services:eureka-svc:build
+> Task :services:gateway-svc:compileAcceptanceTestJava
+> Task :services:gateway-svc:processAcceptanceTestResources NO-SOURCE
+> Task :services:gateway-svc:acceptanceTestClasses
+> Task :services:gateway-svc:integrationTest
+
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-05T00:13:27.298+02:00  INFO 84765 --- [gateway-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:13:27.299+02:00  INFO 84765 --- [gateway-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-11-05T00:13:27.300+02:00  WARN 84765 --- [gateway-svc] [ionShutdownHook] [                                                 ] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [localhost/<unresolved>:58888]: java.util.concurrent.CancellationException
+
+> Task :services:gateway-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:gateway-svc:spotbugsTest SKIPPED
+> Task :services:ledger-svc:jar SKIPPED
+> Task :services:ledger-svc:assemble
+> Task :services:gateway-svc:jacocoTestCoverageVerification
+> Task :services:gateway-svc:jacocoTestReport
+> Task :services:gateway-svc:checkstyleTest
+> Task :services:gateway-svc:checkstyleMain
+> Task :services:gateway-svc:checkstyleAcceptanceTest
+> Task :services:ledger-svc:extractIncludeTestProto
+
+> Task :services:gateway-svc:checkCoverageFloors
+checkCoverageFloors(gateway-svc): LINE measured 0.9713, floor 0.95
+checkCoverageFloors(gateway-svc): BRANCH measured 1.0000, floor 0.97
+
+> Task :services:ledger-svc:extractTestProto
+> Task :services:ledger-svc:generateTestProto NO-SOURCE
+> Task :services:ledger-svc:compileTestJava
+> Task :services:ledger-svc:processTestProtoResources
+> Task :services:ledger-svc:processTestResources NO-SOURCE
+> Task :services:ledger-svc:testClasses
+> Task :services:gateway-svc:spotbugsMain
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by io.pyroscope.vendor.one.profiler.AsyncProfiler in an unnamed module (file:/Users/sean/.gradle/caches/modules-2/files-2.1/io.pyroscope/agent/2.9.2/22b5457e884f2baef2e5fdd3dbed26f4d1147ba4/agent-2.9.2.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :services:ledger-svc:test
+
+> Task :services:gateway-svc:checkSpotbugsReport
+spotbugs(gateway-svc): 36 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:gateway-svc:check
+> Task :services:gateway-svc:build
+> Task :services:ledger-svc:extractAcceptanceTestProto
+> Task :services:ledger-svc:extractIncludeAcceptanceTestProto
+> Task :services:ledger-svc:generateAcceptanceTestProto NO-SOURCE
+> Task :services:ledger-svc:compileAcceptanceTestJava
+> Task :services:ledger-svc:processAcceptanceTestProtoResources
+> Task :services:ledger-svc:processAcceptanceTestResources
+> Task :services:ledger-svc:acceptanceTestClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-05T00:13:55.921+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-05T00:13:55.921+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-11-05T00:13:56.117+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:13:56.118+02:00  INFO 84974 --- [ledger-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-11-05T00:13:56.120+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown initiated...
+2026-11-05T00:13:56.121+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown completed.
+2026-11-05T00:13:56.309+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.g.s.lifecycle.GrpcServerLifecycle    : Completed gRPC server shutdown
+2026-11-05T00:13:56.311+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown initiated...
+2026-11-05T00:13:56.311+02:00  INFO 84974 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Shutdown completed.
+> Task :services:ledger-svc:integrationTest
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-11-05T00:14:16.169+02:00  INFO 85028 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.g.s.lifecycle.GrpcServerLifecycle    : Completed gRPC server shutdown
+2026-11-05T00:14:16.169+02:00  INFO 85028 --- [ledger-svc] [ionShutdownHook] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-11-05T00:14:16.170+02:00  INFO 85028 --- [ledger-svc] [tomcat-shutdown] [                                                 ] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-11-05T00:14:16.176+02:00  INFO 85028 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-11-05T00:14:16.176+02:00  INFO 85028 --- [ledger-svc] [ionShutdownHook] [                                                 ] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+> Task :services:ledger-svc:acceptanceTest
+> Task :services:ledger-svc:spotbugsAcceptanceTest SKIPPED
+> Task :services:ledger-svc:spotbugsTest SKIPPED
+> Task :services:ledger-svc:jacocoTestCoverageVerification
+> Task :services:ledger-svc:checkstyleTest
+> Task :services:ledger-svc:checkstyleAcceptanceTest
+> Task :services:ledger-svc:jacocoTestReport
+
+> Task :services:ledger-svc:checkCoverageFloors
+checkCoverageFloors(ledger-svc): LINE measured 0.9598, floor 0.93
+checkCoverageFloors(ledger-svc): BRANCH measured 0.8923, floor 0.87
+
+> Task :services:ledger-svc:checkstyleMain
+> Task :services:ledger-svc:spotbugsMain
+
+> Task :services:ledger-svc:checkSpotbugsReport
+spotbugs(ledger-svc): 162 class files, plugins [com.h3xstream.findsecbugs:true], 0 errors, 0 missing classes, 0 findings
+
+> Task :services:ledger-svc:check
+> Task :services:ledger-svc:build
+
+[Incubating] Problems report is available at: file:///Users/sean/env/repo/be/java/spring/ezeebit-wallet/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 5m 3s
+110 actionable tasks: 110 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
+exit=0

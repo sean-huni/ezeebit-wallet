@@ -1,0 +1,75 @@
+# ProfilingFailing and ProfilesAbsent promtool evidence, 2026-11-04 (fix round 1), bash docker/lgtm/test-rules.sh [rules-file]
+
+## red: the new cases against the previous rules (HEAD 732e4f8 mirror): ProfilingFailing resolved before 10m, ProfilesAbsent absent
+
+
+
+
+
+  FAILED:
+    alertname: ProfilingFailing, time: 10m, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilingFailing", cause="start", job="ledger-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+    alertname: ProfilesAbsent, time: 3m, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilesAbsent", job="gateway-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+    alertname: ProfilesAbsent, time: 3m, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilesAbsent", job="conversion-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+    alertname: ProfilesAbsent, time: 5m, 
+        exp:[
+            0:
+              Labels:{alertname="ProfilesAbsent", job="eureka-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+exit=1
+
+## green: the rules of this change
+  SUCCESS
+
+exit=0
+
+## red-proofs, one mutation of the mirror each: pf1 start selector renamed; pf2 start arm back on the 5m series-born window; pf3 push selector renamed; pf4 push threshold 5 to 0; pf5 push arm on the series-born helper; pa1 no-gauge arm deleted; pa2 running == 0 read as == 2; pa3 staleness 120 to 100000; pa4 staleness 120 to -1 (the healthy case must fire)
+## pf1-start-selector
+    alertname: ProfilingFailing, time: 10m, 
+    alertname: ProfilingFailing, time: 3m, 
+exit=1
+## pf2-start-window-not-persistent
+    alertname: ProfilingFailing, time: 10m, 
+exit=1
+## pf3-push-selector
+    alertname: ProfilingFailing, time: 5m30s, 
+    alertname: ProfilingFailing, time: 3m, 
+exit=1
+## pf4-push-threshold-0
+    alertname: ProfilingFailing, time: 4m, 
+exit=1
+## pf5-push-series-born-arm
+    alertname: ProfilingFailing, time: 3m, 
+exit=1
+## pa1-no-gauge-arm-deleted
+    alertname: ProfilesAbsent, time: 3m, 
+exit=1
+## pa2-running-zero-arm-reads-2
+    alertname: ProfilesAbsent, time: 3m, 
+exit=1
+## pa3-stale-threshold-huge
+    alertname: ProfilesAbsent, time: 5m, 
+exit=1
+## pa4-stale-threshold-negative-healthy-fires
+    alertname: ProfilesAbsent, time: 3m30s, 
+    alertname: ProfilesAbsent, time: 5m, 
+exit=1

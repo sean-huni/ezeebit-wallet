@@ -1,0 +1,1 @@
+{"label":"kind-noalloc","start":"2026-11-04T18:05:08.538Z","end":"2026-11-04T18:10:08.459Z","startMs":1793815508538,"endMs":1793815808459,"units":3000,"codes":{"quote 201":3000,"convert 201":3000,"balances 200":3000},"clientP95ms":{"quote":9.5,"convert":14,"balances":4.9,"all":12.4}}

@@ -41,7 +41,7 @@ final class LedgerProcess {
 				// The gateway proof secret, from the file config-svc serves to every service.
 				"--spring.config.import=file:%s".formatted(System.getProperty("served.shared")),
 				"--management.otlp.metrics.export.enabled=false", "--management.tracing.export.otlp.enabled=false",
-				"--management.logging.export.otlp.enabled=false"))
+				"--management.logging.export.otlp.enabled=false", "--ezeebit.profiling.enabled=false"))
 				.redirectErrorStream(true)
 				.redirectOutput(new File("build/ledger-process.log"));
 		builder.environment().put("CONFIG_IMPORT_OPTIONALITY", "optional:");

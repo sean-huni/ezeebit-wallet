@@ -1,0 +1,861 @@
+> Task :services:config-svc:compileJava UP-TO-DATE
+> Task :services:config-svc:processResources UP-TO-DATE
+> Task :services:config-svc:classes UP-TO-DATE
+> Task :services:config-svc:resolveMainClassName UP-TO-DATE
+> Task :services:config-svc:bootJar UP-TO-DATE
+
+> Task :services:config-svc:bootBuildImage
+Building image 'docker.io/ezeebit/config-svc:0.3.2'
+
+ > Pulling builder image 'docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.197@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9' ..................................................
+ > Pulled builder image 'paketobuildpacks/builder-noble-java-tiny@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9'
+ > Pulling run image 'docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.138@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a' for platform 'linux/arm64' ..................................................
+ > Pulled run image 'paketobuildpacks/ubuntu-noble-run-tiny@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a'
+ > Executing lifecycle version v0.21.22
+ > Using build cache volume 'pack-cache-a2d060560b44.build'
+
+ > Running creator
+    [creator]     ===> ANALYZING
+    [creator]     Restoring data for SBOM from previous image
+    [creator]     ===> DETECTING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     6 of 26 buildpacks participating
+    [creator]     paketo-buildpacks/ca-certificates   3.13.0
+    [creator]     paketo-buildpacks/bellsoft-liberica 11.9.0
+    [creator]     paketo-buildpacks/syft              2.41.0
+    [creator]     paketo-buildpacks/executable-jar    6.16.0
+    [creator]     paketo-buildpacks/dist-zip          5.13.0
+    [creator]     paketo-buildpacks/spring-boot       5.37.0
+    [creator]     ===> RESTORING
+    [creator]     Restoring metadata for "paketo-buildpacks/ca-certificates:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:java-security-properties" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:jre" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:web-application-type" from app image
+    [creator]     Restoring data for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring data for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from cache
+    [creator]     Restoring data for SBOM from cache
+    [creator]     ===> BUILDING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     
+    [creator]     Paketo Buildpack for CA Certificates 3.13.0
+    [creator]       https://github.com/paketo-buildpacks/ca-certificates
+    [creator]       Build Configuration:
+    [creator]         $BP_EMBED_CERTS                    false  Embed certificates into the image
+    [creator]         $BP_ENABLE_RUNTIME_CERT_BINDING    true   Deprecated: Enable/disable certificate helper layer to add certs at runtime
+    [creator]         $BP_RUNTIME_CERT_BINDING_DISABLED  false  Disable certificate helper layer to add certs at runtime
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for BellSoft Liberica 11.9.0
+    [creator]       https://github.com/paketo-buildpacks/bellsoft-liberica
+    [creator]       Build Configuration:
+    [creator]         $BP_JVM_JLINK_ARGS           --no-man-pages --no-header-files --strip-debug --compress=1  configure custom link arguments (--output must be omitted)
+    [creator]         $BP_JVM_JLINK_ENABLED        false                                                        enables running jlink tool to generate custom JRE
+    [creator]         $BP_JVM_TYPE                 JRE                                                          the JVM type - JDK or JRE
+    [creator]         $BP_JVM_VERSION              25                                                           the Java version
+    [creator]       Launch Configuration:
+    [creator]         $BPL_DEBUG_ENABLED           false                                                        enables Java remote debugging support
+    [creator]         $BPL_DEBUG_PORT              8000                                                         configure the remote debugging port
+    [creator]         $BPL_DEBUG_SUSPEND           false                                                        configure whether to suspend execution until a debugger has attached
+    [creator]         $BPL_HEAP_DUMP_PATH                                                                       write heap dumps on error to this path
+    [creator]         $BPL_JAVA_NMT_ENABLED        true                                                         enables Java Native Memory Tracking (NMT)
+    [creator]         $BPL_JAVA_NMT_LEVEL          summary                                                      configure level of NMT, summary or detail
+    [creator]         $BPL_JFR_ARGS                                                                             configure custom Java Flight Recording (JFR) arguments
+    [creator]         $BPL_JFR_ENABLED             false                                                        enables Java Flight Recording (JFR)
+    [creator]         $BPL_JMX_ENABLED             false                                                        enables Java Management Extensions (JMX)
+    [creator]         $BPL_JMX_PORT                5000                                                         configure the JMX port
+    [creator]         $BPL_JVM_HEAD_ROOM           0                                                            the headroom in memory calculation
+    [creator]         $BPL_JVM_LOADED_CLASS_COUNT  35% of classes                                               the number of loaded classes in memory calculation
+    [creator]         $BPL_JVM_THREAD_COUNT        250                                                          the number of threads in memory calculation
+    [creator]         $JAVA_TOOL_OPTIONS                                                                        the JVM launch flags
+    [creator]         Using Java version 25 from BP_JVM_VERSION
+    [creator]       BellSoft Liberica JRE 25.0.4: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       Java Security Properties: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for Syft 2.41.0
+    [creator]       https://github.com/paketo-buildpacks/syft
+    [creator]     
+    [creator]     Paketo Buildpack for Executable JAR 6.16.0
+    [creator]       https://github.com/paketo-buildpacks/executable-jar
+    [creator]       Class Path: Contributing to layer
+    [creator]         Writing env/CLASSPATH.delim
+    [creator]         Writing env/CLASSPATH.prepend
+    [creator]       Process types:
+    [creator]         executable-jar: java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         task:           java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         web:            java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]     
+    [creator]     Paketo Buildpack for Spring Boot 5.37.0
+    [creator]       https://github.com/paketo-buildpacks/spring-boot
+    [creator]       Build Configuration:
+    [creator]         $BPL_JVM_AOTCACHE_ENABLED            false  whether to enable JVM AOT Cache optimizations at runtime
+    [creator]         $BPL_JVM_CDS_ENABLED                 false  whether to enable CDS optimizations at runtime
+    [creator]         $BPL_SPRING_AOT_ENABLED              false  whether to enable Spring AOT at runtime
+    [creator]         $BP_JVM_AOTCACHE_ENABLED             false  whether to enable JVM AOT Cache & perform JVM training run
+    [creator]         $BP_JVM_CDS_ENABLED                  false  whether to enable CDS & perform JVM training run
+    [creator]         $BP_SPRING_AOT_ENABLED               false  whether to enable Spring AOT
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_DISABLED   false  whether to contribute Spring Boot cloud bindings support
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_VERSION    1      default version of Spring Cloud Bindings library to contribute
+    [creator]         $BP_UNPACK_LAYOUT_ONLY               false  whether to unpack (-Djarmode=tools [...] extract) the Spring Boot archive and run it in extracted mode
+    [creator]       Launch Configuration:
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_DISABLED  false  whether to auto-configure Spring Boot environment properties from bindings
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_ENABLED   true   Deprecated - whether to auto-configure Spring Boot environment properties from bindings
+    [creator]       Creating slices from layers index
+    [creator]         dependencies (56.4 MB)
+    [creator]         spring-boot-loader (460.8 KB)
+    [creator]         snapshot-dependencies (0.0 B)
+    [creator]         application (97.4 KB)
+    [creator]       Spring Cloud Bindings 2.0.4: Reusing cached layer
+    [creator]       Web Application Type: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       4 application slices
+    [creator]       Image labels:
+    [creator]         org.opencontainers.image.title
+    [creator]         org.opencontainers.image.version
+    [creator]         org.springframework.boot.version
+    [creator]     ===> EXPORTING
+    [creator]     Reusing layer 'paketo-buildpacks/ca-certificates:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:java-security-properties'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:jre'
+    [creator]     Reusing layer 'paketo-buildpacks/executable-jar:classpath'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:web-application-type'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launch.sbom'
+    [creator]     Reused 5/5 app layer(s)
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launcher'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:config'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:process-types'
+    [creator]     Adding label 'io.buildpacks.lifecycle.metadata'
+    [creator]     Adding label 'io.buildpacks.build.metadata'
+    [creator]     Adding label 'io.buildpacks.project.metadata'
+    [creator]     Adding label 'org.opencontainers.image.title'
+    [creator]     Adding label 'org.opencontainers.image.version'
+    [creator]     Adding label 'org.springframework.boot.version'
+    [creator]     Setting default process type 'web'
+    [creator]     Saving docker.io/ezeebit/config-svc:0.3.2...
+    [creator]     *** Images (554e8c93d859):
+    [creator]           docker.io/ezeebit/config-svc:0.3.2
+    [creator]     Reusing cache layer 'paketo-buildpacks/syft:syft'
+    [creator]     Reusing cache layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing cache layer 'buildpacksio/lifecycle:cache.sbom'
+
+Successfully built image 'docker.io/ezeebit/config-svc:0.3.2'
+
+
+> Task :services:conversion-svc:protobufDummy UP-TO-DATE
+> Task :services:conversion-svc:extractIncludeProto UP-TO-DATE
+> Task :services:conversion-svc:extractProto UP-TO-DATE
+> Task :services:conversion-svc:generateProto UP-TO-DATE
+> Task :services:conversion-svc:compileJava UP-TO-DATE
+> Task :services:conversion-svc:processProtoResources UP-TO-DATE
+> Task :services:conversion-svc:processResources UP-TO-DATE
+> Task :services:conversion-svc:classes UP-TO-DATE
+> Task :services:conversion-svc:resolveMainClassName UP-TO-DATE
+> Task :services:conversion-svc:bootJar UP-TO-DATE
+
+> Task :services:conversion-svc:bootBuildImage
+Building image 'docker.io/ezeebit/conversion-svc:0.3.2'
+
+ > Pulling builder image 'docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.197@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9' ..................................................
+ > Pulled builder image 'paketobuildpacks/builder-noble-java-tiny@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9'
+ > Pulling run image 'docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.138@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a' for platform 'linux/arm64' ..................................................
+ > Pulled run image 'paketobuildpacks/ubuntu-noble-run-tiny@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a'
+ > Executing lifecycle version v0.21.22
+ > Using build cache volume 'pack-cache-e9ce6aea5751.build'
+
+ > Running creator
+    [creator]     ===> ANALYZING
+    [creator]     Restoring data for SBOM from previous image
+    [creator]     ===> DETECTING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     6 of 26 buildpacks participating
+    [creator]     paketo-buildpacks/ca-certificates   3.13.0
+    [creator]     paketo-buildpacks/bellsoft-liberica 11.9.0
+    [creator]     paketo-buildpacks/syft              2.41.0
+    [creator]     paketo-buildpacks/executable-jar    6.16.0
+    [creator]     paketo-buildpacks/dist-zip          5.13.0
+    [creator]     paketo-buildpacks/spring-boot       5.37.0
+    [creator]     ===> RESTORING
+    [creator]     Restoring metadata for "paketo-buildpacks/ca-certificates:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:java-security-properties" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:jre" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:web-application-type" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from app image
+    [creator]     Restoring data for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring data for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from cache
+    [creator]     Restoring data for SBOM from cache
+    [creator]     ===> BUILDING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     
+    [creator]     Paketo Buildpack for CA Certificates 3.13.0
+    [creator]       https://github.com/paketo-buildpacks/ca-certificates
+    [creator]       Build Configuration:
+    [creator]         $BP_EMBED_CERTS                    false  Embed certificates into the image
+    [creator]         $BP_ENABLE_RUNTIME_CERT_BINDING    true   Deprecated: Enable/disable certificate helper layer to add certs at runtime
+    [creator]         $BP_RUNTIME_CERT_BINDING_DISABLED  false  Disable certificate helper layer to add certs at runtime
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for BellSoft Liberica 11.9.0
+    [creator]       https://github.com/paketo-buildpacks/bellsoft-liberica
+    [creator]       Build Configuration:
+    [creator]         $BP_JVM_JLINK_ARGS           --no-man-pages --no-header-files --strip-debug --compress=1  configure custom link arguments (--output must be omitted)
+    [creator]         $BP_JVM_JLINK_ENABLED        false                                                        enables running jlink tool to generate custom JRE
+    [creator]         $BP_JVM_TYPE                 JRE                                                          the JVM type - JDK or JRE
+    [creator]         $BP_JVM_VERSION              25                                                           the Java version
+    [creator]       Launch Configuration:
+    [creator]         $BPL_DEBUG_ENABLED           false                                                        enables Java remote debugging support
+    [creator]         $BPL_DEBUG_PORT              8000                                                         configure the remote debugging port
+    [creator]         $BPL_DEBUG_SUSPEND           false                                                        configure whether to suspend execution until a debugger has attached
+    [creator]         $BPL_HEAP_DUMP_PATH                                                                       write heap dumps on error to this path
+    [creator]         $BPL_JAVA_NMT_ENABLED        true                                                         enables Java Native Memory Tracking (NMT)
+    [creator]         $BPL_JAVA_NMT_LEVEL          summary                                                      configure level of NMT, summary or detail
+    [creator]         $BPL_JFR_ARGS                                                                             configure custom Java Flight Recording (JFR) arguments
+    [creator]         $BPL_JFR_ENABLED             false                                                        enables Java Flight Recording (JFR)
+    [creator]         $BPL_JMX_ENABLED             false                                                        enables Java Management Extensions (JMX)
+    [creator]         $BPL_JMX_PORT                5000                                                         configure the JMX port
+    [creator]         $BPL_JVM_HEAD_ROOM           0                                                            the headroom in memory calculation
+    [creator]         $BPL_JVM_LOADED_CLASS_COUNT  35% of classes                                               the number of loaded classes in memory calculation
+    [creator]         $BPL_JVM_THREAD_COUNT        250                                                          the number of threads in memory calculation
+    [creator]         $JAVA_TOOL_OPTIONS                                                                        the JVM launch flags
+    [creator]         Using Java version 25 from BP_JVM_VERSION
+    [creator]       BellSoft Liberica JRE 25.0.4: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       Java Security Properties: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for Syft 2.41.0
+    [creator]       https://github.com/paketo-buildpacks/syft
+    [creator]     
+    [creator]     Paketo Buildpack for Executable JAR 6.16.0
+    [creator]       https://github.com/paketo-buildpacks/executable-jar
+    [creator]       Class Path: Contributing to layer
+    [creator]         Writing env/CLASSPATH.delim
+    [creator]         Writing env/CLASSPATH.prepend
+    [creator]       Process types:
+    [creator]         executable-jar: java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         task:           java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         web:            java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]     
+    [creator]     Paketo Buildpack for Spring Boot 5.37.0
+    [creator]       https://github.com/paketo-buildpacks/spring-boot
+    [creator]       Build Configuration:
+    [creator]         $BPL_JVM_AOTCACHE_ENABLED            false  whether to enable JVM AOT Cache optimizations at runtime
+    [creator]         $BPL_JVM_CDS_ENABLED                 false  whether to enable CDS optimizations at runtime
+    [creator]         $BPL_SPRING_AOT_ENABLED              false  whether to enable Spring AOT at runtime
+    [creator]         $BP_JVM_AOTCACHE_ENABLED             false  whether to enable JVM AOT Cache & perform JVM training run
+    [creator]         $BP_JVM_CDS_ENABLED                  false  whether to enable CDS & perform JVM training run
+    [creator]         $BP_SPRING_AOT_ENABLED               false  whether to enable Spring AOT
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_DISABLED   false  whether to contribute Spring Boot cloud bindings support
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_VERSION    1      default version of Spring Cloud Bindings library to contribute
+    [creator]         $BP_UNPACK_LAYOUT_ONLY               false  whether to unpack (-Djarmode=tools [...] extract) the Spring Boot archive and run it in extracted mode
+    [creator]       Launch Configuration:
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_DISABLED  false  whether to auto-configure Spring Boot environment properties from bindings
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_ENABLED   true   Deprecated - whether to auto-configure Spring Boot environment properties from bindings
+    [creator]       Creating slices from layers index
+    [creator]         dependencies (105.8 MB)
+    [creator]         spring-boot-loader (460.8 KB)
+    [creator]         snapshot-dependencies (0.0 B)
+    [creator]         application (790.3 KB)
+    [creator]       Spring Cloud Bindings 2.0.4: Reusing cached layer
+    [creator]       Web Application Type: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       4 application slices
+    [creator]       Image labels:
+    [creator]         org.opencontainers.image.title
+    [creator]         org.opencontainers.image.version
+    [creator]         org.springframework.boot.version
+    [creator]     ===> EXPORTING
+    [creator]     Reusing layer 'paketo-buildpacks/ca-certificates:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:java-security-properties'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:jre'
+    [creator]     Reusing layer 'paketo-buildpacks/executable-jar:classpath'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:web-application-type'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launch.sbom'
+    [creator]     Reused 5/5 app layer(s)
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launcher'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:config'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:process-types'
+    [creator]     Adding label 'io.buildpacks.lifecycle.metadata'
+    [creator]     Adding label 'io.buildpacks.build.metadata'
+    [creator]     Adding label 'io.buildpacks.project.metadata'
+    [creator]     Adding label 'org.opencontainers.image.title'
+    [creator]     Adding label 'org.opencontainers.image.version'
+    [creator]     Adding label 'org.springframework.boot.version'
+    [creator]     Setting default process type 'web'
+    [creator]     Saving docker.io/ezeebit/conversion-svc:0.3.2...
+    [creator]     *** Images (a757d41afb02):
+    [creator]           docker.io/ezeebit/conversion-svc:0.3.2
+    [creator]     Reusing cache layer 'paketo-buildpacks/syft:syft'
+    [creator]     Reusing cache layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing cache layer 'buildpacksio/lifecycle:cache.sbom'
+
+Successfully built image 'docker.io/ezeebit/conversion-svc:0.3.2'
+
+
+> Task :services:eureka-svc:compileJava UP-TO-DATE
+> Task :services:eureka-svc:processResources UP-TO-DATE
+> Task :services:eureka-svc:classes UP-TO-DATE
+> Task :services:eureka-svc:resolveMainClassName UP-TO-DATE
+> Task :services:eureka-svc:bootJar UP-TO-DATE
+
+> Task :services:eureka-svc:bootBuildImage
+Building image 'docker.io/ezeebit/eureka-svc:0.3.2'
+
+ > Pulling builder image 'docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.197@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9' ..................................................
+ > Pulled builder image 'paketobuildpacks/builder-noble-java-tiny@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9'
+ > Pulling run image 'docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.138@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a' for platform 'linux/arm64' ..................................................
+ > Pulled run image 'paketobuildpacks/ubuntu-noble-run-tiny@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a'
+ > Executing lifecycle version v0.21.22
+ > Using build cache volume 'pack-cache-698b5fcfae84.build'
+
+ > Running creator
+    [creator]     ===> ANALYZING
+    [creator]     Restoring data for SBOM from previous image
+    [creator]     ===> DETECTING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     6 of 26 buildpacks participating
+    [creator]     paketo-buildpacks/ca-certificates   3.13.0
+    [creator]     paketo-buildpacks/bellsoft-liberica 11.9.0
+    [creator]     paketo-buildpacks/syft              2.41.0
+    [creator]     paketo-buildpacks/executable-jar    6.16.0
+    [creator]     paketo-buildpacks/dist-zip          5.13.0
+    [creator]     paketo-buildpacks/spring-boot       5.37.0
+    [creator]     ===> RESTORING
+    [creator]     Restoring metadata for "paketo-buildpacks/ca-certificates:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:java-security-properties" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:jre" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:web-application-type" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from app image
+    [creator]     Restoring data for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring data for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from cache
+    [creator]     Restoring data for SBOM from cache
+    [creator]     ===> BUILDING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     
+    [creator]     Paketo Buildpack for CA Certificates 3.13.0
+    [creator]       https://github.com/paketo-buildpacks/ca-certificates
+    [creator]       Build Configuration:
+    [creator]         $BP_EMBED_CERTS                    false  Embed certificates into the image
+    [creator]         $BP_ENABLE_RUNTIME_CERT_BINDING    true   Deprecated: Enable/disable certificate helper layer to add certs at runtime
+    [creator]         $BP_RUNTIME_CERT_BINDING_DISABLED  false  Disable certificate helper layer to add certs at runtime
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for BellSoft Liberica 11.9.0
+    [creator]       https://github.com/paketo-buildpacks/bellsoft-liberica
+    [creator]       Build Configuration:
+    [creator]         $BP_JVM_JLINK_ARGS           --no-man-pages --no-header-files --strip-debug --compress=1  configure custom link arguments (--output must be omitted)
+    [creator]         $BP_JVM_JLINK_ENABLED        false                                                        enables running jlink tool to generate custom JRE
+    [creator]         $BP_JVM_TYPE                 JRE                                                          the JVM type - JDK or JRE
+    [creator]         $BP_JVM_VERSION              25                                                           the Java version
+    [creator]       Launch Configuration:
+    [creator]         $BPL_DEBUG_ENABLED           false                                                        enables Java remote debugging support
+    [creator]         $BPL_DEBUG_PORT              8000                                                         configure the remote debugging port
+    [creator]         $BPL_DEBUG_SUSPEND           false                                                        configure whether to suspend execution until a debugger has attached
+    [creator]         $BPL_HEAP_DUMP_PATH                                                                       write heap dumps on error to this path
+    [creator]         $BPL_JAVA_NMT_ENABLED        true                                                         enables Java Native Memory Tracking (NMT)
+    [creator]         $BPL_JAVA_NMT_LEVEL          summary                                                      configure level of NMT, summary or detail
+    [creator]         $BPL_JFR_ARGS                                                                             configure custom Java Flight Recording (JFR) arguments
+    [creator]         $BPL_JFR_ENABLED             false                                                        enables Java Flight Recording (JFR)
+    [creator]         $BPL_JMX_ENABLED             false                                                        enables Java Management Extensions (JMX)
+    [creator]         $BPL_JMX_PORT                5000                                                         configure the JMX port
+    [creator]         $BPL_JVM_HEAD_ROOM           0                                                            the headroom in memory calculation
+    [creator]         $BPL_JVM_LOADED_CLASS_COUNT  35% of classes                                               the number of loaded classes in memory calculation
+    [creator]         $BPL_JVM_THREAD_COUNT        250                                                          the number of threads in memory calculation
+    [creator]         $JAVA_TOOL_OPTIONS                                                                        the JVM launch flags
+    [creator]         Using Java version 25 from BP_JVM_VERSION
+    [creator]       BellSoft Liberica JRE 25.0.4: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       Java Security Properties: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for Syft 2.41.0
+    [creator]       https://github.com/paketo-buildpacks/syft
+    [creator]     
+    [creator]     Paketo Buildpack for Executable JAR 6.16.0
+    [creator]       https://github.com/paketo-buildpacks/executable-jar
+    [creator]       Class Path: Contributing to layer
+    [creator]         Writing env/CLASSPATH.delim
+    [creator]         Writing env/CLASSPATH.prepend
+    [creator]       Process types:
+    [creator]         executable-jar: java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         task:           java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         web:            java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]     
+    [creator]     Paketo Buildpack for Spring Boot 5.37.0
+    [creator]       https://github.com/paketo-buildpacks/spring-boot
+    [creator]       Build Configuration:
+    [creator]         $BPL_JVM_AOTCACHE_ENABLED            false  whether to enable JVM AOT Cache optimizations at runtime
+    [creator]         $BPL_JVM_CDS_ENABLED                 false  whether to enable CDS optimizations at runtime
+    [creator]         $BPL_SPRING_AOT_ENABLED              false  whether to enable Spring AOT at runtime
+    [creator]         $BP_JVM_AOTCACHE_ENABLED             false  whether to enable JVM AOT Cache & perform JVM training run
+    [creator]         $BP_JVM_CDS_ENABLED                  false  whether to enable CDS & perform JVM training run
+    [creator]         $BP_SPRING_AOT_ENABLED               false  whether to enable Spring AOT
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_DISABLED   false  whether to contribute Spring Boot cloud bindings support
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_VERSION    1      default version of Spring Cloud Bindings library to contribute
+    [creator]         $BP_UNPACK_LAYOUT_ONLY               false  whether to unpack (-Djarmode=tools [...] extract) the Spring Boot archive and run it in extracted mode
+    [creator]       Launch Configuration:
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_DISABLED  false  whether to auto-configure Spring Boot environment properties from bindings
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_ENABLED   true   Deprecated - whether to auto-configure Spring Boot environment properties from bindings
+    [creator]       Creating slices from layers index
+    [creator]         dependencies (70.8 MB)
+    [creator]         spring-boot-loader (460.8 KB)
+    [creator]         snapshot-dependencies (0.0 B)
+    [creator]         application (85.7 KB)
+    [creator]       Spring Cloud Bindings 2.0.4: Reusing cached layer
+    [creator]       Web Application Type: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       4 application slices
+    [creator]       Image labels:
+    [creator]         org.opencontainers.image.title
+    [creator]         org.opencontainers.image.version
+    [creator]         org.springframework.boot.version
+    [creator]     ===> EXPORTING
+    [creator]     Reusing layer 'paketo-buildpacks/ca-certificates:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:java-security-properties'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:jre'
+    [creator]     Reusing layer 'paketo-buildpacks/executable-jar:classpath'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:web-application-type'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launch.sbom'
+    [creator]     Reused 5/5 app layer(s)
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launcher'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:config'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:process-types'
+    [creator]     Adding label 'io.buildpacks.lifecycle.metadata'
+    [creator]     Adding label 'io.buildpacks.build.metadata'
+    [creator]     Adding label 'io.buildpacks.project.metadata'
+    [creator]     Adding label 'org.opencontainers.image.title'
+    [creator]     Adding label 'org.opencontainers.image.version'
+    [creator]     Adding label 'org.springframework.boot.version'
+    [creator]     Setting default process type 'web'
+    [creator]     Saving docker.io/ezeebit/eureka-svc:0.3.2...
+    [creator]     *** Images (b7e6cf8d7afe):
+    [creator]           docker.io/ezeebit/eureka-svc:0.3.2
+    [creator]     Reusing cache layer 'paketo-buildpacks/syft:syft'
+    [creator]     Reusing cache layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing cache layer 'buildpacksio/lifecycle:cache.sbom'
+
+Successfully built image 'docker.io/ezeebit/eureka-svc:0.3.2'
+
+
+> Task :services:gateway-svc:compileJava UP-TO-DATE
+> Task :services:gateway-svc:processResources UP-TO-DATE
+> Task :services:gateway-svc:classes UP-TO-DATE
+> Task :services:gateway-svc:resolveMainClassName UP-TO-DATE
+> Task :services:gateway-svc:bootJar UP-TO-DATE
+
+> Task :services:gateway-svc:bootBuildImage
+Building image 'docker.io/ezeebit/gateway-svc:0.3.2'
+
+ > Pulling builder image 'docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.197@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9' ..................................................
+ > Pulled builder image 'paketobuildpacks/builder-noble-java-tiny@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9'
+ > Pulling run image 'docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.138@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a' for platform 'linux/arm64' ..................................................
+ > Pulled run image 'paketobuildpacks/ubuntu-noble-run-tiny@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a'
+ > Executing lifecycle version v0.21.22
+ > Using build cache volume 'pack-cache-680fe35af65e.build'
+
+ > Running creator
+    [creator]     ===> ANALYZING
+    [creator]     Restoring data for SBOM from previous image
+    [creator]     ===> DETECTING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     6 of 26 buildpacks participating
+    [creator]     paketo-buildpacks/ca-certificates   3.13.0
+    [creator]     paketo-buildpacks/bellsoft-liberica 11.9.0
+    [creator]     paketo-buildpacks/syft              2.41.0
+    [creator]     paketo-buildpacks/executable-jar    6.16.0
+    [creator]     paketo-buildpacks/dist-zip          5.13.0
+    [creator]     paketo-buildpacks/spring-boot       5.37.0
+    [creator]     ===> RESTORING
+    [creator]     Restoring metadata for "paketo-buildpacks/ca-certificates:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:java-security-properties" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:jre" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:web-application-type" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from app image
+    [creator]     Restoring data for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring data for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from cache
+    [creator]     Restoring data for SBOM from cache
+    [creator]     ===> BUILDING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     
+    [creator]     Paketo Buildpack for CA Certificates 3.13.0
+    [creator]       https://github.com/paketo-buildpacks/ca-certificates
+    [creator]       Build Configuration:
+    [creator]         $BP_EMBED_CERTS                    false  Embed certificates into the image
+    [creator]         $BP_ENABLE_RUNTIME_CERT_BINDING    true   Deprecated: Enable/disable certificate helper layer to add certs at runtime
+    [creator]         $BP_RUNTIME_CERT_BINDING_DISABLED  false  Disable certificate helper layer to add certs at runtime
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for BellSoft Liberica 11.9.0
+    [creator]       https://github.com/paketo-buildpacks/bellsoft-liberica
+    [creator]       Build Configuration:
+    [creator]         $BP_JVM_JLINK_ARGS           --no-man-pages --no-header-files --strip-debug --compress=1  configure custom link arguments (--output must be omitted)
+    [creator]         $BP_JVM_JLINK_ENABLED        false                                                        enables running jlink tool to generate custom JRE
+    [creator]         $BP_JVM_TYPE                 JRE                                                          the JVM type - JDK or JRE
+    [creator]         $BP_JVM_VERSION              25                                                           the Java version
+    [creator]       Launch Configuration:
+    [creator]         $BPL_DEBUG_ENABLED           false                                                        enables Java remote debugging support
+    [creator]         $BPL_DEBUG_PORT              8000                                                         configure the remote debugging port
+    [creator]         $BPL_DEBUG_SUSPEND           false                                                        configure whether to suspend execution until a debugger has attached
+    [creator]         $BPL_HEAP_DUMP_PATH                                                                       write heap dumps on error to this path
+    [creator]         $BPL_JAVA_NMT_ENABLED        true                                                         enables Java Native Memory Tracking (NMT)
+    [creator]         $BPL_JAVA_NMT_LEVEL          summary                                                      configure level of NMT, summary or detail
+    [creator]         $BPL_JFR_ARGS                                                                             configure custom Java Flight Recording (JFR) arguments
+    [creator]         $BPL_JFR_ENABLED             false                                                        enables Java Flight Recording (JFR)
+    [creator]         $BPL_JMX_ENABLED             false                                                        enables Java Management Extensions (JMX)
+    [creator]         $BPL_JMX_PORT                5000                                                         configure the JMX port
+    [creator]         $BPL_JVM_HEAD_ROOM           0                                                            the headroom in memory calculation
+    [creator]         $BPL_JVM_LOADED_CLASS_COUNT  35% of classes                                               the number of loaded classes in memory calculation
+    [creator]         $BPL_JVM_THREAD_COUNT        250                                                          the number of threads in memory calculation
+    [creator]         $JAVA_TOOL_OPTIONS                                                                        the JVM launch flags
+    [creator]         Using Java version 25 from BP_JVM_VERSION
+    [creator]       BellSoft Liberica JRE 25.0.4: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       Java Security Properties: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for Syft 2.41.0
+    [creator]       https://github.com/paketo-buildpacks/syft
+    [creator]     
+    [creator]     Paketo Buildpack for Executable JAR 6.16.0
+    [creator]       https://github.com/paketo-buildpacks/executable-jar
+    [creator]       Class Path: Contributing to layer
+    [creator]         Writing env/CLASSPATH.delim
+    [creator]         Writing env/CLASSPATH.prepend
+    [creator]       Process types:
+    [creator]         executable-jar: java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         task:           java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         web:            java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]     
+    [creator]     Paketo Buildpack for Spring Boot 5.37.0
+    [creator]       https://github.com/paketo-buildpacks/spring-boot
+    [creator]       Build Configuration:
+    [creator]         $BPL_JVM_AOTCACHE_ENABLED            false  whether to enable JVM AOT Cache optimizations at runtime
+    [creator]         $BPL_JVM_CDS_ENABLED                 false  whether to enable CDS optimizations at runtime
+    [creator]         $BPL_SPRING_AOT_ENABLED              false  whether to enable Spring AOT at runtime
+    [creator]         $BP_JVM_AOTCACHE_ENABLED             false  whether to enable JVM AOT Cache & perform JVM training run
+    [creator]         $BP_JVM_CDS_ENABLED                  false  whether to enable CDS & perform JVM training run
+    [creator]         $BP_SPRING_AOT_ENABLED               false  whether to enable Spring AOT
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_DISABLED   false  whether to contribute Spring Boot cloud bindings support
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_VERSION    1      default version of Spring Cloud Bindings library to contribute
+    [creator]         $BP_UNPACK_LAYOUT_ONLY               false  whether to unpack (-Djarmode=tools [...] extract) the Spring Boot archive and run it in extracted mode
+    [creator]       Launch Configuration:
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_DISABLED  false  whether to auto-configure Spring Boot environment properties from bindings
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_ENABLED   true   Deprecated - whether to auto-configure Spring Boot environment properties from bindings
+    [creator]       Creating slices from layers index
+    [creator]         dependencies (69.0 MB)
+    [creator]         spring-boot-loader (460.8 KB)
+    [creator]         snapshot-dependencies (0.0 B)
+    [creator]         application (211.2 KB)
+    [creator]       Spring Cloud Bindings 2.0.4: Reusing cached layer
+    [creator]       Web Application Type: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       4 application slices
+    [creator]       Image labels:
+    [creator]         org.opencontainers.image.title
+    [creator]         org.opencontainers.image.version
+    [creator]         org.springframework.boot.version
+    [creator]     ===> EXPORTING
+    [creator]     Reusing layer 'paketo-buildpacks/ca-certificates:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:java-security-properties'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:jre'
+    [creator]     Reusing layer 'paketo-buildpacks/executable-jar:classpath'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:web-application-type'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launch.sbom'
+    [creator]     Reused 5/5 app layer(s)
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launcher'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:config'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:process-types'
+    [creator]     Adding label 'io.buildpacks.lifecycle.metadata'
+    [creator]     Adding label 'io.buildpacks.build.metadata'
+    [creator]     Adding label 'io.buildpacks.project.metadata'
+    [creator]     Adding label 'org.opencontainers.image.title'
+    [creator]     Adding label 'org.opencontainers.image.version'
+    [creator]     Adding label 'org.springframework.boot.version'
+    [creator]     Setting default process type 'web'
+    [creator]     Saving docker.io/ezeebit/gateway-svc:0.3.2...
+    [creator]     *** Images (5f5775fcba11):
+    [creator]           docker.io/ezeebit/gateway-svc:0.3.2
+    [creator]     Reusing cache layer 'paketo-buildpacks/syft:syft'
+    [creator]     Reusing cache layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing cache layer 'buildpacksio/lifecycle:cache.sbom'
+
+Successfully built image 'docker.io/ezeebit/gateway-svc:0.3.2'
+
+
+> Task :services:ledger-svc:protobufDummy UP-TO-DATE
+> Task :services:ledger-svc:extractIncludeProto UP-TO-DATE
+> Task :services:ledger-svc:extractProto UP-TO-DATE
+> Task :services:ledger-svc:generateProto UP-TO-DATE
+> Task :services:ledger-svc:compileJava UP-TO-DATE
+> Task :services:ledger-svc:processProtoResources UP-TO-DATE
+> Task :services:ledger-svc:processResources UP-TO-DATE
+> Task :services:ledger-svc:classes UP-TO-DATE
+> Task :services:ledger-svc:resolveMainClassName UP-TO-DATE
+> Task :services:ledger-svc:bootJar UP-TO-DATE
+
+> Task :services:ledger-svc:bootBuildImage
+Building image 'docker.io/ezeebit/ledger-svc:0.3.2'
+
+ > Pulling builder image 'docker.io/paketobuildpacks/builder-noble-java-tiny:0.0.197@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9' ..................................................
+ > Pulled builder image 'paketobuildpacks/builder-noble-java-tiny@sha256:b95da27fce97b58037f0c11ae934760c50730da4c9a24976205b53638592eba9'
+ > Pulling run image 'docker.io/paketobuildpacks/ubuntu-noble-run-tiny:0.0.138@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a' for platform 'linux/arm64' ..................................................
+ > Pulled run image 'paketobuildpacks/ubuntu-noble-run-tiny@sha256:b1a26d91357134faa5a7f118f4e68a8c4c3278230660e8a49c924e92af6a905a'
+ > Executing lifecycle version v0.21.22
+ > Using build cache volume 'pack-cache-45b92ae58050.build'
+
+ > Running creator
+    [creator]     ===> ANALYZING
+    [creator]     Restoring data for SBOM from previous image
+    [creator]     ===> DETECTING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     6 of 26 buildpacks participating
+    [creator]     paketo-buildpacks/ca-certificates   3.13.0
+    [creator]     paketo-buildpacks/bellsoft-liberica 11.9.0
+    [creator]     paketo-buildpacks/syft              2.41.0
+    [creator]     paketo-buildpacks/executable-jar    6.16.0
+    [creator]     paketo-buildpacks/dist-zip          5.13.0
+    [creator]     paketo-buildpacks/spring-boot       5.37.0
+    [creator]     ===> RESTORING
+    [creator]     Restoring metadata for "paketo-buildpacks/ca-certificates:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:java-security-properties" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:jre" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/bellsoft-liberica:helper" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:web-application-type" from app image
+    [creator]     Restoring metadata for "paketo-buildpacks/spring-boot:helper" from app image
+    [creator]     Restoring data for "paketo-buildpacks/syft:syft" from cache
+    [creator]     Restoring data for "paketo-buildpacks/spring-boot:spring-cloud-bindings" from cache
+    [creator]     Restoring data for SBOM from cache
+    [creator]     ===> BUILDING
+    [creator]     target distro name/version labels not found, reading /etc/os-release file
+    [creator]     
+    [creator]     Paketo Buildpack for CA Certificates 3.13.0
+    [creator]       https://github.com/paketo-buildpacks/ca-certificates
+    [creator]       Build Configuration:
+    [creator]         $BP_EMBED_CERTS                    false  Embed certificates into the image
+    [creator]         $BP_ENABLE_RUNTIME_CERT_BINDING    true   Deprecated: Enable/disable certificate helper layer to add certs at runtime
+    [creator]         $BP_RUNTIME_CERT_BINDING_DISABLED  false  Disable certificate helper layer to add certs at runtime
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for BellSoft Liberica 11.9.0
+    [creator]       https://github.com/paketo-buildpacks/bellsoft-liberica
+    [creator]       Build Configuration:
+    [creator]         $BP_JVM_JLINK_ARGS           --no-man-pages --no-header-files --strip-debug --compress=1  configure custom link arguments (--output must be omitted)
+    [creator]         $BP_JVM_JLINK_ENABLED        false                                                        enables running jlink tool to generate custom JRE
+    [creator]         $BP_JVM_TYPE                 JRE                                                          the JVM type - JDK or JRE
+    [creator]         $BP_JVM_VERSION              25                                                           the Java version
+    [creator]       Launch Configuration:
+    [creator]         $BPL_DEBUG_ENABLED           false                                                        enables Java remote debugging support
+    [creator]         $BPL_DEBUG_PORT              8000                                                         configure the remote debugging port
+    [creator]         $BPL_DEBUG_SUSPEND           false                                                        configure whether to suspend execution until a debugger has attached
+    [creator]         $BPL_HEAP_DUMP_PATH                                                                       write heap dumps on error to this path
+    [creator]         $BPL_JAVA_NMT_ENABLED        true                                                         enables Java Native Memory Tracking (NMT)
+    [creator]         $BPL_JAVA_NMT_LEVEL          summary                                                      configure level of NMT, summary or detail
+    [creator]         $BPL_JFR_ARGS                                                                             configure custom Java Flight Recording (JFR) arguments
+    [creator]         $BPL_JFR_ENABLED             false                                                        enables Java Flight Recording (JFR)
+    [creator]         $BPL_JMX_ENABLED             false                                                        enables Java Management Extensions (JMX)
+    [creator]         $BPL_JMX_PORT                5000                                                         configure the JMX port
+    [creator]         $BPL_JVM_HEAD_ROOM           0                                                            the headroom in memory calculation
+    [creator]         $BPL_JVM_LOADED_CLASS_COUNT  35% of classes                                               the number of loaded classes in memory calculation
+    [creator]         $BPL_JVM_THREAD_COUNT        250                                                          the number of threads in memory calculation
+    [creator]         $JAVA_TOOL_OPTIONS                                                                        the JVM launch flags
+    [creator]         Using Java version 25 from BP_JVM_VERSION
+    [creator]       BellSoft Liberica JRE 25.0.4: Reusing cached layer
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       Java Security Properties: Reusing cached layer
+    [creator]     
+    [creator]     Paketo Buildpack for Syft 2.41.0
+    [creator]       https://github.com/paketo-buildpacks/syft
+    [creator]     
+    [creator]     Paketo Buildpack for Executable JAR 6.16.0
+    [creator]       https://github.com/paketo-buildpacks/executable-jar
+    [creator]       Class Path: Contributing to layer
+    [creator]         Writing env/CLASSPATH.delim
+    [creator]         Writing env/CLASSPATH.prepend
+    [creator]       Process types:
+    [creator]         executable-jar: java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         task:           java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]         web:            java org.springframework.boot.loader.launch.JarLauncher (direct)
+    [creator]     
+    [creator]     Paketo Buildpack for Spring Boot 5.37.0
+    [creator]       https://github.com/paketo-buildpacks/spring-boot
+    [creator]       Build Configuration:
+    [creator]         $BPL_JVM_AOTCACHE_ENABLED            false  whether to enable JVM AOT Cache optimizations at runtime
+    [creator]         $BPL_JVM_CDS_ENABLED                 false  whether to enable CDS optimizations at runtime
+    [creator]         $BPL_SPRING_AOT_ENABLED              false  whether to enable Spring AOT at runtime
+    [creator]         $BP_JVM_AOTCACHE_ENABLED             false  whether to enable JVM AOT Cache & perform JVM training run
+    [creator]         $BP_JVM_CDS_ENABLED                  false  whether to enable CDS & perform JVM training run
+    [creator]         $BP_SPRING_AOT_ENABLED               false  whether to enable Spring AOT
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_DISABLED   false  whether to contribute Spring Boot cloud bindings support
+    [creator]         $BP_SPRING_CLOUD_BINDINGS_VERSION    1      default version of Spring Cloud Bindings library to contribute
+    [creator]         $BP_UNPACK_LAYOUT_ONLY               false  whether to unpack (-Djarmode=tools [...] extract) the Spring Boot archive and run it in extracted mode
+    [creator]       Launch Configuration:
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_DISABLED  false  whether to auto-configure Spring Boot environment properties from bindings
+    [creator]         $BPL_SPRING_CLOUD_BINDINGS_ENABLED   true   Deprecated - whether to auto-configure Spring Boot environment properties from bindings
+    [creator]       Creating slices from layers index
+    [creator]         dependencies (84.4 MB)
+    [creator]         spring-boot-loader (460.8 KB)
+    [creator]         snapshot-dependencies (0.0 B)
+    [creator]         application (741.1 KB)
+    [creator]       Spring Cloud Bindings 2.0.4: Reusing cached layer
+    [creator]       Web Application Type: Contributing to layer
+    [creator]         Servlet web application detected
+    [creator]         Writing env.launch/BPL_JVM_THREAD_COUNT.default
+    [creator]       Launch Helper: Reusing cached layer
+    [creator]       4 application slices
+    [creator]       Image labels:
+    [creator]         org.opencontainers.image.title
+    [creator]         org.opencontainers.image.version
+    [creator]         org.springframework.boot.version
+    [creator]     ===> EXPORTING
+    [creator]     Reusing layer 'paketo-buildpacks/ca-certificates:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:java-security-properties'
+    [creator]     Reusing layer 'paketo-buildpacks/bellsoft-liberica:jre'
+    [creator]     Reusing layer 'paketo-buildpacks/executable-jar:classpath'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:helper'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing layer 'paketo-buildpacks/spring-boot:web-application-type'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launch.sbom'
+    [creator]     Reused 4/5 app layer(s)
+    [creator]     Added 1/5 app layer(s)
+    [creator]     Reusing layer 'buildpacksio/lifecycle:launcher'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:config'
+    [creator]     Reusing layer 'buildpacksio/lifecycle:process-types'
+    [creator]     Adding label 'io.buildpacks.lifecycle.metadata'
+    [creator]     Adding label 'io.buildpacks.build.metadata'
+    [creator]     Adding label 'io.buildpacks.project.metadata'
+    [creator]     Adding label 'org.opencontainers.image.title'
+    [creator]     Adding label 'org.opencontainers.image.version'
+    [creator]     Adding label 'org.springframework.boot.version'
+    [creator]     Setting default process type 'web'
+    [creator]     Saving docker.io/ezeebit/ledger-svc:0.3.2...
+    [creator]     *** Images (c5c1106a327a):
+    [creator]           docker.io/ezeebit/ledger-svc:0.3.2
+    [creator]     Reusing cache layer 'paketo-buildpacks/syft:syft'
+    [creator]     Reusing cache layer 'paketo-buildpacks/spring-boot:spring-cloud-bindings'
+    [creator]     Reusing cache layer 'buildpacksio/lifecycle:cache.sbom'
+
+Successfully built image 'docker.io/ezeebit/ledger-svc:0.3.2'
+
+
+> Task :bootBuildImageAll
+> Task :checkSupplyChain
+==============================================================================
+EZEEBIT SUPPLY CHAIN   trivy 0.74.0, gitleaks v8.30.1, pinned in security/scanners.lock
+==============================================================================
+
+STAGES REQUIRED BY THIS RUN  [secrets,sbom,images,config]
+  secrets  3/3 scanner(s) completed   4/4 report file(s) usable   OK
+  sbom     5/5 scanner(s) completed   5/5 report file(s) usable   OK
+  images   5/5 scanner(s) completed   11/11 report file(s) usable   OK
+  config   1/1 scanner(s) completed   2/2 report file(s) usable   OK
+
+SECRETS  [any finding fails; values are redacted and never printed]
+  gitleaks history : 0 finding(s)  [278 of 278 commits with changes, all refs, merges by first parent; 278 in all]
+  gitleaks tree    : 0 finding(s)  [634 files: tracked plus untracked, .gitignore honoured]
+  trivy secret     : 0 finding(s)  [the same 634 files, second instrument]
+
+IMAGES  [5 images, 15 layers carried by all 5; trivy DB updated 2026-11-04T07:16:25.226375897Z]
+  service          SERVICE  SHARED  distinct   gating
+  config-svc             1      39        40   0
+  conversion-svc         2      39        41   0
+  eureka-svc             1      39        40   0
+  gateway-svc            2      39        41   0
+  ledger-svc             2      39        41   0
+
+  SERVICE SCOPE, app layers and unattributed layers, ours to fix (2 distinct)
+    MEDIUM   CVE-2020-13956       org.apache.httpcomponents:httpclient 4.5.3 fix=4.5.13, 5.0.3  [3/5 images]
+    MEDIUM   CVE-2026-118259      io.opentelemetry:opentelemetry-api 1.62.0 fix=1.67.0         [5/5 images]
+
+  SHARED SCOPE, builder and run-image layers, fixed by moving those pins (39 distinct)
+    HIGH     CVE-2026-111943      stdlib v1.27.1                           fix=1.26.10, 1.27.3 [5/5 images]
+    HIGH     CVE-2026-111943      stdlib v1.26.8                           fix=1.26.10, 1.27.3 [5/5 images]
+    HIGH     CVE-2026-78667       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78667       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78669       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78669       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-78669       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    HIGH     CVE-2026-97031       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    HIGH     CVE-2026-97031       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-18374       libc6 2.39-0ubuntu8.9                    fix=NONE           [5/5 images]
+    MEDIUM   CVE-2026-56866       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-56866       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78659       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-78659       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78659       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78660       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78660       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78660       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-78663       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78663       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-78663       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-85091       zlib1g 1:1.3.dfsg-3.1ubuntu2.2           fix=1:1.3.dfsg-3.1ubuntu2.3 [5/5 images]
+    MEDIUM   CVE-2026-89092       libc6 2.39-0ubuntu8.9                    fix=NONE           [5/5 images]
+    MEDIUM   CVE-2026-94439       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94439       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94440       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94440       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94448       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-94448       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97030       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97030       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97032       golang.org/x/net v0.58.0                 fix=0.60.0         [5/5 images]
+    MEDIUM   CVE-2026-97032       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    MEDIUM   CVE-2026-97032       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    LOW      CVE-2026-56857       stdlib v1.27.1                           fix=1.26.9, 1.27.2 [5/5 images]
+    LOW      CVE-2026-56857       stdlib v1.26.8                           fix=1.26.9, 1.27.2 [5/5 images]
+    UNKNOWN  CVE-2026-78661       golang.org/x/net v0.58.0                 fix=0.62.0         [5/5 images]
+    UNKNOWN  CVE-2026-97045       golang.org/x/net v0.58.0                 fix=0.62.0         [5/5 images]
+    UNKNOWN  GO-2026-5932         golang.org/x/crypto v0.56.0              fix=0.58.1-0.20261009181718-2f1f834330b2 [5/5 images]
+
+SBOM  [CycloneDX written by trivy from each image, build/supply-chain/sbom/]
+  config-svc        180 components  CycloneDX 1.7
+  conversion-svc    290 components  CycloneDX 1.7
+  eureka-svc        235 components  CycloneDX 1.7
+  gateway-svc       239 components  CycloneDX 1.7
+  ledger-svc        271 components  CycloneDX 1.7
+
+MISCONFIGURATION  [reported, NOT gating; its own universe, never add it to image totals]
+  17 file(s) staged (compose.yaml, docker/, Dockerfile*); trivy recognised 0 as a config format
+  failing checks: CRITICAL=0  HIGH=0  MEDIUM=0  LOW=0  UNKNOWN=0
+
+SUPPRESSIONS  security/trivy-ignore.yaml holds 0 vulnerability entries
+
+==============================================================================
+SUPPLY CHAIN GATE: PASSED  (no finding is HIGH or CRITICAL AND fixable AND in a SERVICE layer)
+
+[Incubating] Problems report is available at: file:///Users/sean/env/repo/be/java/spring/ezeebit-wallet/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 33s
+34 actionable tasks: 6 executed, 28 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
+exit=0

@@ -107,7 +107,8 @@ schemathesis() {
     [ "$rc" -eq 1 ] && worst=1
   done
   if [ "$MODE" = control ]; then
-    if grep -q 'ST101' "$OUT/schemathesis/ledger-svc.log"; then echo "PASS schemathesis control: planted server error found"; return 0; fi
+    # The plant's own code, not ST101 alone: the fixture's 501 for an unknown method is a server error too.
+    if grep -q 'PLANTED_SERVER_ERROR' "$OUT/schemathesis/ledger-svc.log"; then echo "PASS schemathesis control: planted server error found"; return 0; fi
     echo "FAIL schemathesis control: planted server error MISSED"
     return 1
   fi

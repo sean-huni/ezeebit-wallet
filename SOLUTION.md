@@ -37,6 +37,7 @@ of it:
 | Use-case packages and a map of every package and class | `refactor-ledger-packages` | [docs/project-layout.md](docs/project-layout.md) |
 | Dependency-injection budget: the build fails on any bean with more than 3 injected dependencies; 8 beans split by job to meet it | `bugfix-di-flooding` | [docs/quality-gates.md](docs/quality-gates.md#architecture-gates) |
 | Conversion to ledger over gRPC instead of REST, Resilience4j retries and circuit breakers, a Kafka dead-letter topic, Slack alert delivery | `feat-ledger-grpc` | [ARCHITECTURE.md](ARCHITECTURE.md#conversion-to-ledger-over-grpc), [docs/observability.md](docs/observability.md) |
+| Dynamic application security testing (DAST) gate: ZAP API scan, Schemathesis and Nuclei through the gateway, with a planted-defect control; its first runs found two 500s (any HTTP method at the gateway, a boundaryless multipart body in every service), both fixed | `feat-dast-zap` | [docs/quality-gates.md](docs/quality-gates.md#dast-zap-schemathesis-and-nuclei-against-the-running-gateway) |
 
 Each landed as its own merge on `dev`, so `git show --stat <merge>` shows exactly what it
 added. Later work, these documents included, was built on top of them, so reverting one now means

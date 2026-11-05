@@ -1,4 +1,4 @@
-# Quality gates: tests, static application security testing (SAST) and coverage
+# Quality gates: tests, static and dynamic application security testing (SAST, DAST) and coverage
 
 Back to [README](../README.md). The supply-chain half, covering secrets, images and software bills of materials (SBOMs), is
 in [supply-chain.md](supply-chain.md).
@@ -117,3 +117,56 @@ Checkstyle reports, and waits for the quality gate (`sonar.qualitygate.wait`). `
 - **SAST** (SpotBugs with Find Security Bugs, Checkstyle, SonarQube) reads this repository's own code. It finds **unknown** defects that no Common Vulnerabilities and Exposures (CVE) entry describes.
 - **SCA** (trivy, in [supply-chain.md](supply-chain.md)) reads the shipped image: jars, operating system
   (OS) packages, the Java Runtime Environment (JRE), buildpack binaries. It finds **known** CVEs in code nobody here wrote.
+- **DAST** (dynamic application security testing, below) reads nothing: it attacks the running edge
+  the way a caller can, and finds what the code and the image both looked fine on.
+
+## DAST: ZAP, Schemathesis and Nuclei against the running gateway
+
+`security/dast.sh` is a release gate beside `scripts/verify-topology.sh`. It needs a running fleet
+(`./fleet.sh up`), so it runs before a release rather than inside `./gradlew build`. Every scan goes
+through the gateway, because that is the only surface a caller has; a finding behind it that no caller
+can reach is not one.
+
+```sh
+security/dast.sh            # the compose fleet at http://localhost:8080 (DAST_TARGET, loopback only)
+security/dast.sh control    # the same scans against security/dast-fixture.py, where each must find its plant
+```
+
+| Scanner | What it does | Fails the run when |
+|---|---|---|
+| ZAP 2.17.0, API scan | imports `docs/openapi/{conversion-svc,ledger-svc}.json` and actively attacks every operation: injection, path traversal, error disclosure, Spring4Shell, Log4Shell and the rest of its active rules | any High alert, read from its JSON report (the console calls some Highs WARN) |
+| Schemathesis 4.32.4 | generates requests from the same specs, valid and invalid, including methods and content types the specs do not declare | any 5xx answer |
+| Nuclei v3.11.1 | its `springboot`, `spring`, `actuator`, `exposure` and `misconfig` templates against the gateway's root | any finding at low or above: an exposed actuator endpoint is a defect whatever its template's rating |
+
+- **Exit codes**: 0 clean, 1 a finding (in `control`, a missed plant), 2 a scanner could not run
+  (Docker absent, the target not answering 200 on `/actuator/health` before or after the scan, an
+  import of zero operations, zero templates loaded). A 2 means nothing was learned.
+- **It refuses any target that is not loopback.** The scanners send attack payloads and write rows
+  (quotes, rejected conversions); they never run against a shared environment.
+- **ZAP is throttled** to one thread and 100 ms between requests. It reuses one example merchant id,
+  and the gateway allows 20 requests a second per merchant: unthrottled, its SQL-injection rule read
+  the resulting 429 answers as a High (measured 2026-11-05).
+- **Pins**: images by tag and digest in `security/scanners.lock`. Schemathesis and Nuclei are Alpine
+  images; ZAP publishes Debian only, the one non-Alpine scanner. Nuclei's templates are data, like
+  trivy's database: cached in the `ezeebit-nuclei-templates` volume, the loaded count printed per run.
+- **The control is the proof the scanners can see.** `security/dast-fixture.py` plants one defect
+  per scanner: a MySQL error on any quote (ZAP SQL injection, plugin 40018), a 500 on balances
+  (Schemathesis), an exposed `/actuator/env` (Nuclei `springboot-env`). `control` fails unless each
+  is found by name.
+
+What the first runs found, 2026-11-05, both fixed with a red test first:
+
+| Finding | Where | Fix |
+|---|---|---|
+| Any method reached the proxy client: QUERY and FOO answered 500 with an ERROR stack trace per request; PATCH and DELETE were forwarded | gateway-svc routes, `Path` predicate only | `Method=GET,POST` on both merchant routes; an unserved method answers 404 like any unpublished path (`EdgeHeadersIT`, `RouteCoverageIT`) |
+| A `multipart/*` Content-Type without a boundary answered 500 on every route | ledger-svc and conversion-svc; the same class in config-svc and eureka-svc, found by sweeping every service | `spring.servlet.multipart.enabled: false` (nothing takes multipart): reads ignore the header, JSON writes answer 415 (`MultipartRequestIT`, config and eureka boot tests) |
+
+The second finding was hidden behind the first: Schemathesis reports one failure per operation, so it
+appeared only once the method fix had landed. Evidence: the gate red on the unfixed fleet (5 QUERY 500s),
+then [the fleet run](evidence/2026-11-05-dast-fleet.log) and [the control run](evidence/2026-11-05-dast-control.log)
+at the committed fix.
+
+What it does not cover: authenticated flows (the API has none at the gateway yet), the internal
+`/internal/**` and gRPC surfaces (not routed, so not reachable by a caller), and business-logic abuse
+such as replaying a quote, which the acceptance tier tests by name ("A quote cannot be used twice" in
+`conversions.feature`).

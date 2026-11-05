@@ -1,0 +1,11 @@
+# security/dast.sh fleet at f11f9b1 (Add a DAST release gate: ZAP, Schemathesis and Nuclei through the gateway), uncommitted paths: 1
+dast fleet: target http://dast-target:8080 (host port 8080), 2026-11-05T22:12:47Z
+zap 2.17.0: 0 High alert(s)
+PASS zap
+schemathesis conversion-svc: 593 generated, 593 passed
+schemathesis ledger-svc: 190 generated, 190 passed
+PASS schemathesis
+nuclei: 1536 templates, 0 finding(s) at low or above
+PASS nuclei
+dast fleet exit=0
+exit=0 in 379s

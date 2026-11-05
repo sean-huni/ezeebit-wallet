@@ -99,6 +99,9 @@ table.led { width: 100%; border-collapse: collapse; font-size: .95rem }
 .led .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap }
 .led .neg { color: var(--red-ink) }
 .led tfoot td { border-top: 3px double var(--rule-strong); border-bottom: 0; font: 500 .82rem/1.3 var(--mono); color: var(--green-ink) }
+#memory .led { min-width: 34rem }
+#memory .led.wide { min-width: 52rem }
+#memory .led td.mono { white-space: nowrap }
 .led .t { font-family: var(--mono); color: var(--red-ink); white-space: nowrap }
 
 /* decision ledger: Dr buys, Cr costs */
@@ -285,7 +288,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <span>Senior Software Engineer (Java &amp; Spring)</span>
     <span>Release 0.4.0 · Java 25 · Spring Boot 4.1.2 · 5 November 2026</span>
   </div>
-  <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 20 folios</span></div>
+  <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 21 folios</span></div>
 </section>
 
 <section class="sheet" id="contents" data-tab="1">
@@ -310,6 +313,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <li><a href="#summary">Summary</a><span class="dots"></span><span class="fo">18</span></li>
     <li><a href="#lessons">Lessons learnt</a><span class="dots"></span><span class="fo">19</span></li>
     <li><a href="#further">Potential further work</a><span class="dots"></span><span class="fo">20</span></li>
+    <li><a href="#memory">Memory: observed, then derived</a> <span class="new">NEW</span><span class="dots"></span><span class="fo">21</span></li>
   </ol>
   <p class="note"><b>How to read</b>Folios 8 to 10 post every technology choice like a ledger entry: Dr is what the choice buys, Cr is what it costs. Arrow keys, Page Up and Page Down move one sheet. The deep detail is in the repository: README, SOLUTION, ARCHITECTURE, EVIDENCE and docs/k8s.md.</p>
 </section>
@@ -721,6 +725,45 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </table>
   </div>
   <p class="note"><b>Source</b>SOLUTION.md section 6 is the ordered list (its items 2 and 7 are merged here); section 7 holds every known gap, including the pipeline. Scheduled separately for December 2026: highly available PostgreSQL (CloudNativePG, PgBouncer), because one Postgres pod is still a single failure domain.</p>
+</section>
+
+<section class="sheet" id="memory" data-tab="21">
+  <header class="head"><span class="acct">Footprint</span><h2>Memory: observed, then derived</h2><span class="folio">Fo. 21</span></header>
+  <p class="lede">What Grafana showed on the kind fleet, idle at 8 pods, and the cuts those numbers point to. Measured lines are measured; projections are published ratios until one service is ported.</p>
+  <div class="split">
+    <div>
+      <div class="scroll">
+        <table class="led">
+          <thead><tr><th>MiB per pod</th><th>Working set</th><th>Heap committed</th><th>Class metadata</th></tr></thead>
+          <tbody>
+            <tr><td><strong>conversion-svc</strong></td><td class="mono">375 → 351</td><td class="mono">129 → 96</td><td class="mono">118 → 124</td></tr>
+            <tr><td>ledger-svc</td><td class="mono">367 → 348</td><td class="mono">123 → 93</td><td class="mono">117 → 122</td></tr>
+            <tr><td>gateway-svc</td><td class="mono">360 → 317</td><td class="mono">85 → 81</td><td class="mono">107 → 111</td></tr>
+            <tr><td>eureka-svc</td><td class="mono">360 → 329</td><td class="mono">97 → 87</td><td class="mono">96 → 100</td></tr>
+            <tr><td>config-svc</td><td class="mono">374 → 272</td><td class="mono">83 → 72</td><td class="mono">75 → 78</td></tr>
+            <tr><td><strong>8 pods</strong></td><td class="mono"><strong>2938 → 2633</strong></td><td colspan="2">−305 MiB, −10%, from G1 and compact object headers in 0.4.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note"><b>Observed</b>Each cell reads 0.3.2-era SerialGC → 0.4.0 G1. conversion-svc is the heaviest pod, and its heap is the smaller part: class metadata (Metaspace plus class space) is about as large as the heap and G1 did not move it. Of 351 MiB, about 96 is heap, 124 class metadata, 23 compiled code; the rest is threads, buffers and the profiler.</p>
+    </div>
+    <figure>
+      <span class="mount"><i></i><i></i><i></i><i></i><img src="img/memory.png" alt="Grafana panel Heap used and committed per service over 75 minutes; committed heap steps down when the G1 images roll out at 19:57" width="2400" height="1120"></span>
+      <figcaption>Grafana, heap committed per service (two pods summed): it steps down at the 19:57 rollout to the G1 images.</figcaption>
+    </figure>
+  </div>
+  <div class="scroll" style="margin-top:1.2rem">
+    <table class="led wide">
+      <thead><tr><th>Derived option</th><th>Targets</th><th>Per pod, estimated</th><th>Costs</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Spring AOT plus a JDK 25 AOT cache</strong> (Leyden)</td><td>bean wiring and class loading at start</td><td class="mono">−5 to −10%</td><td>Mostly startup, 40 to 60% faster. The bean graph is fixed at build time, so a served config value can no longer switch a bean on or off.</td></tr>
+        <tr><td><strong>Quarkus JVM, conversion-svc first</strong></td><td>class metadata: build-time wiring, no runtime reflection</td><td class="mono">351 → ~210 to 245</td><td>A port per service. The heaviest pod goes first, then ledger-svc. Gateway, Eureka and Config Server have no Quarkus twin.</td></tr>
+        <tr><td><strong>Kubernetes discovery and ConfigMaps</strong></td><td>eureka-svc and config-svc themselves</td><td class="mono">−601 MiB fleet</td><td>An architecture change, not a framework one: two pods gone, and with them the registry caches tuned for routing.</td></tr>
+        <tr><td><strong>Native image</strong> (Spring or Quarkus)</td><td>the whole JVM</td><td class="mono">~70 to 110 · ~40 to 70</td><td>Serial GC only on GraalVM CE, lower peak throughput, 3 to 6 min and 5 to 8 GB per build, native metadata for Resilience4j, Kafka and gRPC.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><b>Next</b>Port conversion-svc and compare its working set under the sweep's own traffic; only that turns the Quarkus line into a measurement. The 1 GiB limit is not under pressure today: the gain is pods per node, not stability. <b>Limits</b>Idle readings; the G1 pods were 13 minutes old against 3 to 19 hours for the baseline. Evidence: <code>docs/observability/verification/2026-11-05-memory-snapshots.txt</code>.</p>
 </section>
 
 <section class="board" id="close" data-tab="B" aria-label="Back cover">

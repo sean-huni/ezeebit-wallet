@@ -1,0 +1,26 @@
+label=kind-off window=299s ending 2026-11-04T17:47:01Z
+p95ms config-svc NaN
+p95ms conversion-svc 9.898794385276313
+p95ms eureka-svc 0.9500000000000001
+p95ms gateway-svc 11.358450204726775
+p95ms ledger-svc 1.387250520926443
+requests config-svc 0
+requests conversion-svc 5981.057663860625
+requests eureka-svc 715.5379310344828
+requests gateway-svc 9010.166604458904
+requests ledger-svc 2989.6795011167833
+cpu_usage_mean config-svc 0.00995493957041144
+cpu_usage_mean conversion-svc 0.02824117745107844
+cpu_usage_mean eureka-svc 0.008316440631968704
+cpu_usage_mean gateway-svc 0.025362111372903923
+cpu_usage_mean ledger-svc 0.020760579145015723
+cpu_seconds config-svc 0.97175
+cpu_seconds conversion-svc 33.37481413857642
+cpu_seconds eureka-svc 2.0001999993103476
+cpu_seconds gateway-svc 26.250008342006446
+cpu_seconds ledger-svc 24.343750133472685
+jvms_seen_in_window config-svc 1
+jvms_seen_in_window conversion-svc 2
+jvms_seen_in_window eureka-svc 1
+jvms_seen_in_window gateway-svc 2
+jvms_seen_in_window ledger-svc 2

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the fleet on a local kind cluster.
 # Usage: k8s/kube.sh up [--no-build] [--only data,obs,app,chaos] | down | status | chaos on|off|run|status | sweep
+# SWEEP_LABEL=<label> names the sweep log <date>-<label>-sweep.log instead of <date>-<version>-sweep.log.
 # Written for the bash 3.2 macOS ships: no ${x,,}, no mapfile, and empty arrays expanded with ${a[@]+...}.
 set -uo pipefail
 # shellcheck source=lib/common.sh
@@ -411,8 +412,8 @@ sweep_images() {
 }
 
 cmd_sweep() {
-  local check rc out sha branch dirty build_log ver
-  (( $# == 0 )) || fail "sweep takes no options: it always builds the images it tests"
+  local check rc out sha branch dirty build_log ver rel
+  (( $# == 0 )) || fail "sweep takes no options: it always builds the images it tests (SWEEP_LABEL names the log)"
   out=$(git status --porcelain); rc=$?
   (( rc == 0 )) || fail "git status exited $rc: cannot tell whether the tree is clean"
   if [[ -n $out ]]; then
@@ -425,10 +426,9 @@ cmd_sweep() {
   (( rc == 0 )) || fail "git rev-parse --abbrev-ref HEAD exited $rc"
   ver=$(sed -nE "s/^[[:space:]]*version = '([^']+)'.*/\1/p" build.gradle)
   [[ -n $ver ]] || fail "no version = '...' line in build.gradle"
-  # One file per release and day, so a later sweep can never truncate evidence an earlier release committed.
-  SWEEP_LOG="$ROOT/docs/k8s/verification/$(date +%F)-$ver-sweep.log"
-  git ls-files --error-unmatch "${SWEEP_LOG#"$ROOT"/}" > /dev/null 2>&1 \
-    && fail "${SWEEP_LOG#"$ROOT"/} is committed: a new run would overwrite it; remove it in a commit first"
+  # One file per release (or SWEEP_LABEL) and day, so a later sweep can never truncate evidence already committed.
+  rel=$(sweep_log_path "$(date +%F)" "$ver" "${SWEEP_LABEL:-}") || exit 1
+  SWEEP_LOG="$ROOT/$rel"
   mkdir -p "$(dirname "$SWEEP_LOG")"
   : > "$SWEEP_LOG"
   trap sweep_finish EXIT

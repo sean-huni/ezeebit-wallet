@@ -56,6 +56,7 @@ spec:
             matchLabels: {app.kubernetes.io/name: lgtm}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -104,6 +105,7 @@ spec:
             matchLabels: {app.kubernetes.io/name: lgtm}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -164,6 +166,7 @@ spec:
             matchLabels: {app.kubernetes.io/name: lgtm}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -191,6 +194,7 @@ spec:
             matchLabels: {app.kubernetes.io/name: lgtm}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
 ---
 # Standalone: its own peer is its pod IP, which never leaves the pod's network namespace.
 apiVersion: networking.k8s.io/v1
@@ -219,6 +223,7 @@ spec:
             matchLabels: {app.kubernetes.io/name: lgtm}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

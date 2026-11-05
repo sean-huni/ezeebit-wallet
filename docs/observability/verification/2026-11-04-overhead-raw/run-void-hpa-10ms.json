@@ -1,0 +1,1 @@
+{"label":"kind-on","start":"2026-11-04T17:09:15.351Z","end":"2026-11-04T17:14:15.277Z","startMs":1793812155351,"endMs":1793812455277,"units":3000,"codes":{"quote 201":3000,"convert 201":3000,"balances 200":3000},"clientP95ms":{"quote":9.8,"convert":16.3,"balances":5.6,"all":13.9}}

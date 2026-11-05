@@ -1,5 +1,6 @@
 # Replaces the image's grafana-datasources.yaml (same uids). Added to its defaults: a 10s step to match the services'
-# export interval, trace-to-metrics, and trace-to-logs filtered by trace id. $$ is a literal $ in provisioning.
+# export interval, trace-to-metrics, trace-to-logs filtered by trace id, and trace-to-profiles. $$ is a literal $ in
+# provisioning. Grafana 13.3 builds the profile link itself: span filter, span +-60s, no time-shift setting.
 apiVersion: 1
 
 datasources:
@@ -46,6 +47,13 @@ datasources:
             query: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_milliseconds_bucket{$$__tags}[1m])))'
           - name: 5xx ratio
             query: 'sum(rate(http_server_requests_milliseconds_count{$$__tags, status=~"5.."}[1m])) / sum(rate(http_server_requests_milliseconds_count{$$__tags}[1m]))'
+      tracesToProfiles:
+        datasourceUid: pyroscope
+        profileTypeId: 'wall:wall:nanoseconds:wall:nanoseconds'
+        customQuery: false
+        tags:
+          - key: service.name
+            value: service_name
       serviceMap:
         datasourceUid: prometheus
       nodeGraph:

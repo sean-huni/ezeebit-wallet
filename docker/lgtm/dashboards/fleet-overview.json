@@ -6,6 +6,7 @@
     "ezeebit",
     "ezeebit-fleet",
     "health",
+    "grafana-pyroscope-datasource",
     "prometheus"
   ],
   "editable": false,
@@ -1666,16 +1667,210 @@
     },
     {
       "type": "row",
-      "title": "JVM",
-      "collapsed": false,
+      "title": "Profiling (Pyroscope): wall-clock flame graph per service, and profiler failures",
+      "collapsed": true,
       "gridPos": {
         "x": 0,
         "y": 52,
         "w": 24,
         "h": 1
       },
-      "panels": [],
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Profiler failures by service and cause",
+          "description": "start: the profiler did not start; push: an upload to Pyroscope failed; push_dropped: the SDK gave up on one; link-*: the span-to-profile link is off; any other cause is the class thrown at start. Empty is the healthy state. ProfilingFailing pages on every cause but push and push_dropped while the JVM runs, and on more than 5 of those in 5m. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (job, cause) (((ezeebit_profiling_failures_total{job=~\"$service\"} - ezeebit_profiling_failures_total{job=~\"$service\"} offset $interval) >= 0) or (ezeebit_profiling_failures_total{job=~\"$service\"} unless ezeebit_profiling_failures_total{job=~\"$service\"} offset $interval) or (ezeebit_profiling_failures_total{job=~\"$service\"} < ezeebit_profiling_failures_total{job=~\"$service\"} offset $interval))",
+              "legendFormat": "{{job}} {{cause}}",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": false,
+                "gradientMode": "opacity"
+              },
+              "links": [
+                {
+                  "title": "Logs for ${__field.labels.job}",
+                  "url": "/d/ezeebit-logs/logs?var-service=${__field.labels.job}&${__url_time_range}"
+                },
+                {
+                  "title": "Traces for ${__field.labels.job}",
+                  "url": "/d/ezeebit-traces/traces?var-service=${__field.labels.job}&${__url_time_range}"
+                }
+              ],
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 53,
+            "w": 12,
+            "h": 6
+          },
+          "id": 29
+        },
+        {
+          "type": "timeseries",
+          "title": "Seconds since the last accepted upload",
+          "description": "Per JVM: now minus the last upload Pyroscope accepted (or the profiler's setup, before the first). Uploads run every 10s; ProfilesAbsent fires past the 120s line. A JVM missing here while it exports metrics has profiling off.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "time() - max by (job, instance) (last_over_time(ezeebit_profiling_last_push_seconds{job=~\"$service\"}[1m]))",
+              "legendFormat": "{{instance}}",
+              "range": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 12,
+                "showPoints": "never",
+                "spanNulls": true,
+                "gradientMode": "opacity",
+                "thresholdsStyle": {
+                  "mode": "dashed"
+                }
+              },
+              "links": [
+                {
+                  "title": "Logs for ${__field.labels.job}",
+                  "url": "/d/ezeebit-logs/logs?var-service=${__field.labels.job}&${__url_time_range}"
+                },
+                {
+                  "title": "Traces for ${__field.labels.job}",
+                  "url": "/d/ezeebit-traces/traces?var-service=${__field.labels.job}&${__url_time_range}"
+                }
+              ],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 120
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 53,
+            "w": 12,
+            "h": 6
+          },
+          "id": 30
+        },
+        {
+          "type": "flamegraph",
+          "title": "Wall clock: $service",
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "pyroscope"
+          },
+          "description": "Where $service's threads spent wall-clock time over the dashboard's time range, every replica merged: the service-wide view for a trace's window. Under virtual threads much of it is carrier idle time (ForkJoinPool.awaitWork). A virtual thread parked on I/O is on no thread, so that wait does not appear: the span's duration shows it. Empty: no profile in the range (they arrive in about 10s chunks).",
+          "repeat": "service",
+          "repeatDirection": "h",
+          "maxPerRow": 2,
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "grafana-pyroscope-datasource",
+                "uid": "pyroscope"
+              },
+              "queryType": "profile",
+              "profileTypeId": "wall:wall:nanoseconds:wall:nanoseconds",
+              "labelSelector": "{service_name=~\"$service\"}",
+              "groupBy": []
+            }
+          ],
+          "gridPos": {
+            "x": 0,
+            "y": 59,
+            "w": 12,
+            "h": 14
+          },
+          "id": 31
+        }
+      ],
       "id": 28
+    },
+    {
+      "type": "row",
+      "title": "JVM",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "id": 32
     },
     {
       "type": "timeseries",
@@ -1746,11 +1941,11 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 54,
         "w": 8,
         "h": 8
       },
-      "id": 29
+      "id": 33
     },
     {
       "type": "timeseries",
@@ -1811,11 +2006,11 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 53,
+        "y": 54,
         "w": 8,
         "h": 8
       },
-      "id": 30
+      "id": 34
     },
     {
       "type": "timeseries",
@@ -1876,11 +2071,11 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 53,
+        "y": 54,
         "w": 8,
         "h": 8
       },
-      "id": 31
+      "id": 35
     }
   ]
 }

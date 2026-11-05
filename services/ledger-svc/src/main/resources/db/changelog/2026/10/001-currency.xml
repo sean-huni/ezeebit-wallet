@@ -6,22 +6,32 @@
             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <changeSet id="001-currency-table" author="ledger-svc">
-        <preConditions onFail="MARK_RAN"><not><tableExists tableName="currency"/></not></preConditions>
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="currency"/>
+            </not>
+        </preConditions>
         <createTable tableName="currency">
             <column name="code" type="VARCHAR(5)"><constraints primaryKey="true" primaryKeyName="pk_currency"/></column>
             <column name="kind" type="VARCHAR(16)"><constraints nullable="false"/></column>
             <column name="scale" type="SMALLINT"><constraints nullable="false"/></column>
         </createTable>
-        <rollback><dropTable tableName="currency"/></rollback>
+        <rollback>
+            <dropTable tableName="currency"/>
+        </rollback>
     </changeSet>
 
     <changeSet id="001-currency-checks" author="ledger-svc">
         <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname IN ('ck_currency_kind', 'ck_currency_scale')</sqlCheck>
+            <sqlCheck expectedResult="0">SELECT count(*)
+                                         FROM pg_constraint
+                                         WHERE conname IN ('ck_currency_kind', 'ck_currency_scale')</sqlCheck>
         </preConditions>
         <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
-        <sql>ALTER TABLE currency ADD CONSTRAINT ck_currency_kind CHECK (kind IN ('FIAT', 'STABLECOIN'));
-ALTER TABLE currency ADD CONSTRAINT ck_currency_scale CHECK (scale BETWEEN 0 AND 18);</sql>
+        <sql>ALTER TABLE currency
+            ADD CONSTRAINT ck_currency_kind CHECK (kind IN ('FIAT', 'STABLECOIN'));
+        ALTER TABLE currency
+            ADD CONSTRAINT ck_currency_scale CHECK (scale BETWEEN 0 AND 18);</sql>
         <rollback>
             <!-- LIQUIBASE-SQL-EXCEPTION: Liquibase has no typed tag for CHECK constraints -->
             <sql>ALTER TABLE currency DROP CONSTRAINT ck_currency_kind, DROP CONSTRAINT ck_currency_scale;</sql>

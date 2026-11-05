@@ -322,7 +322,7 @@ the stubbed suites are its tests.
 k8s/
 ├── kube.sh                up | down | status | chaos on|off|run|status | sweep
 ├── kind-cluster.yaml      the ezeebit cluster: node image, pod and service ranges, host ports 8080 and 3000
-├── lib/common.sh          cluster, context, node and run-directory names; kctl, log, fail
+├── lib/common.sh          cluster, context, node and run-directory names; kctl, log, fail, sweep_log_path
 ├── base/
 │   ├── namespaces/        ezeebit-data, ezeebit-app, ezeebit-obs, ezeebit-chaos
 │   ├── data/              postgres, redis, kafka (with the kafka-topics Job)
@@ -334,7 +334,7 @@ k8s/
 ├── overlays/local/        the one overlay: every base, labelled part-of ezeebit
 ├── chaos/                 monkey.sh (the draw and the kill, shared by the CronJob and the sweep); test/ (stubbed kubectl)
 ├── sweep/                 lib.sh; parity, money, replicas, policy, chaos, outage, monitoring
-└── gates/                 fleet-separation, image-parity, app-image-version, replicas, pool-budget, virtual-threads; manifests.sh (the manifest reader two of them source)
+└── gates/                 fleet-separation, image-parity, app-image-version, replicas, pool-budget, virtual-threads, sweep-log-name; manifests.sh (the manifest reader two of them source)
 scripts/
 ├── env-guard.sh           acquire | release | state: the one lease both fleets take
 └── test/                  env-guard-test.sh and its stubbed docker, ps and lsof

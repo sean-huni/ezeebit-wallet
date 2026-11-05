@@ -18,6 +18,7 @@ spec:
               - {key: app.kubernetes.io/name, operator: In, values: [config-svc, eureka-svc, gateway-svc, ledger-svc, conversion-svc]}
       ports:
         - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4040}
     # The host, through the NodePort: kindnet judges it before SNAT, from the kind network gateway, which differs
     # per machine. Any address but a pod; the host port binds 127.0.0.1.
     - from:

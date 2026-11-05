@@ -17,7 +17,10 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
 
-Images come from Spring Boot's `bootBuildImage` with `BP_JVM_VERSION=25`. The Paketo builder and
+Images come from Spring Boot's `bootBuildImage` with `BP_JVM_VERSION=25`, and the image appends
+`-XX:+UseCompactObjectHeaders -XX:+UseG1GC` to `JAVA_TOOL_OPTIONS` at launch (Java 27's defaults,
+JEP 534 and JEP 523). Without the flag, a 1Gi pod sits under the JVM's 1792MB server-class line and
+ergonomics picks SerialGC; measured on the 0.3.2 image, 2026-11-04. The Paketo builder and
 its run image are both pinned by tag and digest in `gradle.properties` (`paketoBuilder`,
 `paketoRunImage`). The repository has no Dockerfile. Images are built for the Docker daemon's
 architecture.

@@ -500,7 +500,13 @@ configure(services) {
 		runImage = paketoRunImage
 		imageName = "ezeebit/${project.name}:${project.version}"
 		// The Paketo default JVM line is not 25, so leaving this out ships an older runtime.
-		environment = ['BP_JVM_VERSION': '25']
+		// Java 27 defaults, adopted on 25: a 1Gi pod is under the 1792MB server-class line, so ergonomics picks
+		// SerialGC unless G1 is named (JEP 523); compact headers shrink every object by 4 bytes (JEP 534).
+		environment = [
+			'BP_JVM_VERSION'              : '25',
+			'BPE_DELIM_JAVA_TOOL_OPTIONS' : ' ',
+			'BPE_APPEND_JAVA_TOOL_OPTIONS': '-XX:+UseCompactObjectHeaders -XX:+UseG1GC',
+		]
 	}
 }
 

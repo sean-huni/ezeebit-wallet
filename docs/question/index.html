@@ -101,6 +101,8 @@ table.led { width: 100%; border-collapse: collapse; font-size: .95rem }
 .led tfoot td { border-top: 3px double var(--rule-strong); border-bottom: 0; font: 500 .82rem/1.3 var(--mono); color: var(--green-ink) }
 #memory .led { min-width: 34rem }
 #memory .led.wide { min-width: 52rem }
+#security .led { min-width: 52rem }
+#security .scroll + .scroll { margin-top: 1.5rem }
 #memory .led td.mono { white-space: nowrap }
 .led .t { font-family: var(--mono); color: var(--red-ink); white-space: nowrap }
 
@@ -197,7 +199,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 .arch .cap.mix rect { stroke: var(--brass) } .arch .cap.mix text { fill: var(--brass) }
 .arch .cap.na rect { stroke: var(--pencil) } .arch .cap.na text { fill: var(--pencil) }
 .capk { display: inline-block; font: 600 .7rem/1 var(--mono); padding: .14rem .32rem; border-radius: 2px; border: 1px solid currentColor; white-space: nowrap }
-.capk.cp { color: var(--red-ink) } .capk.ap { color: var(--green-ink) } .capk.mix { color: var(--brass) }
+.capk.cp { color: var(--red-ink) } .capk.ap { color: var(--green-ink) } .capk.mix { color: var(--brass) } .capk.dy { color: var(--ink) }
 
 /* leather boards (cover, back) */
 .board { position: relative; scroll-snap-align: start; min-width: 0; padding: clamp(2rem, 6vw, 4.5rem) clamp(1.6rem, 6vw, 5rem);
@@ -288,7 +290,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <span>Senior Software Engineer (Java &amp; Spring)</span>
     <span>Release 0.4.0 · Java 25 · Spring Boot 4.1.2 · 5 November 2026</span>
   </div>
-  <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 21 folios</span></div>
+  <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 22 folios</span></div>
 </section>
 
 <section class="sheet" id="contents" data-tab="1">
@@ -314,6 +316,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <li><a href="#lessons">Lessons learnt</a><span class="dots"></span><span class="fo">19</span></li>
     <li><a href="#further">Potential further work</a><span class="dots"></span><span class="fo">20</span></li>
     <li><a href="#memory">Memory: observed, then derived</a> <span class="new">NEW</span><span class="dots"></span><span class="fo">21</span></li>
+    <li><a href="#security">Security gates: SAST, SCA, DAST and live probes</a> <span class="new">NEW</span><span class="dots"></span><span class="fo">22</span></li>
   </ol>
   <p class="note"><b>How to read</b>Folios 8 to 10 post every technology choice like a ledger entry: Dr is what the choice buys, Cr is what it costs. Arrow keys, Page Up and Page Down move one sheet. The deep detail is in the repository: README, SOLUTION, ARCHITECTURE, EVIDENCE and docs/k8s.md.</p>
 </section>
@@ -764,6 +767,38 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </table>
   </div>
   <p class="note"><b>Next</b>Port conversion-svc and compare its working set under the sweep's own traffic; only that turns the Quarkus line into a measurement. The 1 GiB limit is not under pressure today: the gain is pods per node, not stability. <b>Limits</b>Idle readings; the G1 pods were 13 minutes old against 3 to 19 hours for the baseline. Evidence: <code>docs/observability/verification/2026-11-05-memory-snapshots.txt</code>.</p>
+</section>
+
+<section class="sheet" id="security" data-tab="22">
+  <header class="head"><span class="acct">Security</span><h2>Security gates: SAST, SCA, DAST and live probes</h2><span class="folio">Fo. 22</span></header>
+  <p class="lede">What reads the code, what reads the shipped image, what attacks the running edge the way a caller can, and what is tried against a running fleet. The attackers found two defects on their first run.</p>
+  <div class="scroll">
+    <table class="led wide">
+      <thead><tr><th>Kind</th><th>Tool</th><th>Reads</th><th>Fails the build or the run when</th></tr></thead>
+      <tbody>
+        <tr><td><span class="capk cp">SAST</span></td><td><strong>SpotBugs 4.10.5 with Find Security Bugs 1.14.0</strong></td><td>compiled classes of every service, effort max, confidence low</td><td>any finding not excluded with a written reason; <code>checkSpotbugsReport</code> fails if Find Security Bugs did not run over a full analysis</td></tr>
+        <tr><td><span class="capk cp">SAST</span></td><td><strong>Checkstyle 14.3.0</strong></td><td>every Java source set</td><td>any violation</td></tr>
+        <tr><td><span class="capk cp">SAST</span></td><td><strong>gitleaks 8.30.1 and trivy secret scan</strong> (<code>checkSecrets</code>)</td><td>the whole git history and the tree</td><td>any secret found, or a scan that left no evidence</td></tr>
+        <tr><td><span class="capk cp">SAST</span></td><td><strong>SonarQube</strong>, opt-in</td><td>source and coverage</td><td>runs only with <code>SONAR_TOKEN</code>; otherwise skipped with the reason printed</td></tr>
+        <tr><td><span class="capk mix">SCA</span></td><td><strong>trivy 0.74.0</strong> (<code>checkSupplyChain</code>)</td><td>the 5 shipped images, a CycloneDX SBOM per image, manifest misconfiguration</td><td>a HIGH or CRITICAL with a fix, in a service layer. 0.4.0 passed; 6 Go HIGHs in the buildpack’s own binaries ship, named in <code>docs/supply-chain.md</code></td></tr>
+        <tr><td><span class="capk ap">Live</span></td><td><strong>kind sweep, <code>policy</code></strong></td><td>the running cluster, default-deny with 20 NetworkPolicies</td><td>an unnamed pod reaches Postgres, or ledger-svc cannot; the refused arm runs only after a control connection succeeds, so a broken probe is not read as a refusal</td></tr>
+        <tr><td><span class="capk ap">Live</span></td><td><strong>gateway tests and the sweep’s burst</strong></td><td>real HTTP against running processes</td><td><code>/internal/**</code> answers anything but 404; Redis down answers anything but 503 (the limiter fails closed); a 200-request burst admits more than capacity plus refill</td></tr>
+        <tr><td><span class="capk dy">DAST</span></td><td><strong>ZAP 2.17.0, API scan</strong> (<code>security/dast.sh</code>)</td><td>every operation in the two public OpenAPI specs, attacked through the gateway</td><td>any High alert. Throttled under the 20/s per-merchant limit: unthrottled, it read the 429s as SQL injection</td></tr>
+        <tr><td><span class="capk dy">DAST</span></td><td><strong>Schemathesis 4.32.4</strong></td><td>the same specs: valid and invalid requests, undeclared methods and content types</td><td>any 5xx answer</td></tr>
+        <tr><td><span class="capk dy">DAST</span></td><td><strong>Nuclei v3.11.1</strong></td><td>Spring, actuator, exposure and misconfiguration templates against the gateway</td><td>any finding at low or above</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="scroll">
+    <table class="led wide">
+      <thead><tr><th>Found by DAST, 5 November</th><th>Where</th><th>Fixed, red test first</th></tr></thead>
+      <tbody>
+        <tr><td>QUERY or FOO answered <strong>500</strong> with a stack trace per request; PATCH and DELETE were forwarded</td><td>gateway routes matched on path only</td><td><code>Method=GET,HEAD,POST</code>; anything else stops at the edge, never forwarded</td></tr>
+        <tr><td>A <code>multipart/*</code> Content-Type without a boundary answered <strong>500</strong> on every route</td><td>ledger and conversion; the same class in config and eureka</td><td>multipart parsing off: reads ignore it, JSON writes answer 415</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><b>Pinned</b>The scanners are pinned by tag and digest in <code>security/scanners.lock</code>, each the newest release at least two weeks old; every SCA verdict prints its vulnerability database date and every DAST run its Nuclei template count, because the data changes daily. <b>Split</b>SAST finds defects nobody has catalogued in this repository’s code; SCA finds catalogued CVEs in code nobody here wrote; DAST finds what both missed, on the running edge. <b>Control</b><code>dast.sh control</code> scans a stub with one planted defect per scanner and fails unless each is found, so a clean run is not a blind one; a reach probe through the scanners' own route fails the run if no service answered. Detail: <code>docs/quality-gates.md</code> and <code>docs/supply-chain.md</code>.</p>
 </section>
 
 <section class="board" id="close" data-tab="B" aria-label="Back cover">

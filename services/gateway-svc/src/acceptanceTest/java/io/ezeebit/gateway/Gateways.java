@@ -13,6 +13,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +60,13 @@ final class Gateways {
 			request = request.header(headers[i], headers[i + 1]);
 		}
 		return request.body(body).retrieve().toEntity(String.class);
+	}
+
+	// Any token is a legal HTTP method name, so a test can send one no route serves, such as QUERY or FOO.
+	static ResponseEntity<String> send(final ConfigurableApplicationContext gateway, final String method, final String rawPath) {
+		return CLIENT.method(HttpMethod.valueOf(method)).uri(URI.create("http://127.0.0.1:%s%s"
+				.formatted(gateway.getEnvironment().getRequiredProperty("local.server.port"), rawPath)))
+				.retrieve().toEntity(String.class);
 	}
 
 	static Map<String, Double> outcomes(final ConfigurableApplicationContext gateway) {

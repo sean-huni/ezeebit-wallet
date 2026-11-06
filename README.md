@@ -23,7 +23,7 @@ Walkthrough video: link to be added.
 | [SOLUTION.md](SOLUTION.md) | Tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6 fit, known gaps, AI usage notes |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, application programming interface (API), failure handling |
 | [docs/project-layout.md](docs/project-layout.md) | Every package and class per service, measured dependencies, where new code goes |
-| [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, SAST and coverage |
+| [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, SAST, DAST and coverage |
 | [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |

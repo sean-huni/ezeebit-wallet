@@ -10,6 +10,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  servlet:
+    multipart:
+      # No endpoint takes multipart. Left on, a multipart Content-Type without a boundary failed the parse as a 500
+      # on every route (DAST class sweep, 2026-11-05).
+      enabled: false
   application:
     name: eureka-svc
 eureka:

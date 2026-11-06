@@ -1,0 +1,11 @@
+# 2026-11-06T00:26:37Z arm=green
+200 200 200 200 200 
+edges 2
+  probe-caller -> rates.example:8089 virtual_node 5
+  probe-caller -> probe-callee  5
+exit=0
+# 2026-11-06T00:27:27Z arm=red
+200 200 200 200 200 
+edges 1
+  probe-caller -> probe-callee  5
+exit=0

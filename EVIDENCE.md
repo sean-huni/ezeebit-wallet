@@ -188,11 +188,15 @@ services" found all three names rendered, and the trace's 8 spans come from thos
 
 ![Service map](docs/observability/evidence/traces-service-map.png)
 
-The Traces board's Service map after one zoom-out click. Six nodes: user; gateway-svc 6.41 ms/r;
-conversion-svc 14.49 ms/r; ledger-svc 4.60 ms/r; config-svc 6.05 ms/r; eureka-svc 1.24 ms/r. Edges run
-user to gateway-svc, config-svc, eureka-svc and conversion-svc; gateway-svc to eureka-svc,
-conversion-svc and ledger-svc; conversion-svc to ledger-svc. Every node ring is green. Below it, span
-rate by service and status spikes at 21:04 and 21:10. Captured 21:22:45 by a separate committed script, [2026-10-13-service-map-capture.mjs](docs/observability/verification/2026-10-13-service-map-capture.mjs), not the suite.
+The Traces board's Service map over the last 6 hours, recaptured 2026-11-06 00:25Z after the map was
+narrowed to the request path. Five nodes: user; gateway-svc 5.52 ms/r; conversion-svc 2.16 ms/r;
+ledger-svc 2.72 ms/r; eureka-svc 0.65 ms/r. Edges run user to gateway-svc, conversion-svc and
+ledger-svc; gateway-svc to eureka-svc, conversion-svc and ledger-svc; conversion-svc to ledger-svc.
+The `user` edges into eureka-svc and config-svc (other services' untraced heartbeats and config
+fetches) are filtered out, so config-svc has no node. The rate feed's node is not in this capture: the
+fleet's collector did not yet run `docker/lgtm/otelcol-peer.yml`. Captured by
+[2026-11-06-logs-service-map-playwright.mjs](docs/observability/verification/2026-11-06-logs-service-map-playwright.mjs)
+([run log](docs/observability/verification/2026-11-06-logs-service-map-playwright-run.log)).
 
 **Proves** Tempo derives the call graph from spans (gateway to conversion and ledger, conversion to
 ledger), and its span metrics give rates and status per service as a cross-check on the services' own
@@ -206,6 +210,18 @@ failed` with status error (trace `1da752b225ab41c41cb44000e260f031`).
 Over gRPC (2026-10-14): one demo conversion is one trace, `f9b98a426a168f23f9bbc22fdce2f5e2`, in which the ledger-svc gRPC server span `ConversionPostings/Post` is the child of conversion-svc's gRPC client span; commands and every span in [the gRPC trace check](docs/observability/verification/2026-10-14-grpc-trace.md).
 
 ### Logs
+
+![The Logs board in triage order](docs/observability/evidence/2026-11-06-logs-triage.png)
+
+The Logs board over the last 3 hours, 2026-11-06: section 1 Errors (gateway-svc 39, eureka-svc 11,
+ledger-svc 10 in the legend, one entry per line with service and exception class), then 2 Warnings
+(gateway-svc 79, eureka-svc 20, ledger-svc 14). Info and All logs are below the fold. Suite checks:
+the service is named right after the level on 16 of 16 error rows and 25 of 25 All logs rows, and a
+trace id in the box reaches 6 of 6 Loki queries
+([run log](docs/observability/verification/2026-11-06-logs-service-map-playwright-run.log)).
+
+**Proves** a support engineer reads errors first, sees which service and which exception without
+expanding a line, and narrows every section to one request with one box.
 
 ![A log line and its trace](docs/observability/evidence/logs-trace-correlated.png)
 

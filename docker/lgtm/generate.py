@@ -720,6 +720,9 @@ def tempo_table(title, description, query, table_type="traces", limit=20):
 
 
 BUSINESS_SPANS = "quote|conversion accept|deposit|ledger posting"
+# Grafana ORs these selectors. Only 'user' edges into the registry and config server are dropped: those are
+# other services' untraced heartbeat and config clients, while gateway-svc's own registry calls are real spans.
+SERVICE_MAP_FILTER = ['{client!="user"}', '{client="user", server!~"eureka-svc|config-svc"}']
 
 
 def traces():
@@ -747,10 +750,15 @@ def traces():
                       f'{{{svc} && name=~"{BUSINESS_SPANS}"}} | select(span.pair, span.currency, '
                       'span.outcome, span.code, span.reason, span.detail, span.operation) with (most_recent=true)',
                       table_type="spans", limit=30), 24, 10)
-    b.add({"type": "nodeGraph", "title": "Service map", "description": "Calls between services, derived by Tempo from the "
-           "spans (traces_service_graph metrics). An arrow is a client span in one service whose server span is in "
-           "another; the rate feed appears as the host conversion-svc calls.", "datasource": TEMPO,
-           "targets": [{"refId": "A", "datasource": TEMPO, "queryType": "serviceMap", "serviceMapQuery": "{}"}]}, 24, 12)
+    b.add({"type": "nodeGraph", "title": "Service map", "description": "The request path, from Tempo's service-graph "
+           "metrics. An arrow is a client span paired with the server span it called; a peer that sends no spans (the "
+           "rate feed) is named by the host:port its caller dialled, set by docker/lgtm/otelcol-peer.yml. 'user' is any "
+           "caller outside the fleet: merchants, probes, scanners. Left out: 'user' edges into eureka-svc and config-svc, "
+           "which are the other services' registry heartbeats and config fetches (their clients are not traced), so "
+           "gateway-svc to eureka-svc stays. A client call that never matched a server span also shows as host:port. "
+           "Postgres, Redis and Kafka are absent because the services record no client span for them.", "datasource": TEMPO,
+           "targets": [{"refId": "A", "datasource": TEMPO, "queryType": "serviceMap",
+                        "serviceMapQuery": SERVICE_MAP_FILTER}]}, 24, 12)
     b.add(timeseries("Span rate by service and status", "Spans per second from Tempo's span metrics, by status code: a "
                      "cross-check of the services' own request counters.",
                      [prom('sum by (service, status_code) (rate(traces_spanmetrics_calls_total{service=~"$service"}'
@@ -762,36 +770,81 @@ def traces():
                      time_from="now-1h")
 
 
+LEVEL_COLORS = {"error": "red", "warn": "orange", "info": "blue", "debug": "purple"}
+# Every line names its service first, so a support engineer never has to expand a line to learn who wrote it.
+# Naming the fields also replaces Grafana's OTel default, which puts the exception before the service.
+LOG_BODY = "___LOG_LINE_BODY___"
+LOG_OPTIONS = {"showTime": True, "sortOrder": "Descending", "enableLogDetails": True, "wrapLogMessage": True,
+               "dedupStrategy": "none", "prettifyLogMessage": False, "showLabels": False, "showCommonLabels": False,
+               "displayedFields": ["service_name", "exception_type", LOG_BODY]}
+
+
+def log_stream(level):
+    return (f'{{service_name=~"${{service:regex}}"}} | detected_level=~"{level}" | trace_id=~"${{trace_id}}" '
+            '|~ "(?i)${search}"')
+
+
+def log_volume(title, description, level, by, color, empty="No lines in this window"):
+    defaults = {"custom": {"drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": {"mode": "normal"}},
+                "unit": "short", "decimals": 0, "noValue": empty}
+    overrides = []
+    legend = {"displayMode": "table", "placement": "bottom", "calcs": ["sum"], "sortBy": "Total", "sortDesc": True}
+    if color:
+        defaults["color"] = {"mode": "shades", "fixedColor": color}
+    else:
+        legend["placement"] = "right"
+        overrides = [{"matcher": {"id": "byName", "options": lvl},
+                      "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": c}}]}
+                     for lvl, c in LEVEL_COLORS.items()]
+    return {"type": "timeseries", "title": title, "description": description, "datasource": LOKI,
+            "targets": [{"refId": "A", "datasource": LOKI, "queryType": "range", "legendFormat": f"{{{{{by}}}}}",
+                         "expr": f"sum by ({by}) (count_over_time({log_stream(level)} [$__auto]))"}],
+            "fieldConfig": {"defaults": defaults, "overrides": overrides},
+            "options": {"legend": legend, "tooltip": {"mode": "multi", "sort": "desc"}}}
+
+
+def log_lines(title, description, level, wrap):
+    return {"type": "logs", "title": title, "description": description, "datasource": LOKI,
+            "targets": [{"refId": "A", "datasource": LOKI, "queryType": "range",
+                         "expr": log_stream(level)}],
+            "options": dict(LOG_OPTIONS, wrapLogMessage=wrap)}
+
+
+TRACE_HINT = " Expand a line for its labels; its trace_id opens the whole request in Tempo."
+LEVEL_SECTIONS = [
+    ("error|fatal|critical", "error", "Errors", "Something failed and a person may need to act: start here. Empty is the healthy state."),
+    ("warn|warning", "warn", "Warnings", "Degraded but still answering (a retry, a refusal, a slow or missing dependency). Read after "
+                         "Errors: a warning burst often comes just before the errors it explains."),
+    ("info", "info", "Info", "Normal operation: what each service did. Use it to rebuild the sequence around an error or warning."),
+]
+
+
 def logs():
     b = Board()
-    stream = '{service_name=~"${service:regex}"} | detected_level=~"${level:regex}" | trace_id=~"${trace_id}" |~ "(?i)${search}"'
-    b.add({"type": "timeseries", "title": "Log lines by service and level", "description": "Lines per interval, so a burst "
-           "of warnings stands out before reading any of them.", "datasource": LOKI,
-           "targets": [{"refId": "A", "datasource": LOKI, "expr": f"sum by (service_name, detected_level) "
-                        f"(count_over_time({stream} [$__auto]))", "legendFormat": "{{service_name}} {{detected_level}}",
-                        "queryType": "range"}],
-           "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 60, "stacking": {"mode": "normal"}}},
-                           "overrides": []},
-           "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}}, 24, 7)
-    b.add({"type": "logs", "title": "Logs", "description": "Every line written inside a request carries trace_id and span_id. "
-           "Expand a line and click its trace_id to open the trace in Tempo. The Trace ID box narrows this panel to one "
-           "request.", "datasource": LOKI,
-           "targets": [{"refId": "A", "datasource": LOKI, "expr": stream, "queryType": "range"}],
-           "options": {"showTime": True, "sortOrder": "Descending", "enableLogDetails": True, "wrapLogMessage": True,
-                       "dedupStrategy": "none", "prettifyLogMessage": False, "showLabels": False}}, 24, 16)
-    b.add({"type": "logs", "title": "Warnings and errors", "description": "Only WARN and ERROR, whatever the level box says. "
-           "Empty is the healthy state.", "datasource": LOKI,
-           "targets": [{"refId": "A", "datasource": LOKI, "queryType": "range",
-                        "expr": '{service_name=~"${service:regex}"} | detected_level=~"warn|error" |~ "(?i)${search}"'}],
-           "options": {"showTime": True, "sortOrder": "Descending", "enableLogDetails": True, "wrapLogMessage": True,
-                       "dedupStrategy": "none"}}, 24, 10)
+    for n, (level, color, title, why) in enumerate(LEVEL_SECTIONS, 1):
+        b.row(f"{n} · {title}")
+        empty = f"No {title.lower()} in this window"
+        b.add(log_volume(f"{title} by service", f"{title} lines per interval and service, with the window total in "
+                         f"the legend, largest first: which service to read first, and when it started. {why}",
+                         level, "service_name", LEVEL_COLORS[color], empty), 8, 9)
+        b.add(log_lines(title, f"Every {level.upper().replace('|', ' or ')} line in the window, newest first, the service in front of each. "
+                        + why + " One entry per line; click it for the whole message and stack." + TRACE_HINT,
+                        level, False), 16, 9)
+    b.row("4 · All logs (interactive)")
+    b.add(log_volume("Log lines by level", "Every level together, coloured by level as in the sections above: error "
+                     "red, warn orange, info blue, debug purple. Narrow it with the Level, Service, Search and Trace ID "
+                     "boxes.", "${level:regex}", "detected_level", None), 24, 6)
+    b.add(log_lines("All logs", "Every line at the levels in the Level box (only this section reads it), newest first, "
+                    "the service in front of each. Put a trace ID in the Trace ID box to read one request across "
+                    "every service." + TRACE_HINT, "${level:regex}", True), 24, 16)
     levels = ["error", "warn", "info", "debug"]
     variables = [service_var(),
-                 {"name": "level", "label": "Level", "type": "custom", "query": ",".join(levels),
+                 {"name": "level", "label": "Level (All logs)", "type": "custom", "query": ",".join(levels),
                   "options": [{"text": lvl, "value": lvl, "selected": False} for lvl in levels],
                   "multi": True, "includeAll": True, "allValue": ".*", "current": {"text": ["All"], "value": ["$__all"]}},
                  textbox("search", "Search"), textbox("trace_id", "Trace ID", ".*")]
-    return dashboard("ezeebit-logs", "Logs", "Every service's logs, by level, text and trace.", b.numbered(), variables,
+    return dashboard("ezeebit-logs", "Logs", "Triage order: errors, then warnings, then info, then every line together; "
+                     "each line names its service and links its trace.", b.numbered(), variables,
                      purpose="logging", time_from="now-1h")
 
 

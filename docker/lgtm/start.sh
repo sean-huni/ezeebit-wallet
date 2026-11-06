@@ -7,4 +7,6 @@ if [[ -n "${SLACK_WEBHOOK_URL:-}" ]]; then
 else
   rm -f "$target"
 fi
+# Names peers that send no spans (the rate feed) on Tempo's service map: otelcol-peer.yml.
+export OTELCOL_EXTRA_ARGS="${OTELCOL_EXTRA_ARGS:+$OTELCOL_EXTRA_ARGS }--config=file:/ezeebit/otelcol-peer.yml"
 exec /otel-lgtm/run-all.sh

@@ -367,7 +367,7 @@
     {
       "type": "nodeGraph",
       "title": "Service map",
-      "description": "Calls between services, derived by Tempo from the spans (traces_service_graph metrics). An arrow is a client span in one service whose server span is in another; the rate feed appears as the host conversion-svc calls.",
+      "description": "The request path, from Tempo's service-graph metrics. An arrow is a client span paired with the server span it called; a peer that sends no spans (the rate feed) is named by the host:port its caller dialled, set by docker/lgtm/otelcol-peer.yml. 'user' is any caller outside the fleet: merchants, probes, scanners. Left out: 'user' edges into eureka-svc and config-svc, which are the other services' registry heartbeats and config fetches (their clients are not traced), so gateway-svc to eureka-svc stays. A client call that never matched a server span also shows as host:port. Postgres, Redis and Kafka are absent because the services record no client span for them.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -380,7 +380,10 @@
             "uid": "tempo"
           },
           "queryType": "serviceMap",
-          "serviceMapQuery": "{}"
+          "serviceMapQuery": [
+            "{client!=\"user\"}",
+            "{client=\"user\", server!~\"eureka-svc|config-svc\"}"
+          ]
         }
       ],
       "gridPos": {

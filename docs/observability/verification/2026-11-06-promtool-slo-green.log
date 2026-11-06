@@ -1,0 +1,4 @@
+# 2026-11-06 docker/lgtm/test-rules.sh (mirror, le=~"500(\.0)?") against fixtures in the live le="500" shape
+  SUCCESS
+
+exit=0

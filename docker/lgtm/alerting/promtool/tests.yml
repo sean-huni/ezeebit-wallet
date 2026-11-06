@@ -72,15 +72,16 @@ tests:
 
   # LatencySLOBurn: conversion-svc answers half its requests over 500 ms for over an hour (burn 50x); ledger-svc
   # answers 99.9% under it. Only conversion-svc pages, and only after both windows burn.
+  # le="500" is the shape OTLP ingestion stores (measured 2026-11-06); a fixture of "500.0" passed while live never fired.
   - interval: 1m
     input_series:
       - series: 'http_server_requests_milliseconds_count{job="conversion-svc", uri="/quotes"}'
         values: '0+60x80'
-      - series: 'http_server_requests_milliseconds_bucket{job="conversion-svc", uri="/quotes", le="500.0"}'
+      - series: 'http_server_requests_milliseconds_bucket{job="conversion-svc", uri="/quotes", le="500"}'
         values: '0+30x80'
       - series: 'http_server_requests_milliseconds_count{job="ledger-svc", uri="/deposits"}'
         values: '0+1000x80'
-      - series: 'http_server_requests_milliseconds_bucket{job="ledger-svc", uri="/deposits", le="500.0"}'
+      - series: 'http_server_requests_milliseconds_bucket{job="ledger-svc", uri="/deposits", le="500"}'
         values: '0+999x80'
     alert_rule_test:
       - eval_time: 70m

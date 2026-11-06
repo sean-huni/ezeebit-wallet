@@ -224,7 +224,7 @@ groups:
         # SLO: 99% of business requests answered within 500 ms, so the error budget is 1%. Fires when the slow
         # share burns that budget 14.4 times too fast over both 5m and 1h (the fast-burn pair of the multiwindow
         # method), and only while a service sees at least 3 requests a minute, so one slow call on an idle
-        # service is not a page. le="500.0" is the SLO bucket the shared config adds to http.server.requests.
+        # service is not a page. le=~"500(\.0)?" is the SLO bucket the shared config adds (OTLP stores "500").
         data:
           - refId: A
             datasourceUid: prometheus
@@ -233,8 +233,8 @@ groups:
               refId: A
               instant: true
               expr: >-
-                ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le="500.0", uri!~"/actuator.*"}[5m])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~"/actuator.*"}[5m]))) / 0.01 > 14.4)
-                and ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le="500.0", uri!~"/actuator.*"}[1h])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~"/actuator.*"}[1h]))) / 0.01 > 14.4)
+                ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=~"500(\\.0)?", uri!~"/actuator.*"}[5m])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~"/actuator.*"}[5m]))) / 0.01 > 14.4)
+                and ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=~"500(\\.0)?", uri!~"/actuator.*"}[1h])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~"/actuator.*"}[1h]))) / 0.01 > 14.4)
                 and sum by (job) (rate(http_server_requests_milliseconds_count{uri!~"/actuator.*"}[5m])) > 0.05
           - refId: B
             datasourceUid: __expr__

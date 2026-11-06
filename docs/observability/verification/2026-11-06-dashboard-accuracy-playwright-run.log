@@ -1,0 +1,20 @@
+# 2026-11-06T01:00:21Z GRAFANA_URL=http://127.0.0.1:3010 (verification Grafana 13.3.0 on this branch's boards and alert rules, reading the live compose fleet)
+PASS Fleet: panel 'Outbound calls by host and status' is on the board
+PASS Fleet: panel 'Outbound p95 by host' is on the board
+PASS Fleet: panel 'Connection acquire mean and timeouts' is on the board
+PASS Fleet: acquire mean renders a millisecond value (conversion-svc 0.500 ms, ledger-svc 0.450 ms)
+PASS Fleet: 5xx ratio counts a series' first event (counted, not rate)
+PASS Fleet: gRPC calls and error ratio are counted
+PASS Fleet: breaker codes ranked, FORCED_OPEN highest (5)
+PASS Fleet: no datasource errors (0) 
+PASS Alerts: LatencySLOBurn selects the 500 ms bucket in either form
+PASS Alerts: no query selects the exact le="500.0" that matches nothing
+PASS Alerts: no panel description shows raw alert templates (none)
+PASS Alerts: no datasource errors (0)
+PASS Money: renders with no datasource errors (0)
+PASS Money: quote and conversion counters say validation refusals are not counted
+PASS Traces: span rate counts server spans only
+PASS Traces: slow merchant requests test the whole trace duration
+PASS Traces: no datasource errors (0) 
+RESULT PASS (0 failed)
+exit=0

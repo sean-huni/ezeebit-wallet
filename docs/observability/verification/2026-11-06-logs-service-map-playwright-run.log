@@ -1,0 +1,23 @@
+# 2026-11-06T00:24:59Z GRAFANA_URL=http://127.0.0.1:3010 (verification Grafana 13.3.0 on this branch's generated boards, reading the live compose fleet's Loki, Tempo and Prometheus; collector overlay NOT live there)
+trace id with a warn/error line: 54fdedc8be92d627044be7723ee1df69
+PASS logs pane scrolled in moving steps: [700,483]
+PASS logs panels render in triage order: [38527,40983,43667,45942,48410,53350,80253,82699,88927,142714,145273,150608]
+PASS logs board sent 12 Loki query requests (8 panels)
+PASS no datasource errors on logs board (0) 
+PASS Warnings: service named right after the level on 6/6 rendered rows
+PASS All logs: service named right after the level on 25/25 rendered rows
+PASS trace id substituted into 6/6 Loki queries
+PASS Level=error leaves the Warnings and Info sections on their own level
+PASS Errors: service named right after the level on 16/16 rows
+PASS Errors section shows real ERROR lines over 3h: 16
+PASS no datasource errors on the 3h board (0)
+1h Errors panel text starts: "Errors\nNo data"
+PASS service map sent 1 service-graph queries
+PASS every service-graph query carries both selectors of the filter
+service map labels: ["conversion-svc","ledger-svc","gateway-svc","eureka-svc","user"]
+PASS map draws gateway-svc, conversion-svc and ledger-svc
+PASS map drops config-svc, which only 'user' calls (of 5 labels)
+PASS map keeps eureka-svc: gateway-svc's registry calls are real span pairs
+PASS no datasource errors on traces board (0) 
+RESULT PASS (0 failed)
+exit=0

@@ -14,7 +14,7 @@ const OUT = new URL('./out/', import.meta.url).pathname;
 const BOARDS = ['ezeebit-fleet', 'ezeebit-money', 'ezeebit-traces', 'ezeebit-logs', 'ezeebit-alerts'];
 const WIDTHS = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
 // One value per variable, chosen so its substitution is recognisable in a query body.
-const VALUES = { service: 'conversion-svc', currency: 'ZAR', pair: 'ZAR/USDT', outcome: 'issued', level: 'warn',
+const VALUES = { service: 'conversion-svc', currency: 'ZAR', pair: 'ZAR/USDT', outcome: 'issued', level: 'debug',
   search: 'quote issued', min_duration: '7ms', interval: '5m', trace_id: null };
 
 mkdirSync(OUT, { recursive: true });
@@ -242,7 +242,7 @@ expect(/\/d\/ezeebit-traces/.test(page.url()) && /from=now-15m/.test(page.url())
 
 // 11. A log line's trace_id opens the trace in Tempo.
 await open(page, `${GRAFANA}/d/ezeebit-logs?from=now-15m&to=now&refresh=&var-service=conversion-svc&var-search=${encodeURIComponent('conversion accepted')}`);
-const logsPanel = page.locator('[data-testid="data-testid Panel header Logs"]');
+const logsPanel = page.locator('[data-testid="data-testid Panel header All logs"]');
 await logsPanel.getByText('conversion accepted', { exact: false }).first().click();
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${OUT}logs-line-expanded.png` });

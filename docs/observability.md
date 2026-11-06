@@ -45,9 +45,15 @@ On kind, the lgtm pod copies the dashboards in at start, so a changed board need
 |---|---|---|
 | Fleet Overview | UP/DOWN per service; JVMs per service (metric identity); firing alerts; rate, 5xx ratio and p95 per service and per endpoint; outbound calls by target; the Ledger gRPC row (below); limiter decisions, the Redis round trip and Redis reachability; Hikari connections, utilisation, acquire time and timeouts; profiler failures, seconds since each JVM's last accepted upload, and a wall-clock flame graph per selected service (collapsed row, one panel repeated over the Service box); heap, garbage collection, warnings and errors | service, rate window |
 | Money | deposits by currency and outcome; quotes by pair, refusals by reason and rule; rate-feed calls; conversion requests by pair and outcome; settled outcomes; ledger postings; overdue PENDING; sweeper actions; p95 of each business step | currency, pair, outcome, rate window |
-| Traces | a trace by ID (in a collapsed row: a trace panel with no ID is an error), merchant requests, traces with an error or a 5xx, slow merchant requests, business spans with their attributes, the service map, span rates | service, trace ID, min duration, rate window |
-| Logs | lines per service and level, the lines, warnings and errors | service, level, search, trace ID |
+| Traces | a trace by ID (in a collapsed row: a trace panel with no ID is an error), merchant requests, traces with an error or a 5xx, slow merchant requests, business spans with their attributes, the service map (request path only: `user` edges into eureka-svc and config-svc are left out, gateway-svc's registry calls stay), span rates | service, trace ID, min duration, rate window |
+| Logs | in triage order: 1 Errors, 2 Warnings, 3 Info, each a count per service beside its lines, then 4 All logs, every level with its volume by level; every line names its service after the level, error lines their exception class, and each opens its trace | service, level (drives only All logs), search, trace ID (all four sections) |
 | Alerts | every rule in every state, what is firing, and each rule's expression plotted against its threshold with its state changes as annotations | none |
+
+**The service map's rate-feed node** comes from `docker/lgtm/otelcol-peer.yml`, a collector overlay that
+`docker/lgtm/start.sh` loads on compose and kind. Micrometer's client spans carry only `http.url`, and Tempo
+names a peer that sends no spans only from `peer.service`, so the overlay sets it to the URL's host:port
+(credentials stripped). The node reads `localhost:8089` on compose and `wiremock.ezeebit-app:8080` on kind.
+Postgres, Redis and Kafka stay off the map: no service records a client span for them.
 
 Money is its own dashboard because currency, pair and outcome filter only the business panels; on Fleet
 Overview they would be three controls that do nothing to twenty panels.

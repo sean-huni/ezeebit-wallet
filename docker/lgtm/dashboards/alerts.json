@@ -133,7 +133,7 @@
     {
       "type": "timeseries",
       "title": "ServiceDown",
-      "description": "{{ $labels.job }} has exported no metrics for 30s. Holds 1m before firing. Runbook: Run ./fleet.sh status; read .fleet/{{ $labels.job }}.log for the exit; restart with ./fleet.sh down && ./fleet.sh up. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "... has exported no metrics for 30s. Holds 1m before firing. Runbook: Run ./fleet.sh status; read .fleet/....log for the exit; restart with ./fleet.sh down && ./fleet.sh up. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -206,7 +206,7 @@
     {
       "type": "timeseries",
       "title": "HighErrorRate",
-      "description": "{{ $labels.job }} answers more than 5% of requests with 5xx. Holds 2m before firing. Runbook: Open Logs filtered to {{ $labels.job }} at level error; a 503 from the gateway names the upstream that is down. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "... answers more than 5% of requests with 5xx. Holds 2m before firing. Runbook: Open Logs filtered to ... at level error; a 503 from the gateway names the upstream that is down. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -279,7 +279,7 @@
     {
       "type": "timeseries",
       "title": "RateFeedRefusing",
-      "description": "conversion-svc refused quotes for {{ $labels.pair }} for the rate (unavailable or rejected) {{ $values.A.Value }} times in the last minute: more than 2, or half or more of its quotes. Holds 2m before firing. Runbook: Open Money, Quote refusals by reason: RATE_UNAVAILABLE means the feed does not answer (curl localhost:8089/rates), RATE_REJECTED names the rule (stale, out of band, jump). Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "conversion-svc refused quotes for ... for the rate (unavailable or rejected) ... times in the last minute: more than 2, or half or more of its quotes. Holds 2m before firing. Runbook: Open Money, Quote refusals by reason: RATE_UNAVAILABLE means the feed does not answer (curl localhost:8089/rates), RATE_REJECTED names the rule (stale, out of band, jump). Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -352,7 +352,7 @@
     {
       "type": "timeseries",
       "title": "ConversionsStuckPending",
-      "description": "conversion-svc: {{ $values.A.Value }} PENDING conversions are past their deadline and the sweeper has not resolved them for 5m. Holds 5m before firing. Runbook: The sweeper asks ledger-svc every 10s: check ledger-svc is up and answering, then Traces for span 'sweep'. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "conversion-svc: ... PENDING conversions are past their deadline and the sweeper has not resolved them for 5m. Holds 5m before firing. Runbook: The sweeper asks ledger-svc every 10s: check ledger-svc is up and answering, then Traces for span 'sweep'. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -425,7 +425,7 @@
     {
       "type": "timeseries",
       "title": "RateLimiterUnavailable",
-      "description": "gateway-svc refused {{ $values.A.Value }} merchant requests in the last minute because Redis did not answer. Holds 1m before firing. Runbook: docker compose ps redis; the limiter fails closed, so every merchant call is 503 until Redis answers. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "gateway-svc refused ... merchant requests in the last minute because Redis did not answer. Holds 1m before firing. Runbook: docker compose ps redis; the limiter fails closed, so every merchant call is 503 until Redis answers. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -571,7 +571,7 @@
     {
       "type": "timeseries",
       "title": "LatencySLOBurn",
-      "description": "{{ $labels.job }} is burning its latency budget (99% under 500 ms) 14.4x too fast over 5m and 1h. Holds 2m before firing. Runbook: Open Fleet Overview, p95 by endpoint for {{ $labels.job }}, and click an exemplar to open the slowest trace. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "... is burning its latency budget (99% under 500 ms) 14.4x too fast over 5m and 1h. Holds 2m before firing. Runbook: Open Fleet Overview, p95 by endpoint for ..., and click an exemplar to open the slowest trace. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -583,7 +583,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=\"500.0\", uri!~\"/actuator.*\"}[5m])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[5m]))) / 0.01 > 14.4) and ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=\"500.0\", uri!~\"/actuator.*\"}[1h])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[1h]))) / 0.01 > 14.4) and sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[5m])) > 0.05",
+          "expr": "((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=~\"500(\\\\.0)?\", uri!~\"/actuator.*\"}[5m])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[5m]))) / 0.01 > 14.4) and ((1 - sum by (job) (rate(http_server_requests_milliseconds_bucket{le=~\"500(\\\\.0)?\", uri!~\"/actuator.*\"}[1h])) / sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[1h]))) / 0.01 > 14.4) and sum by (job) (rate(http_server_requests_milliseconds_count{uri!~\"/actuator.*\"}[5m])) > 0.05",
           "legendFormat": "{{job}} burn",
           "range": true
         }
@@ -644,7 +644,7 @@
     {
       "type": "timeseries",
       "title": "DbPoolSaturated",
-      "description": "{{ $labels.job }} ({{ $labels.instance }}) has threads waiting for a database connection. Holds 1m before firing. Runbook: Fleet Overview, Database pool row: active at max means slow queries or a held transaction; check Postgres. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "... (...) has threads waiting for a database connection. Holds 1m before firing. Runbook: Fleet Overview, Database pool row: active at max means slow queries or a held transaction; check Postgres. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -717,7 +717,7 @@
     {
       "type": "timeseries",
       "title": "LedgerInvariantBroken",
-      "description": "ledger-svc broke a posting invariant ({{ $labels.code }}) {{ $values.A.Value }} times in the last 5m. Holds 0s before firing. Runbook: Logs for ledger-svc, search 'ledger invariant violated': the trace_id opens the request that broke it. Stop postings until fixed. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "ledger-svc broke a posting invariant (...) ... times in the last 5m. Holds 0s before firing. Runbook: Logs for ledger-svc, search 'ledger invariant violated': the trace_id opens the request that broke it. Stop postings until fixed. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -790,7 +790,7 @@
     {
       "type": "timeseries",
       "title": "ConversionLedgerDeadLettered",
-      "description": "{{ $labels.op }} to the ledger was dead-lettered ({{ $labels.reason }}). Holds 0s before firing. Runbook: Read the topic: docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ezeebit.conversion.ledger.deadletter --from-beginning. The sweeper settles the conversion once the ledger answers; check ledger-svc with ./fleet.sh status. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "... to the ledger was dead-lettered (...). Holds 0s before firing. Runbook: Read the topic: docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ezeebit.conversion.ledger.deadletter --from-beginning. The sweeper settles the conversion once the ledger answers; check ledger-svc with ./fleet.sh status. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -863,7 +863,7 @@
     {
       "type": "timeseries",
       "title": "DeadLetterPublishFailing",
-      "description": "conversion-svc could not publish a {{ $labels.op }} dead letter to Kafka: it is only in the log. Holds 0s before firing. Runbook: docker compose ps kafka; then .fleet/conversion-svc.log, search 'dead letter not published' for the conversion ids and the cause. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "conversion-svc could not publish a ... dead letter to Kafka: it is only in the log. Holds 0s before firing. Runbook: docker compose ps kafka; then .fleet/conversion-svc.log, search 'dead letter not published' for the conversion ids and the cause. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1009,7 +1009,7 @@
     {
       "type": "timeseries",
       "title": "ProfilingFailing",
-      "description": "{{ $labels.job }}: profiling failed (cause {{ $labels.cause }}), so its profiles, or for link-* its span-to-profile links, are missing. Holds 1m before firing. Runbook: Logs for {{ $labels.job }}, search 'io.pyroscope' or 'Profiler did not start'; push means lgtm:4040 does not answer (check the lgtm pod and the 4040 NetworkPolicy edge). Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "...: profiling failed (cause ...), so its profiles, or for link-* its span-to-profile links, are missing. Holds 1m before firing. Runbook: Logs for ..., search 'io.pyroscope' or 'Profiler did not start'; push means lgtm:4040 does not answer (check the lgtm pod and the 4040 NetworkPolicy edge). Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1082,7 +1082,7 @@
     {
       "type": "timeseries",
       "title": "ProfilesAbsent",
-      "description": "{{ $labels.job }}: {{ $values.A.Value }} JVMs send no profiles (profiling off, the profiler not running, or no accepted upload for 120s). Holds 1m before firing. Runbook: Fleet Overview, Profiling row: upload age and failures for {{ $labels.job }}; check EZEEBIT_PROFILING_ENABLED on the deployment and the service's log for 'io.pyroscope' or 'Profiler did not start'. Empty: the expression returns no series, which this rule treats as OK.",
+      "description": "...: ... JVMs send no profiles (profiling off, the profiler not running, or no accepted upload for 120s). Holds 1m before firing. Runbook: Fleet Overview, Profiling row: upload age and failures for ...; check EZEEBIT_PROFILING_ENABLED on the deployment and the service's log for 'io.pyroscope' or 'Profiler did not start'. Empty: the expression returns no series, which this rule treats as OK.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

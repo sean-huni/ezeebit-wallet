@@ -42,7 +42,7 @@ management:
       maximum-expected-value:
         http: 10s
         ezeebit: 10s
-      # An exact 500 ms bucket (le="500.0"): LatencySLOBurn counts requests slower than the SLO against it.
+      # An exact 500 ms bucket (stored as le="500" via OTLP): LatencySLOBurn counts requests slower than the SLO against it.
       slo:
         http.server.requests: 500ms
 ezeebit:

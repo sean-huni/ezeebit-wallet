@@ -248,7 +248,7 @@
     {
       "type": "timeseries",
       "title": "Deposit p95",
-      "description": "Time inside the ledger's 'deposit' span, by currency and outcome. Exemplars open the deposit's trace.",
+      "description": "Time inside the ledger's 'deposit' span, by currency and outcome ('error': the step threw before answering). Exemplars open the deposit's trace.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -317,7 +317,7 @@
     {
       "type": "timeseries",
       "title": "Quotes by pair and outcome",
-      "description": "issued or refused. 'unknown' pair: a currency the service does not support, so the caller's text never becomes a tag. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
+      "description": "issued or refused by the quote service. 'unknown' pair: a currency the service does not support, so the caller's text never becomes a tag. Requests refused by validation before the service (400, 415) are not counted: Fleet Overview, Requests by endpoint and status. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -372,7 +372,7 @@
     {
       "type": "timeseries",
       "title": "Quote refusals by reason",
-      "description": "Refusal code, and for RATE_REJECTED the rule broken (stale, out of band, jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Empty: nothing refused. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
+      "description": "Refusal code, and for RATE_REJECTED the rule broken (stale, out of band, jump). RateFeedRefusing watches RATE_UNAVAILABLE and RATE_REJECTED. Request validation refusals (400, 415) are not counted here. Empty: nothing refused. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -578,7 +578,7 @@
     {
       "type": "timeseries",
       "title": "Conversion requests by pair and outcome",
-      "description": "Every accept answer from the 'conversion accept' span: completed, pending (the ledger's answer was unknown), rejected by the ledger, or refused (quote missing, expired or used). Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
+      "description": "Every accept answer from the 'conversion accept' span: completed, pending (the ledger's answer was unknown), rejected by the ledger, refused (quote missing, expired or used), or error (the step threw before answering). Requests refused by validation before the span (400, 415) are not counted. Counted per rate window, including a series' first event and the events after a restart, which rate() cannot see.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -809,7 +809,7 @@
     {
       "type": "timeseries",
       "title": "Ledger posting p95",
-      "description": "Time inside the ledger's 'ledger posting' span, by operation (post, void).",
+      "description": "Time inside the ledger's 'ledger posting' span, by operation (post, void), every outcome including error (the step threw before answering).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

@@ -1,0 +1,12 @@
+# 2026-11-06 docker/lgtm/test-rules.sh <rules with the old exact le="500.0"> against the same fixtures: the defect, red
+  FAILED:
+    alertname: LatencySLOBurn, time: 1h10m, 
+        exp:[
+            0:
+              Labels:{alertname="LatencySLOBurn", job="conversion-svc", severity="warning"}
+              Annotations:{}
+            ], 
+        got:[]
+
+
+exit=1

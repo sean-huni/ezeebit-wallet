@@ -1,0 +1,63 @@
+k8s/sweep/rbac.sh, red-proofed 2026-11-06 on a throwaway kind cluster (kind v0.32, kindest/node:v1.36.1 pinned
+as in k8s/kind-cluster.yaml), named rbac-check with no host ports so the running compose fleet kept its lease.
+Applied: k8s/base/namespaces and k8s/base/chaos/rbac.yaml only. Context renamed to kind-ezeebit in a scratch
+KUBECONFIG so kctl reached it. Cluster deleted afterwards. Output below is verbatim, tails as printed.
+
+### GREEN
+== serviceaccount: serviceaccount/chaos-monkey (exit 0)
+== allowed (control)
+  can-i list pods -n ezeebit-app: yes (exit 0), want yes
+  can-i delete pods -n ezeebit-app: yes (exit 0), want yes
+  can-i list pods -n ezeebit-data: yes (exit 0), want yes
+  can-i delete pods -n ezeebit-data: yes (exit 0), want yes
+== denied
+  can-i delete pods -n ezeebit-obs: no (exit 1), want no
+  can-i list pods -n ezeebit-obs: no (exit 1), want no
+  can-i get secrets -n ezeebit-app: no (exit 1), want no
+  can-i list secrets -n ezeebit-app: no (exit 1), want no
+  can-i get secrets -n ezeebit-data: no (exit 1), want no
+  can-i get secrets -n ezeebit-obs: no (exit 1), want no
+  can-i patch deployments.apps -n ezeebit-app: no (exit 1), want no
+  can-i create pods -n ezeebit-app: no (exit 1), want no
+  can-i delete pods -n kube-system: no (exit 1), want no
+  can-i delete pods -n ezeebit-chaos: no (exit 1), want no
+PASS rbac
+exit=0
+
+### RED 1: a Role granting get on secrets in ezeebit-app, bound to the chaos ServiceAccount
+  can-i delete pods -n kube-system: no (exit 1), want no
+  can-i delete pods -n ezeebit-chaos: no (exit 1), want no
+  get secrets in ezeebit-app is yes, want no
+FAIL rbac: 1 finding(s)
+exit=1
+
+### RED 2: ServiceAccount ezeebit-chaos/chaos-monkey deleted (every can-i arm still matched the username)
+  can-i get secrets -n ezeebit-data: no (exit 1), want no
+  can-i get secrets -n ezeebit-obs: no (exit 1), want no
+  can-i patch deployments.apps -n ezeebit-app: no (exit 1), want no
+  can-i create pods -n ezeebit-app: no (exit 1), want no
+  can-i delete pods -n kube-system: no (exit 1), want no
+  can-i delete pods -n ezeebit-chaos: no (exit 1), want no
+  ServiceAccount ezeebit-chaos/chaos-monkey not readable (exit 1): Error from server (NotFound): serviceaccounts "chaos-monkey" not found
+FAIL rbac: 1 finding(s)
+exit=1
+
+### GREEN after restoring rbac.yaml
+PASS rbac
+exit=0
+
+### RED 3: RoleBinding chaos-monkey in ezeebit-data deleted (the control arm)
+  can-i list pods -n ezeebit-data: no (exit 1), want yes
+  can-i delete pods -n ezeebit-data: no (exit 1), want yes
+  list pods in ezeebit-data is no, want yes
+  delete pods in ezeebit-data is no, want yes
+  denied arms not judged: the allowed control failed
+FAIL rbac: 3 finding(s)
+exit=1
+
+### GREEN after restoring rbac.yaml
+PASS rbac
+exit=0
+
+Not shown here: a full `kube.sh sweep` with rbac in SWEEP_CHECKS. The compose fleet held the env lease on
+2026-11-06, so the check ran standalone; the next sweep runs it in place.

@@ -357,7 +357,7 @@ cmd_chaos() {
 }
 
 # Spec 6 order. Monitoring wraps the others: it records the lgtm pod at the start and compares at the end.
-SWEEP_CHECKS=(parity money replicas policy chaos outage)
+SWEEP_CHECKS=(parity money replicas policy rbac chaos outage)
 
 SWEEP_LOG=''
 SWEEP_FAILED=0

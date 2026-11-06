@@ -333,7 +333,7 @@ k8s/
 │   └── chaos/             rbac, cronjob
 ├── overlays/local/        the one overlay: every base, labelled part-of ezeebit
 ├── chaos/                 monkey.sh (the draw and the kill, shared by the CronJob and the sweep); test/ (stubbed kubectl)
-├── sweep/                 lib.sh; parity, money, replicas, policy, chaos, outage, monitoring
+├── sweep/                 lib.sh; parity, money, replicas, policy, rbac, chaos, outage, monitoring
 └── gates/                 fleet-separation, image-parity, app-image-version, replicas, pool-budget, virtual-threads, sweep-log-name; manifests.sh (the manifest reader two of them source)
 scripts/
 ├── env-guard.sh           acquire | release | state: the one lease both fleets take

@@ -213,33 +213,38 @@ Over gRPC (2026-10-14): one demo conversion is one trace, `f9b98a426a168f23f9bbc
 
 ![The Logs board in triage order](docs/observability/evidence/2026-11-06-logs-triage.png)
 
-The Logs board over the last 3 hours, 2026-11-06: section 1 Errors (gateway-svc 39, eureka-svc 11,
-ledger-svc 10 in the legend, one entry per line with service and exception class), then 2 Warnings
-(gateway-svc 79, eureka-svc 20, ledger-svc 14). Info and All logs are below the fold. Suite checks:
-the service is named right after the level on 16 of 16 error rows and 25 of 25 All logs rows, and a
-trace id in the box reaches 6 of 6 Loki queries
+The Logs board over the last hour, captured 2026-11-06 08:14 (UTC+2). Section 1 Errors holds three
+lines at 08:05:30 to 08:05:31, one each from eureka-svc, conversion-svc and gateway-svc
+(`java.io.IOException`, failed to export logs), so the legend reads 1, 1, 1. Section 2 Warnings reads
+eureka-svc 6 (its ten-minute empty-replica notice) and gateway-svc 1. Each row names the service and
+the exception class right after the level. Info and All logs are below the fold. Over a 3-hour window
+the earlier suite checked that the service follows the level on 16 of 16 error rows and 25 of 25 All
+logs rows, and that a trace id in the box reaches 6 of 6 Loki queries
 ([run log](docs/observability/verification/2026-11-06-logs-service-map-playwright-run.log)).
 
 **Proves** a support engineer reads errors first, sees which service and which exception without
 expanding a line, and narrows every section to one request with one box.
 
-![A log line and its trace](docs/observability/evidence/logs-trace-correlated.png)
+![A log line and its trace](docs/observability/evidence/2026-11-06-logs-trace-correlated.png)
 
-The Logs board filtered to conversion-svc and "conversion accepted", last 15 minutes. The line
-`2026-10-13 21:10:08.642 INFO conversion accepted for ZAR/USDT: COMPLETED` is expanded, and its Links
-section shows `Trace: d39007b360f71551887726931a623902`. Captured 21:18:21.
+The Logs board filtered to conversion-svc and "conversion accepted", last 15 minutes, scrolled to
+section 3 Info. The suite first drove one demo conversion through the gateway (deposit, quote and
+convert each 201, status COMPLETED). Its line `2026-11-06 08:14:24.278 INFO conversion-svc conversion
+accepted for ZAR/USDT: COMPLETED` is expanded, and the Links section shows
+`Trace: 6f4bd66b0395e98f750cfb258e0e13ae`.
 
-**Proves** a log line written inside a request carries its trace id: the same trace the trace view shows
-across three services. Loki's derived field turns it into a link.
+**Proves** a log line written inside a request carries its trace id, and Loki's derived field turns
+that id into a link.
 
-![The log line's trace opened in Tempo](docs/observability/evidence/logs-trace-opened-in-tempo.png)
+![The log line's trace opened in Tempo](docs/observability/evidence/2026-11-06-logs-trace-opened-in-tempo.png)
 
-Explore on Tempo with a TraceQL query for `d39007b360f71551887726931a623902`. The rendered trace is the
-same gateway-svc conversion: start 21:10:08.626, 17.44 ms, 3 services, 8 spans. Captured 21:18:36.
+Following that link opens Explore on Tempo with a TraceQL query for `6f4bd66b0395e98f750cfb258e0e13ae`.
+The rendered trace is the same gateway-svc conversion: start 08:14:24.246, 33.8 ms, 3 services, 8 spans.
 
-**Proves** clicking the log line's trace link opens Explore on Tempo with that trace id and renders the
-trace. Suite checks "trace_id opens the trace in Tempo" and "the opened trace shows its services"
-passed.
+**Proves** clicking the log line's trace link opens Explore on Tempo with that trace id, and renders the
+trace across gateway-svc, conversion-svc and ledger-svc. All three captures and their 7 checks come
+from [2026-11-06-logs-screenshots-playwright.mjs](docs/observability/verification/2026-11-06-logs-screenshots-playwright.mjs)
+([run log](docs/observability/verification/2026-11-06-logs-screenshots-playwright-run.log), exit 0).
 
 ### Alerts
 

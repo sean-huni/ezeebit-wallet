@@ -1,0 +1,13 @@
+commit d66eaec, 2026-11-06T06:14:24Z
+PASS demo conversion: deposit 201, quote 201, convert 201 COMPLETED (merchant 126a214d-cdfa-4565-b9ff-f3be1729149c)
+Errors by service legend: ["conversion-svc 1","eureka-svc 1","gateway-svc 1"]
+Warnings by service legend: ["eureka-svc 6","gateway-svc 1"]
+PASS Errors section rendered (3 services in legend)
+PASS Warnings section has data (2 services in legend)
+PASS Info section shows a "conversion accepted" line for conversion-svc
+PASS expanded line offers its trace: 6f4bd66b0395e98f750cfb258e0e13ae
+expanded line: "conversion accepted" captured 2026-11-06T06:14:56.535Z
+PASS trace link opens Explore on Tempo with 6f4bd66b0395e98f750cfb258e0e13ae
+PASS opened trace shows gateway-svc, conversion-svc and ledger-svc
+RESULT PASS (0 failed)
+exit=0

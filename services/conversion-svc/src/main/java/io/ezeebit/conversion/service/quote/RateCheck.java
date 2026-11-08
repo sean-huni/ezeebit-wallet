@@ -10,6 +10,11 @@ import io.ezeebit.conversion.service.port.RateSource;
 import io.ezeebit.conversion.service.quote.RateHistory.Snapshot;
 import org.springframework.stereotype.Component;
 
+/**
+ * Fetches the market rate for a pair and rejects it unless {@link RateValidator} accepts it against
+ * the pair's policy and the most recent quoted rate. The returned check time is the same clock read
+ * the quote expires against.
+ */
 @Component
 public class RateCheck {
 

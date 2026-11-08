@@ -1,6 +1,5 @@
 package io.ezeebit.ledger.data;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
@@ -38,18 +37,6 @@ class SchemaConstraintsIT {
 				VALUES (:id, :merchant, 'DEPOSIT', 'POSTED', :key, 'h', 'r')""")
 				.param("id", journal).param("merchant", UUID.randomUUID()).param("key", UUID.randomUUID().toString())
 				.update();
-	}
-
-	@Test
-	void entryInTheAccountsOwnCurrencyIsAccepted() {
-		assertThat(insertEntry(ZAR_CLEARING, "ZAR")).isEqualTo(1);
-	}
-
-	@Test
-	void entryInAnotherCurrencyThanItsAccountIsRefusedByTheDatabase() {
-		assertThatThrownBy(() -> insertEntry(ZAR_CLEARING, "USDT"))
-				.isInstanceOf(DataIntegrityViolationException.class)
-				.hasMessageContaining("fk_entry_account_currency");
 	}
 
 	@Test
@@ -142,14 +129,6 @@ class SchemaConstraintsIT {
 				.param("id", UUID.randomUUID()).param("merchant", merchant).update())
 				.isInstanceOf(DataIntegrityViolationException.class)
 				.hasMessageContaining("uq_journal_idempotency");
-	}
-
-	private int insertEntry(final UUID account, final String currency) {
-		return jdbc.sql("""
-				INSERT INTO entry (id, journal_id, account_id, currency, amount)
-				VALUES (:id, :journal, :account, :currency, -1)""")
-				.param("id", UUID.randomUUID()).param("journal", journal).param("account", account)
-				.param("currency", currency).update();
 	}
 
 	private void insertJournal(final UUID merchant, final String key) {

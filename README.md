@@ -19,12 +19,12 @@ Walkthrough video: link to be added.
 
 | Document | What it covers |
 |---|---|
-| [EVIDENCE.md](EVIDENCE.md) | Screenshots with what each proves: fleet overview, metrics, traces, logs and alerts; static application security testing (SAST) and software composition analysis (SCA) reports; the dependency version report |
+| [EVIDENCE.md](EVIDENCE.md) | Screenshots with what each proves: fleet overview, metrics, traces, logs and alerts; static application security testing (SAST) and software composition analysis (SCA) reports, including the dependency version report |
 | [SOLUTION.md](SOLUTION.md) | Tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6 fit, known gaps, AI usage notes |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, application programming interface (API), failure handling |
 | [docs/project-layout.md](docs/project-layout.md) | Every package and class per service, measured dependencies, where new code goes |
 | [docs/quality-gates.md](docs/quality-gates.md) | Test tiers, architecture gates, SAST, DAST and coverage |
-| [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, images, software bills of materials (SBOMs), how to read the console |
+| [docs/supply-chain.md](docs/supply-chain.md) | Secrets scanning, SCA of images and Maven dependencies, software bills of materials (SBOMs), how to read the console |
 | [docs/ci.md](docs/ci.md) | The continuous integration (CI) pipeline on CircleCI (not yet run) |
 | [docs/observability.md](docs/observability.md) | Dashboards, tracing, business metrics, alerts, rehearsals, the Playwright suite |
 | [docs/k8s.md](docs/k8s.md) | The same fleet on a local kind cluster: `k8s/kube.sh`, the guard that keeps it and `fleet.sh` apart, replicas and autoscaling, the replica fixes, network policy, the chaos monkey, and the sweep with what it checks and what it cannot show |
@@ -59,8 +59,8 @@ Boot 4.1.2, Spring Cloud 2025.1.3.
 
 ```sh
 ./gradlew clean build
-./gradlew spotlessApply     # fixes what spotlessCheck in the build would fail on
-./gradlew checkVersions     # pins with newer releases, shipped modules with advisories; needs network
+./gradlew spotlessApply     # formatting, not a scan: fixes what spotlessCheck in the build would fail on
+./gradlew checkVersions     # SCA: pins with newer releases, shipped modules with advisories; needs network
 ```
 
 `checkVersions` is described in [docs/supply-chain.md](docs/supply-chain.md), with screenshots of it passing and failing.

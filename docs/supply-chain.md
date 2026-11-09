@@ -3,8 +3,13 @@
 Back to [README](../README.md). Static analysis of this repository's own code is in
 [quality-gates.md](quality-gates.md).
 
-Two Gradle tasks, split by cost. Both run the scanners as containers pinned by tag and digest in
-`security/scanners.lock`, the only place a scanner version lives.
+Three Gradle tasks, split by cost. `checkSecrets` and `checkSupplyChain` run the scanners as containers pinned by tag and
+digest in `security/scanners.lock`, the only place a scanner version lives. `checkVersions` is a script that asks Maven Central,
+the Gradle Plugin Portal and OSV directly.
+
+`checkSupplyChain` and `checkVersions` are the two software composition analysis (SCA) checks: the first reads the built images,
+the second reads the Maven modules before an image exists. `spotlessApply` also appears below and is not SCA: it formats this
+repository's own source.
 
 | Task | Runs in | Reads | Needs |
 |---|---|---|---|

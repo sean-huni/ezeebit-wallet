@@ -15,11 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 // Runs after the losing insert rolled back: whatever holds the identity has committed and is visible.
 @Service
-public class ConversionReplayer {
+class ConversionReplayer {
 
 	private final JournalRepo journals;
 
-	public ConversionReplayer(final JournalRepo journals) {
+	ConversionReplayer(final JournalRepo journals) {
 		this.journals = journals;
 	}
 

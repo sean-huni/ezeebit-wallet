@@ -12,13 +12,13 @@ import io.ezeebit.conversion.service.quote.QuoteLookup;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ConversionAcceptance {
+class ConversionAcceptance {
 
 	private final ConversionReplayer replayer;
 	private final QuoteLookup quotes;
 	private final ConversionOpener opener;
 
-	public ConversionAcceptance(final ConversionReplayer replayer, final QuoteLookup quotes, final ConversionOpener opener) {
+	ConversionAcceptance(final ConversionReplayer replayer, final QuoteLookup quotes, final ConversionOpener opener) {
 		this.replayer = replayer;
 		this.quotes = quotes;
 		this.opener = opener;

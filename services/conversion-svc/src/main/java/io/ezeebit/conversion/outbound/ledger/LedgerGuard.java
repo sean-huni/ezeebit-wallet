@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
 
 // Retry inside the breaker: one exhausted retry sequence is one breaker failure, and only transport failures count.
 @Component
-public class LedgerGuard {
+class LedgerGuard {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LedgerGuard.class);
 
@@ -39,7 +39,7 @@ public class LedgerGuard {
 	private final DeadLetters deadLetters;
 
 	// The status predicate cannot be bound from YAML, so each served instance is replaced by one that carries it.
-	public LedgerGuard(final RetryRegistry retryRegistry, final CircuitBreakerRegistry breakerRegistry,
+	LedgerGuard(final RetryRegistry retryRegistry, final CircuitBreakerRegistry breakerRegistry,
 			final DeadLetters deadLetters) {
 		this.deadLetters = deadLetters;
 		for (Operation op : Operation.values()) {

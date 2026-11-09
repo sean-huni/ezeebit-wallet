@@ -9,13 +9,13 @@ import org.springframework.stereotype.Component;
 
 // Not transactional itself: a duplicate key must be caught outside the transaction it rolled back.
 @Component
-public class ConversionOpener {
+class ConversionOpener {
 
 	private final ConversionStarter starter;
 	private final ConversionReplayer replayer;
 	private final ConversionFirstPoster firstPoster;
 
-	public ConversionOpener(final ConversionStarter starter, final ConversionReplayer replayer,
+	ConversionOpener(final ConversionStarter starter, final ConversionReplayer replayer,
 			final ConversionFirstPoster firstPoster) {
 		this.starter = starter;
 		this.replayer = replayer;

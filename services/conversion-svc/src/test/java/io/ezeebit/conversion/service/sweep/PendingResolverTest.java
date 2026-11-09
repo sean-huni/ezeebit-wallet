@@ -17,11 +17,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.ezeebit.conversion.common.metrics.ConversionMetrics;
+import io.ezeebit.conversion.common.metrics.ConversionMetricsImpl;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.service.conversion.ConversionSettler;
+import io.ezeebit.conversion.service.conversion.ConversionSettlerImpl;
 import io.ezeebit.conversion.service.port.LedgerPostings;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -37,7 +39,7 @@ class PendingResolverTest {
 	private static final Instant NOW = Instant.parse("2026-10-13T10:00:00Z");
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-	private final ConversionMetrics metrics = new ConversionMetrics(registry, ObservationRegistry.NOOP);
+	private final ConversionMetrics metrics = new ConversionMetricsImpl(registry, ObservationRegistry.NOOP);
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerPostings ledger = mock(LedgerPostings.class);
 	private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -76,10 +78,10 @@ class PendingResolverTest {
 	private PendingResolver resolver(final AbstractPlatformTransactionManager manager) {
 		ConversionProperties properties = new ConversionProperties(null, null, Duration.ofSeconds(30), null, null, null,
 				null, null);
-		ConversionSettler settler = new ConversionSettler(conversions, clock, metrics);
+		ConversionSettler settler = new ConversionSettlerImpl(conversions, clock, metrics);
 		PendingClaimer claimer = new PendingClaimer(conversions, new DueCutoff(properties, clock),
 				new PendingLedgerCheck(ledger, settler));
-		return new PendingResolver(new TransactionTemplate(manager), claimer, metrics);
+		return new PendingResolverImpl(new TransactionTemplate(manager), claimer, metrics);
 	}
 
 	private static class CommitSucceeds extends AbstractPlatformTransactionManager {

@@ -72,10 +72,10 @@
 	<Match>
 		<Bug pattern="CRLF_INJECTION_LOGS"/>
 		<Or>
-			<And><Class name="io.ezeebit.ledger.service.deposit.DepositService"/><Method name="post"/></And>
-			<And><Class name="io.ezeebit.ledger.service.conversion.answer.ConversionPostingResponder"/><Method name="answer"/></And>
-			<And><Class name="io.ezeebit.conversion.service.quote.QuoteService"/><Method name="issue"/></And>
-			<And><Class name="io.ezeebit.conversion.service.conversion.ConversionService"/><Method name="acceptAndTag"/></And>
+			<And><Class name="io.ezeebit.ledger.service.deposit.DepositServiceImpl"/><Method name="post"/></And>
+			<And><Class name="io.ezeebit.ledger.service.conversion.answer.ConversionPostingResponderImpl"/><Method name="answer"/></And>
+			<And><Class name="io.ezeebit.conversion.service.quote.QuoteServiceImpl"/><Method name="issue"/></And>
+			<And><Class name="io.ezeebit.conversion.service.conversion.ConversionServiceImpl"/><Method name="acceptAndTag"/></And>
 			<And><Class name="io.ezeebit.gateway.api.filter.RateLimitFilter"/><Method name="limit"/></And>
 		</Or>
 	</Match>
@@ -83,7 +83,7 @@
 	<!-- policy() only sees codes require() admitted as ASCII [A-Z]{3,5}; CurrencyCatalogTest proves the guard. -->
 	<Match>
 		<Bug pattern="IMPROPER_UNICODE"/>
-		<Class name="io.ezeebit.conversion.service.CurrencyCatalog"/>
+		<Class name="io.ezeebit.conversion.service.CurrencyCatalogImpl"/>
 		<Method name="policy"/>
 	</Match>
 

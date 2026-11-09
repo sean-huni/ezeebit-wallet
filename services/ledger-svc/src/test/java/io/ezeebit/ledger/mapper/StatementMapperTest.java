@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 class StatementMapperTest {
 
-	private final StatementMapper mapper = new StatementMapper(new AmountFormat());
+	private final StatementMapper mapper = new StatementMapperImpl(new AmountFormat());
 	private final UUID journal = UUID.randomUUID();
 	private final Instant created = Instant.parse("2026-10-13T10:15:30.123456Z");
 	private final StatementLineEntity line = new StatementLineEntity(7L, journal, "DEPOSIT", "rail-1", "USDT",

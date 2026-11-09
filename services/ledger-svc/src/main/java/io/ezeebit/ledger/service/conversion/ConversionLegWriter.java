@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-public class ConversionLegWriter {
+class ConversionLegWriter {
 
 	// Postgres orders uuid bytewise, which is the order of the lowercase hex text.
 	private static final Comparator<UUID> LOCK_ORDER = Comparator.comparing(UUID::toString);
@@ -29,7 +29,7 @@ public class ConversionLegWriter {
 	private final AccountRepo accounts;
 	private final EntryWriter entries;
 
-	public ConversionLegWriter(final AccountRepo accounts, final EntryWriter entries) {
+	ConversionLegWriter(final AccountRepo accounts, final EntryWriter entries) {
 		this.accounts = accounts;
 		this.entries = entries;
 	}

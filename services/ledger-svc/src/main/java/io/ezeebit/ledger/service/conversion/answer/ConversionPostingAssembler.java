@@ -8,13 +8,13 @@ import io.ezeebit.ledger.service.CurrencyCatalog;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ConversionPostingAssembler {
+class ConversionPostingAssembler {
 
 	private final EntryRepo entries;
 	private final CurrencyCatalog catalog;
 	private final ConversionPostingMapper mapper;
 
-	public ConversionPostingAssembler(final EntryRepo entries, final CurrencyCatalog catalog,
+	ConversionPostingAssembler(final EntryRepo entries, final CurrencyCatalog catalog,
 			final ConversionPostingMapper mapper) {
 		this.entries = entries;
 		this.catalog = catalog;

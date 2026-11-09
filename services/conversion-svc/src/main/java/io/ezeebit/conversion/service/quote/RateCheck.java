@@ -16,13 +16,13 @@ import org.springframework.stereotype.Component;
  * the quote expires against.
  */
 @Component
-public class RateCheck {
+class RateCheck {
 
 	private final RateSource rates;
 	private final RateValidator validator;
 	private final RateHistory history;
 
-	public RateCheck(final RateSource rates, final RateValidator validator, final RateHistory history) {
+	RateCheck(final RateSource rates, final RateValidator validator, final RateHistory history) {
 		this.rates = rates;
 		this.validator = validator;
 		this.history = history;

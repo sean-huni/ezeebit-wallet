@@ -10,13 +10,13 @@ import org.springframework.stereotype.Component;
 
 // Not transactional itself: the duplicate key must be caught outside the transaction it rolled back.
 @Component
-public class DepositRecorder {
+class DepositRecorder {
 
 	private final DepositPoster poster;
 	private final DepositReplayer replayer;
 	private final DepositReader reader;
 
-	public DepositRecorder(final DepositPoster poster, final DepositReplayer replayer, final DepositReader reader) {
+	DepositRecorder(final DepositPoster poster, final DepositReplayer replayer, final DepositReader reader) {
 		this.poster = poster;
 		this.replayer = replayer;
 		this.reader = reader;

@@ -69,7 +69,7 @@ public class ConversionSpans {
 
 	public void quoteRefused(final Observation span, final ConversionException refusal) {
 		span.lowCardinalityKeyValue(OUTCOME, "refused").lowCardinalityKeyValue("reason", refusal.code().name())
-				.lowCardinalityKeyValue("detail", ConversionMetrics.detail(refusal));
+				.lowCardinalityKeyValue("detail", ConversionMetricsImpl.detail(refusal));
 	}
 
 	public void pair(final Observation span, final String sell, final String buy) {

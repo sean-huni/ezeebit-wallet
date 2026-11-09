@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class EntryMapperTest {
 
-	private final EntryMapper mapper = new EntryMapper();
+	private final EntryMapper mapper = new EntryMapperImpl();
 	private final UUID journal = UUID.randomUUID();
 	private final UUID account = UUID.randomUUID();
 

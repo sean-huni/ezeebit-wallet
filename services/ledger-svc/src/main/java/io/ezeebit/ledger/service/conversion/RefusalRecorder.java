@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 // Balance-dependent refusals are made final before they are answered; otherwise money arriving later
 // would let a retry of the same conversion post after its caller had recorded it as rejected.
 @Service
-public class RefusalRecorder {
+class RefusalRecorder {
 
 	private static final Set<ErrorCode> FINAL_REFUSALS = EnumSet.of(ErrorCode.INSUFFICIENT_FUNDS,
 			ErrorCode.BALANCE_LIMIT_EXCEEDED);
@@ -21,7 +21,7 @@ public class RefusalRecorder {
 	private final ConversionVoider voider;
 	private final ConversionReplayer replayer;
 
-	public RefusalRecorder(final ConversionVoider voider, final ConversionReplayer replayer) {
+	RefusalRecorder(final ConversionVoider voider, final ConversionReplayer replayer) {
 		this.voider = voider;
 		this.replayer = replayer;
 	}

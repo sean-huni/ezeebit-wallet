@@ -9,13 +9,13 @@ import io.ezeebit.conversion.dto.resp.ConversionResp;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ConversionFirstPoster {
+class ConversionFirstPoster {
 
 	private final ConversionReader reader;
 	private final ConversionLedgerPoster poster;
 	private final ConversionMetrics metrics;
 
-	public ConversionFirstPoster(final ConversionReader reader, final ConversionLedgerPoster poster,
+	ConversionFirstPoster(final ConversionReader reader, final ConversionLedgerPoster poster,
 			final ConversionMetrics metrics) {
 		this.reader = reader;
 		this.poster = poster;

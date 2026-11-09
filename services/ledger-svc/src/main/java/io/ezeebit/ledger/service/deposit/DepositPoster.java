@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 // One deposit, one transaction: journal, both entries and the cached balance commit together or not at all.
 @Service
-public class DepositPoster {
+class DepositPoster {
 
 	private static final String POSTED = "POSTED";
 
@@ -25,7 +25,7 @@ public class DepositPoster {
 	private final AccountRepo accounts;
 	private final EntryWriter entries;
 
-	public DepositPoster(final JournalRepo journals, final AccountRepo accounts, final EntryWriter entries) {
+	DepositPoster(final JournalRepo journals, final AccountRepo accounts, final EntryWriter entries) {
 		this.journals = journals;
 		this.accounts = accounts;
 		this.entries = entries;

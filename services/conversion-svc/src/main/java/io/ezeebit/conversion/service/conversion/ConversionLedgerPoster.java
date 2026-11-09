@@ -8,13 +8,13 @@ import io.ezeebit.conversion.service.quote.QuoteReader;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ConversionLedgerPoster {
+class ConversionLedgerPoster {
 
 	private final LedgerPostings ledger;
 	private final QuoteReader quotes;
 	private final ConversionSettler settler;
 
-	public ConversionLedgerPoster(final LedgerPostings ledger, final QuoteReader quotes, final ConversionSettler settler) {
+	ConversionLedgerPoster(final LedgerPostings ledger, final QuoteReader quotes, final ConversionSettler settler) {
 		this.ledger = ledger;
 		this.quotes = quotes;
 		this.settler = settler;

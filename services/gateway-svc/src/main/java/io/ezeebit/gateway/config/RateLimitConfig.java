@@ -5,9 +5,11 @@ import java.util.concurrent.TimeUnit;
 
 import io.ezeebit.gateway.api.filter.RateLimitFilter;
 import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
+import io.ezeebit.gateway.common.metrics.RateLimitMetricsImpl;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
 import io.ezeebit.gateway.scheduler.StorePingScheduler;
 import io.ezeebit.gateway.service.MerchantBuckets;
+import io.ezeebit.gateway.service.MerchantBucketsImpl;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -60,11 +62,11 @@ class RateLimitConfig {
 	}
 
 	@Bean
-	MerchantBuckets merchantBuckets(final RedisClient rateLimitRedis, final RateLimitProperties properties) {
+	MerchantBucketsImpl merchantBuckets(final RedisClient rateLimitRedis, final RateLimitProperties properties) {
 		RateLimitProperties.Store store = properties.store();
 		RedisURI uri = RedisURI.builder().withHost(store.host()).withPort(store.port())
 				.withPassword(store.password().toCharArray()).withTimeout(store.timeout()).build();
-		return new MerchantBuckets(() -> rateLimitRedis.connect(CODEC, uri), properties, System::nanoTime);
+		return new MerchantBucketsImpl(() -> rateLimitRedis.connect(CODEC, uri), properties, System::nanoTime);
 	}
 
 	@Bean
@@ -73,8 +75,8 @@ class RateLimitConfig {
 	}
 
 	@Bean
-	RateLimitMetrics rateLimitMetrics(final MeterRegistry registry, final ObservationRegistry observations) {
-		return new RateLimitMetrics(registry, observations);
+	RateLimitMetricsImpl rateLimitMetrics(final MeterRegistry registry, final ObservationRegistry observations) {
+		return new RateLimitMetricsImpl(registry, observations);
 	}
 
 	@Bean

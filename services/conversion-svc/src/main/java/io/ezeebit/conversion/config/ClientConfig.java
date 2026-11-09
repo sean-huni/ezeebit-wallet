@@ -7,6 +7,7 @@ import java.time.Duration;
 import io.ezeebit.conversion.config.properties.ConversionProperties;
 import io.ezeebit.conversion.domain.RateRules;
 import io.ezeebit.conversion.domain.RateValidator;
+import io.ezeebit.conversion.domain.RateValidatorImpl;
 import io.ezeebit.conversion.outbound.discovery.DiscoveryNameResolverProvider;
 import io.grpc.ManagedChannel;
 import io.micrometer.observation.ObservationRegistry;
@@ -31,7 +32,7 @@ public class ClientConfig {
 
 	@Bean
 	RateValidator rateValidator(final ConversionProperties properties) {
-		return new RateValidator(new RateRules(properties.rates().maxAge(), properties.rates().maxJumpPercent()));
+		return new RateValidatorImpl(new RateRules(properties.rates().maxAge(), properties.rates().maxJumpPercent()));
 	}
 
 	// Not load-balanced: the rate service is an external URL, not a registry name. Observed, so each call is a client

@@ -11,13 +11,13 @@ import org.springframework.stereotype.Component;
 
 // RFC 9457 body: stable `code` for machines, localised `detail` for people.
 @Component
-public class ProblemFactory {
+class ProblemFactory {
 
 	private static final int MAX_ECHO = 64;
 
 	private final MessageSource messages;
 
-	public ProblemFactory(final MessageSource messages) {
+	ProblemFactory(final MessageSource messages) {
 		this.messages = messages;
 	}
 

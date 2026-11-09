@@ -57,7 +57,7 @@ final class InjectionCounter {
 		return hasNoArg ? 0 : Arrays.stream(constructors).mapToInt(Constructor::getParameterCount).max().orElse(0);
 	}
 
-	private static boolean isInjectionPoint(final AnnotatedElement element) {
+	static boolean isInjectionPoint(final AnnotatedElement element) {
 		Deque<Class<? extends Annotation>> pending = new ArrayDeque<>();
 		Arrays.stream(element.getDeclaredAnnotations()).map(Annotation::annotationType).forEach(pending::add);
 		Set<Class<? extends Annotation>> seen = new HashSet<>();

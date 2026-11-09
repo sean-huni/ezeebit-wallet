@@ -21,7 +21,7 @@ class MerchantBucketsTest {
 
 	private final AtomicLong clock = new AtomicLong(1_000_000_000L);
 	private final AtomicInteger connects = new AtomicInteger();
-	private final MerchantBuckets buckets = new MerchantBuckets(() -> {
+	private final MerchantBuckets buckets = new MerchantBucketsImpl(() -> {
 		connects.incrementAndGet();
 		throw new RedisConnectionException("refused");
 	}, LIMITS, clock::get);
@@ -37,10 +37,10 @@ class MerchantBucketsTest {
 
 	@Test
 	void aStoreErrorAnywhereInTheChainIsAnOutageAndALostRaceIsContention() {
-		assertThat(MerchantBuckets.failed(new RedisCommandTimeoutException("stalled")).outcome()).isEqualTo(LimitOutcome.UNAVAILABLE);
-		assertThat(MerchantBuckets.failed(new IllegalStateException(new RedisConnectionException("reset"))).outcome())
+		assertThat(MerchantBucketsImpl.failed(new RedisCommandTimeoutException("stalled")).outcome()).isEqualTo(LimitOutcome.UNAVAILABLE);
+		assertThat(MerchantBucketsImpl.failed(new IllegalStateException(new RedisConnectionException("reset"))).outcome())
 				.isEqualTo(LimitOutcome.UNAVAILABLE);
-		assertThat(MerchantBuckets.failed(BucketExceptions.maxRetriesExceeded(1)).outcome()).isEqualTo(LimitOutcome.CONTENTION);
+		assertThat(MerchantBucketsImpl.failed(BucketExceptions.maxRetriesExceeded(1)).outcome()).isEqualTo(LimitOutcome.CONTENTION);
 	}
 
 	// An outage opens one socket per RETRY_AFTER, not one per request.

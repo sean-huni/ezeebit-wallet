@@ -14,13 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 // One conversion, one transaction: journal, four entries and both merchant balances commit together or not at all.
 @Service
-public class ConversionPoster {
+class ConversionPoster {
 
 	private final JournalRepo journals;
 	private final ConversionLegWriter legs;
 	private final DbClockRepo clock;
 
-	public ConversionPoster(final JournalRepo journals, final ConversionLegWriter legs, final DbClockRepo clock) {
+	ConversionPoster(final JournalRepo journals, final ConversionLegWriter legs, final DbClockRepo clock) {
 		this.journals = journals;
 		this.legs = legs;
 		this.clock = clock;

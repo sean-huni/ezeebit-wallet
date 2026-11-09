@@ -66,6 +66,7 @@ Design rules, not security findings, so they are not SAST. They run inside `test
 | Gate | Reads | Fails the build when |
 |---|---|---|
 | Dependency-injection budget (`DependencyBudgetTest`; source `architecture/src/test/java`, compiled into every service's `test` task) | every Spring component (`@Component` and its stereotypes, `@Configuration`, advice) found by scanning the service's compiled main classes under `io.ezeebit`, and every `@Bean` method on them | a bean or a `@Bean` method takes more than 3 injected dependencies (the message lists each with its count; no suppression), or the scan does not reach the service's `@SpringBootApplication` class |
+| Code to interfaces (`CodeToInterfaceTest`; source `architecture/src/test/java`, compiled into every service's `test` task) | every Spring component and each project class a `@Bean` method declares it returns: constructors, injected fields and setters, generic arguments, up the superclass chain | one takes a concrete project class from another package; records and enums are data, and `@Bean` parameters are the composition root |
 | Ports before adapters (`ServiceImportsNoOutboundTest`, conversion-svc `test`) | every main source file under `service/` | one imports `io.ezeebit.conversion.outbound.`: the use cases call `service/port/` interfaces, never an adapter |
 | One contract (`checkSingleProto`, root `check`) | every `.proto` in the repository outside `contracts/`, `build/`, `.gradle/`, `node_modules/` and `.superpowers/` | any `.proto` outside `contracts/`, or none inside it |
 

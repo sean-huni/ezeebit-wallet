@@ -13,13 +13,13 @@ import io.ezeebit.conversion.mapper.QuoteMapper;
 import org.springframework.stereotype.Component;
 
 @Component
-public class QuoteWriter {
+class QuoteWriter {
 
 	private final QuoteRepo quotes;
 	private final QuoteMapper mapper;
 	private final ConversionProperties properties;
 
-	public QuoteWriter(final QuoteRepo quotes, final QuoteMapper mapper, final ConversionProperties properties) {
+	QuoteWriter(final QuoteRepo quotes, final QuoteMapper mapper, final ConversionProperties properties) {
 		this.quotes = quotes;
 		this.mapper = mapper;
 		this.properties = properties;

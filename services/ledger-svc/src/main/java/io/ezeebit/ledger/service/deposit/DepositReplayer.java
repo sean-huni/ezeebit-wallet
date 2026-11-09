@@ -14,11 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 // Runs after the losing insert rolled back: the winner has committed, so its journal is visible.
 @Service
-public class DepositReplayer {
+class DepositReplayer {
 
 	private final JournalRepo journals;
 
-	public DepositReplayer(final JournalRepo journals) {
+	DepositReplayer(final JournalRepo journals) {
 		this.journals = journals;
 	}
 

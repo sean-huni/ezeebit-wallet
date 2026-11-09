@@ -11,12 +11,12 @@ import io.ezeebit.ledger.service.idempotency.RequestFingerprint;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ConversionPostingIntake {
+class ConversionPostingIntake {
 
 	private final CurrencyCatalog catalog;
 	private final RequestFingerprint fingerprint;
 
-	public ConversionPostingIntake(final CurrencyCatalog catalog, final RequestFingerprint fingerprint) {
+	ConversionPostingIntake(final CurrencyCatalog catalog, final RequestFingerprint fingerprint) {
 		this.catalog = catalog;
 		this.fingerprint = fingerprint;
 	}

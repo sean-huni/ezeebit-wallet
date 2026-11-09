@@ -10,12 +10,12 @@ import org.springframework.stereotype.Component;
 
 // Two steps, so a refusal of the amount is still counted under the currency that was already admitted.
 @Component
-public class DepositIntake {
+class DepositIntake {
 
 	private final CurrencyCatalog catalog;
 	private final RequestFingerprint fingerprint;
 
-	public DepositIntake(final CurrencyCatalog catalog, final RequestFingerprint fingerprint) {
+	DepositIntake(final CurrencyCatalog catalog, final RequestFingerprint fingerprint) {
 		this.catalog = catalog;
 		this.fingerprint = fingerprint;
 	}

@@ -17,7 +17,7 @@ class BalanceMapperTest {
 		AccountEntity account = new AccountEntity(UUID.randomUUID(), UUID.randomUUID(), "ZAR", "MERCHANT",
 				new BigDecimal("350.500000000000000000"));
 
-		assertThat(new BalanceMapper(new AmountFormat()).toResp(account, ZAR)).isEqualTo(new BalanceResp("ZAR", "350.50"));
+		assertThat(new BalanceMapperImpl(new AmountFormat()).toResp(account, ZAR)).isEqualTo(new BalanceResp("ZAR", "350.50"));
 	}
 
 }

@@ -47,7 +47,8 @@ class ConversionReplayer {
 		}
 		boolean live = quotes.live(conversion.quote()).isPresent();
 		if (ConversionStatus.PENDING.name().equals(conversion.status()) && live) {
-			return reader.answer(poster.postAndSettle(conversion));
+			ConversionEntity settled = poster.postAndSettle(conversion);
+			return reader.answer(settled);
 		}
 		return reader.answer(conversion);
 	}

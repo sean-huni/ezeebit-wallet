@@ -43,7 +43,8 @@ final class PushRecorder {
 		boolean[] state = call.get();
 		call.remove();
 		if (state != null && state[0] && !state[1]) {
-			lastSuccessMillis.set(clock.millis());
+			long now = clock.millis();
+			lastSuccessMillis.set(now);
 		}
 	}
 

@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Optional;
 
 import io.ezeebit.conversion.data.model.QuoteEntity;
+import io.ezeebit.conversion.domain.Currency;
 import io.ezeebit.conversion.domain.Quote;
 import io.ezeebit.conversion.mapper.QuoteMapper;
 import io.ezeebit.conversion.service.CurrencyCatalog;
@@ -24,8 +25,9 @@ class QuoteReaderImpl implements QuoteReader {
 
 	@Override
 	public Quote of(final QuoteEntity entity) {
-		return mapper.toDomain(entity, catalog.require(entity.sellCurrency(), "sell"),
-				catalog.require(entity.buyCurrency(), "buy"));
+		Currency sell = catalog.require(entity.sellCurrency(), "sell");
+		Currency buy = catalog.require(entity.buyCurrency(), "buy");
+		return mapper.toDomain(entity, sell, buy);
 	}
 
 	@Override

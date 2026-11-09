@@ -81,7 +81,8 @@ class LedgerGrpcClient implements LedgerPostings {
 	private LedgerAnswer call(final Operation op, final UUID conversionId, final UUID merchantId, final Message message,
 			final Attempt attempt) {
 		try {
-			return replies.fromResult(guard.call(op, conversionId, merchantId, message, attempt));
+			PostingResult result = guard.call(op, conversionId, merchantId, message, attempt);
+			return replies.fromResult(result);
 		}
 		catch (StatusRuntimeException ex) {
 			LedgerAnswer answer = replies.fromStatus(ex);

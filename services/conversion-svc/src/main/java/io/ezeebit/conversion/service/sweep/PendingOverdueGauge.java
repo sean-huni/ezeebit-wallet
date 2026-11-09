@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.service.sweep;
 
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -44,7 +45,10 @@ public class PendingOverdueGauge implements MeterBinder {
 
 	// NaN when the database cannot answer within about 2 s: an unknown level, never a guessed zero.
 	public double read() {
-		Future<Long> count = reader.submit(() -> conversions.countDue(cutoff.deadlineBefore()));
+		Future<Long> count = reader.submit(() -> {
+			Instant deadline = cutoff.deadlineBefore();
+			return conversions.countDue(deadline);
+		});
 		try {
 			return count.get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
 		}

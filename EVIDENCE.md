@@ -21,6 +21,7 @@ How to reproduce each section:
 | SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
 | Dependency versions (SCA) | `./gradlew --no-build-cache clean spotlessApply checkVersions`, and the same with `-PguavaVersion=33.6.0-jre` | [docs/supply-chain.md](docs/supply-chain.md); images under [Dependency versions](#dependency-versions-2026-11-09) |
+| Nested collaborator calls | `./gradlew spotlessCheck`, red-proofed as described below | [2026-11-10-no-nested-di-calls.log](docs/evidence/2026-11-10-no-nested-di-calls.log); [Nested collaborator calls](#nested-collaborator-calls-2026-11-10) |
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
 
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
@@ -615,6 +616,19 @@ MODERATE advisories, neither blocking.
 
 Gradle exit 1 from the task's exit 3. Guava was forced back to `33.6.0-jre`, so `CVE-2026-102554` (HIGH, fixed in
 33.7.2) blocks. It proves the failing path on a real advisory; this pin is not what ships.
+
+## Nested collaborator calls (2026-11-10)
+
+`noNestedDiCalls` is a Spotless step over `src/main` that rewrites nothing and fails on a call on an injected collaborator
+holding a call on another one in its arguments ([gradle/no-nested-di-calls.gradle](gradle/no-nested-di-calls.gradle)).
+It is a readability rule, not a security scan.
+
+**Proves** over 265 `src/main` files: a throwaway fixture of 10 arms failed on exactly the 4 banned arms, and the 6 allowed
+arms passed; putting the original `ConversionFirstPoster` line back failed at line 26; a file that does not parse fails closed.
+The fixture and the probe were removed afterwards, so the [log](docs/evidence/2026-11-10-no-nested-di-calls.log) is their output.
+
+**Does not prove** anything about a collaborator passed as a method parameter or an unqualified call on `this`: the step reads
+syntax only, so it cannot see either.
 
 ## What this evidence does not prove
 

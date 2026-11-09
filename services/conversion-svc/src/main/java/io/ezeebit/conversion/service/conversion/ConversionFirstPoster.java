@@ -23,7 +23,8 @@ class ConversionFirstPoster {
 	}
 
 	public ConversionResp post(final UUID merchantId, final String key) {
-		ConversionEntity first = poster.postAndSettle(reader.byKey(merchantId, key).orElseThrow());
+		ConversionEntity pending = reader.byKey(merchantId, key).orElseThrow();
+		ConversionEntity first = poster.postAndSettle(pending);
 		// A settled outcome is counted where it is settled; a first answer that left it open is counted here.
 		if (ConversionStatus.PENDING.name().equals(first.status())) {
 			metrics.leftPending();

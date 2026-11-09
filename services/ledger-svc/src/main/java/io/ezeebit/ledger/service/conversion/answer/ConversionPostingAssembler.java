@@ -1,7 +1,12 @@
 package io.ezeebit.ledger.service.conversion.answer;
 
+import java.util.List;
+import java.util.Map;
+
 import io.ezeebit.ledger.data.model.JournalEntity;
+import io.ezeebit.ledger.data.model.StatementLineEntity;
 import io.ezeebit.ledger.data.repo.EntryRepo;
+import io.ezeebit.ledger.domain.Currency;
 import io.ezeebit.ledger.dto.resp.ConversionPostingResp;
 import io.ezeebit.ledger.mapper.ConversionPostingMapper;
 import io.ezeebit.ledger.service.CurrencyCatalog;
@@ -22,7 +27,9 @@ class ConversionPostingAssembler {
 	}
 
 	public ConversionPostingResp assemble(final JournalEntity journal) {
-		return mapper.toResp(journal, entries.merchantLines(journal.id()), catalog.all());
+		List<StatementLineEntity> lines = entries.merchantLines(journal.id());
+		Map<String, Currency> currencies = catalog.all();
+		return mapper.toResp(journal, lines, currencies);
 	}
 
 }

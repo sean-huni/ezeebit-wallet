@@ -1,8 +1,11 @@
 package io.ezeebit.ledger.grpc;
 
+import java.util.UUID;
+
 import io.ezeebit.contracts.ledger.v1.ConversionSettlementGrpc;
 import io.ezeebit.contracts.ledger.v1.PostingLookup;
 import io.ezeebit.contracts.ledger.v1.PostingResult;
+import io.ezeebit.ledger.dto.resp.ConversionPostingResp;
 import io.ezeebit.ledger.service.conversion.ConversionVoidService;
 import io.ezeebit.ledger.service.conversion.answer.ConversionPostingReader;
 import io.grpc.stub.StreamObserver;
@@ -24,15 +27,21 @@ public class ConversionSettlementRpc extends ConversionSettlementGrpc.Conversion
 
 	@Override
 	public void find(final PostingLookup lookup, final StreamObserver<PostingResult> reply) {
-		reply.onNext(messages.toResult(reader.find(messages.uuid(lookup.getConversionId(), "conversionId"),
-				messages.uuid(lookup.getMerchantId(), "merchantId"))));
+		UUID conversionId = messages.uuid(lookup.getConversionId(), "conversionId");
+		UUID merchantId = messages.uuid(lookup.getMerchantId(), "merchantId");
+		ConversionPostingResp found = reader.find(conversionId, merchantId);
+		PostingResult result = messages.toResult(found);
+		reply.onNext(result);
 		reply.onCompleted();
 	}
 
 	@Override
 	public void void_(final PostingLookup lookup, final StreamObserver<PostingResult> reply) {
-		reply.onNext(messages.toResult(voids.voidPosting(messages.uuid(lookup.getConversionId(), "conversionId"),
-				messages.uuid(lookup.getMerchantId(), "merchantId"))));
+		UUID conversionId = messages.uuid(lookup.getConversionId(), "conversionId");
+		UUID merchantId = messages.uuid(lookup.getMerchantId(), "merchantId");
+		ConversionPostingResp voided = voids.voidPosting(conversionId, merchantId);
+		PostingResult result = messages.toResult(voided);
+		reply.onNext(result);
 		reply.onCompleted();
 	}
 

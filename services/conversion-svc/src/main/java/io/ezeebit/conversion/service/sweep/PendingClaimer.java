@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.service.sweep;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,7 +26,8 @@ class PendingClaimer {
 
 	@Transactional(propagation = Propagation.MANDATORY)
 	public Optional<Resolution> claimAndResolve(final List<UUID> skip) {
-		return conversions.claimDue(cutoff.deadlineBefore(), skip).map(check::resolve);
+		Instant deadline = cutoff.deadlineBefore();
+		return conversions.claimDue(deadline, skip).map(check::resolve);
 	}
 
 }

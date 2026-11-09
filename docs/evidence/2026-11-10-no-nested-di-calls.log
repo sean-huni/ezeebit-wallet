@@ -1,0 +1,28 @@
+noNestedDiCalls red-proof, 2026-11-10, branch feat-no-nested-di-calls on top of c51565c.
+Fixture: services/ledger-svc/src/main/java/io/ezeebit/ledger/GateFixture.java, removed after the run. Arms:
+  10 poster.post(reader.byKey(1, 2).orElseThrow());       banned
+  11 this.poster.post(this.reader.byKey(1, 2));           banned
+  12 poster.post(java.util.Optional.of(reader.one()));    banned
+  13 poster.a().post(reader.one());                       banned
+  14 poster.post(dto.amount());                           allowed
+  15 poster.post(properties.limits().max());              allowed
+  16 poster.post(() -> reader.one());                     allowed
+  17 poster.post(java.util.List.of(dto.amount()));        allowed
+  18 poster.post(param.one());                            allowed
+  19 format(reader.one());                                allowed
+
+== fixture: ./gradlew :services:ledger-svc:spotlessNoNestedDiCallsCheck, exit 1
+> There were 1 lint error(s), they must be fixed or suppressed.
+  src/main/java/io/ezeebit/ledger/GateFixture.java:L10 noNestedDiCalls(java.lang.IllegalStateException) line 10: reader.byKey(1, 2).orElseThrow() is nested in a call to poster.post(...): assign it to a named local first; line 11: this.reader.byKey(1, 2) is nested in a call to this.poster.post(...): assign it to a named local first; line 12: reader.one() is nested in a call to poster.post(...): assign it to a named local first; line 13: reader.one() is nested in a call to poster.a().post(...): assign it to a named local first (...)
+BUILD FAILED in 484ms
+
+== original ConversionFirstPoster restored: ./gradlew spotlessCheck --continue, exit 1
+  src/main/java/io/ezeebit/conversion/service/conversion/ConversionFirstPoster.java:L26 noNestedDiCalls(java.lang.IllegalStateException) line 26: reader.byKey(merchantId, key).orElseThrow() is nested in a call to poster.postAndSettle(...): assign it to a named local first (...)
+BUILD FAILED in 496ms
+
+== unparseable file: exit 1
+  src/main/java/io/ezeebit/ledger/GateFixture.java:LINE_UNDEFINED noNestedDiCalls(java.lang.IllegalStateException) noNestedDiCalls could not parse the file: illegal start of type; reached end of file while parsing (...)
+BUILD FAILED in 398ms
+
+== fixture and probe removed: ./gradlew spotlessCheck, exit 0
+BUILD SUCCESSFUL in 509ms

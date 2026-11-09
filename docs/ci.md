@@ -88,4 +88,6 @@ sampler can also miss a short spike.
 ./gradlew --no-build-cache --rerun-tasks clean build
 ./gradlew bootBuildImageAll checkSupplyChain
 ./gradlew sonarAll          # prints SKIPPED without SONAR_TOKEN
+./gradlew spotlessApply     # rewrites what spotlessCheck would fail on
+./gradlew checkVersions     # not a CI stage: it asks the network, see supply-chain.md
 ```

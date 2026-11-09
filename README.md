@@ -19,7 +19,7 @@ Walkthrough video: link to be added.
 
 | Document | What it covers |
 |---|---|
-| [EVIDENCE.md](EVIDENCE.md) | Screenshots with what each proves: fleet overview, metrics, traces, logs and alerts; static application security testing (SAST) and software composition analysis (SCA) reports |
+| [EVIDENCE.md](EVIDENCE.md) | Screenshots with what each proves: fleet overview, metrics, traces, logs and alerts; static application security testing (SAST) and software composition analysis (SCA) reports; the dependency version report |
 | [SOLUTION.md](SOLUTION.md) | Tasks chosen, design and trade-offs, time and scope, how Tasks 3 to 6 fit, known gaps, AI usage notes |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the design was derived, data model, flows, application programming interface (API), failure handling |
 | [docs/project-layout.md](docs/project-layout.md) | Every package and class per service, measured dependencies, where new code goes |
@@ -59,7 +59,11 @@ Boot 4.1.2, Spring Cloud 2025.1.3.
 
 ```sh
 ./gradlew clean build
+./gradlew spotlessApply     # fixes what spotlessCheck in the build would fail on
+./gradlew checkVersions     # pins with newer releases, shipped modules with advisories; needs network
 ```
+
+`checkVersions` is described in [docs/supply-chain.md](docs/supply-chain.md), with screenshots of it passing and failing.
 
 This runs every test tier (unit, Spring integration on Testcontainers, Cucumber acceptance over real
 Hypertext Transfer Protocol (HTTP)), the static analysis and coverage gates, and a secrets scan (about 175 s on an 18-core laptop with dependencies and images cached, a timing that was not logged; the

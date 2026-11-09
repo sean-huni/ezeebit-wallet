@@ -9,7 +9,7 @@ class CurrencyMapperTest {
 
 	@Test
 	void rowBecomesTheDomainCurrency() {
-		assertThat(new CurrencyMapper().toDomain(new CurrencyEntity("USDT", "STABLECOIN", 6))).isEqualTo(Fixtures.USDT);
+		assertThat(new CurrencyMapperImpl().toDomain(new CurrencyEntity("USDT", "STABLECOIN", 6))).isEqualTo(Fixtures.USDT);
 	}
 
 }

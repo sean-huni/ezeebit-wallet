@@ -19,7 +19,7 @@ ezeebit-wallet/
 ├── discovery/       DeregisterBeforeDrain, leave Eureka before the graceful drain, compiled into gateway-svc, ledger-svc and conversion-svc (below)
 ├── k8s/             the fleet on a local kind cluster: kube.sh, manifests, chaos monkey, sweep and build gates (below; docs/k8s.md)
 ├── scripts/         env-guard.sh: the one lease that keeps fleet.sh and k8s/kube.sh from running together (below)
-├── architecture/    the dependency-injection budget gate (DependencyBudgetTest), compiled into every service's test source set
+├── architecture/    the dependency-injection gates (DependencyBudgetTest, CodeToInterfaceTest), compiled into every service's test source set
 ├── contracts/       ledger/v1/conversion_postings.proto: the one gRPC Remote Procedure Call (gRPC) contract, compiled by ledger-svc and conversion-svc (checkSingleProto fails on a second copy)
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
 ├── build.gradle     shared conventions: test tiers, quality gates, image builds
@@ -49,6 +49,7 @@ each one:
 | `exception/` | the service's exception and its `ErrorCode` (wire code and message key only) | `*Exception` |
 | `data/model/`, `data/repo/` (+ `data/repo/query/`) | row records, Structured Query Language (SQL) repositories, query parameter shapes | `*Entity`, `*Repo` |
 | `mapper/` | entity and domain to response | `*Mapper` |
+| beside an interface other packages inject | its implementation, package-private unless outside code constructs it | `*Impl`, `Jdbc*Repo` |
 | `outbound/<context>/` | one anti-corruption layer (ACL) per called service or broker: the adapter implementing a `service/port/` interface, caller-owned data transfer objects (DTOs) or generated messages, translation | `*Client`, `*Dto`, `*Mapper`, `*Publisher` |
 | `scheduler/` | timed triggers that delegate to a service | `*Sweeper`, `*Scheduler` |
 | `common/log/`, `common/metrics/` | cross-cutting: log-safe text, Micrometer counters and gauges, business spans | `*Metrics`, `*Spans` |
@@ -59,9 +60,13 @@ parentheses where the package's job is not obvious. Under it, `a -> b(n)` means 
 `a` have `n` import lines naming a class in package `b` (main code only). Arrows point from the user
 to the used.
 
+In the service trees, `X+Impl` is the public interface `X` and its class `XImpl`; `XRepo+Jdbc` is the
+public interface `XRepo` and its class `JdbcXRepo`. Every injected class in another package is an interface
+(`CodeToInterfaceTest`); a collaborator used only inside its package stays concrete and package-private.
+
 ## ledger-svc
 
-96 classes in 26 packages. The three use cases each own a subpackage of `service/`; the domain
+116 classes in 26 packages. The three use cases each own a subpackage of `service/`; the domain
 depends on nothing but its own exception. No bean takes more than 3 injected dependencies
 ([Dependency injection budget](#dependency-injection-budget)), so a use case is several small classes,
 each named for its one step.
@@ -79,23 +84,23 @@ io.ezeebit.ledger     LedgerApplication
 ├── dto/
 │   ├── req/          ConversionPostingReq, DepositReq, StatementReq
 │   └── resp/         ApiResponse, BalanceResp, ConversionPostingResp, DepositResp, StatementLineResp, StatementResp
-├── service/          CurrencyCatalog (shared by the use cases)
-│   ├── conversion/   ConversionLegWriter, ConversionPoster, ConversionPostingCommand, ConversionPostingIntake, ConversionPostingRecorder, ConversionPostingService, ConversionReplayer, ConversionVoidService, ConversionVoider, RefusalRecorder
-│   │   └── answer/   ConversionPostingAssembler, ConversionPostingReader, ConversionPostingResponder (the stored answer, counted once)
-│   ├── deposit/      DepositCommand, DepositIntake, DepositPoster, DepositReader, DepositRecorder, DepositReplayer, DepositService
-│   ├── idempotency/  RequestFingerprint (request hashing for replay comparison)
-│   ├── posting/      EntryWriter (one posting line as an entry row, shared by deposit and conversion)
-│   └── statement/    BalanceService, StatementService
-├── mapper/           AmountFormat, BalanceMapper, ConversionPostingMapper, CurrencyMapper, EntryMapper, StatementMapper (entity and domain to response)
+├── service/          CurrencyCatalog+Impl (shared by the use cases)
+│   ├── conversion/   ConversionLegWriter, ConversionPoster, ConversionPostingCommand, ConversionPostingIntake, ConversionPostingRecorder, ConversionPostingService+Impl, ConversionReplayer, ConversionVoidService+Impl, ConversionVoider, RefusalRecorder
+│   │   └── answer/   ConversionPostingAssembler, ConversionPostingReader+Impl, ConversionPostingResponder+Impl (the stored answer, counted once)
+│   ├── deposit/      DepositCommand, DepositIntake, DepositPoster, DepositReader, DepositRecorder, DepositReplayer, DepositService+Impl
+│   ├── idempotency/  RequestFingerprint+Impl (request hashing for replay comparison)
+│   ├── posting/      EntryWriter+Impl (one posting line as an entry row, shared by deposit and conversion)
+│   └── statement/    BalanceService+Impl, StatementService+Impl
+├── mapper/           AmountFormat, BalanceMapper+Impl, ConversionPostingMapper+Impl, CurrencyMapper+Impl, EntryMapper+Impl, StatementMapper+Impl (entity and domain to response)
 ├── domain/           AccountType, ConversionLegs, Currency, CurrencyCode, CurrencyKind, JournalStatus, JournalType, MerchantId, Money, Posting, PostingLine (no framework imports)
 ├── exception/        ErrorCode, LedgerException (codes only, no Hypertext Transfer Protocol (HTTP) status)
 ├── data/
 │   ├── model/        AccountEntity, CurrencyEntity, EntryEntity, JournalEntity, StatementLineEntity
-│   └── repo/         AccountRepo, CurrencyRepo, DbClockRepo, EntryRepo, JournalRepo
+│   └── repo/         AccountRepo+Jdbc, CurrencyRepo, DbClockRepo+Jdbc, EntryRepo+Jdbc, JournalRepo+Jdbc
 │       └── query/    StatementFilter (query parameter shapes)
 ├── common/
 │   ├── log/          LogText (log-safe caller text)
-│   └── metrics/      LedgerMetrics
+│   └── metrics/      LedgerMetrics+Impl
 └── config/           ApiVersionConfig, GatewayProofConfig, OpenApiConfig
 ```
 
@@ -106,20 +111,20 @@ api.advice                -> common.log(2), exception(6)
 api.doc                   -> api.advice(1), exception(19)
 api.filter                -> exception(2)
 api.validation            -> dto.req(1)
-common.metrics            -> domain(1), exception(1)
+common.metrics            -> domain(2), exception(2)
 config                    -> api.doc(2), api.filter(1)
 ctl                       -> dto.req(2), dto.resp(6), service.deposit(1), service.statement(2)
-data.repo                 -> data.model(5), data.repo.query(1)
+data.repo                 -> data.model(9), data.repo.query(2)
 domain                    -> exception(6)
 dto.req                   -> api.json(2), api.validation(3)
 grpc                      -> common.log(1), contracts(9), dto.req(1), dto.resp(1), exception(4), service.conversion(2), service.conversion.answer(1)
-mapper                    -> data.model(6), domain(8), dto.resp(4)
-service                   -> data.repo(1), domain(2), exception(2), mapper(1)
-service.conversion        -> common.metrics(2), data.model(4), data.repo(5), domain(21), dto.req(4), dto.resp(2), exception(12), service(1), service.conversion.answer(2), service.idempotency(3), service.posting(1)
-service.conversion.answer -> common.metrics(2), data.model(1), data.repo(2), domain(3), dto.resp(3), exception(3), mapper(1), service(1)
-service.deposit           -> common.metrics(3), data.model(3), data.repo(4), domain(16), dto.req(2), dto.resp(3), exception(3), mapper(1), service(1), service.idempotency(2), service.posting(1)
-service.posting           -> data.repo(1), domain(2), mapper(1)
-service.statement         -> data.model(1), data.repo(2), data.repo.query(1), domain(2), dto.req(1), dto.resp(2), mapper(2), service(2)
+mapper                    -> data.model(12), domain(14), dto.resp(8)
+service                   -> data.repo(1), domain(3), exception(2), mapper(1)
+service.conversion        -> common.metrics(2), data.model(4), data.repo(5), domain(21), dto.req(5), dto.resp(4), exception(12), service(1), service.conversion.answer(2), service.idempotency(3), service.posting(1)
+service.conversion.answer -> common.metrics(3), data.model(1), data.repo(2), domain(5), dto.resp(5), exception(3), mapper(1), service(1)
+service.deposit           -> common.metrics(3), data.model(3), data.repo(4), domain(16), dto.req(3), dto.resp(4), exception(3), mapper(1), service(1), service.idempotency(2), service.posting(1)
+service.posting           -> data.repo(1), domain(4), mapper(1)
+service.statement         -> data.model(1), data.repo(2), data.repo.query(1), domain(2), dto.req(2), dto.resp(4), mapper(2), service(2)
 ```
 
 | Package | One job | Key classes |
@@ -151,7 +156,7 @@ service.statement         -> data.model(1), data.repo(2), data.repo.query(1), do
 
 ## conversion-svc
 
-97 classes in 28 packages. The use cases call `service/port/` interfaces only; each called service or
+112 classes in 28 packages. The use cases call `service/port/` interfaces only; each called service or
 broker has its own adapter under `outbound/` that implements one, and owns the translation both ways.
 `service.* -> outbound.*` is 0 import lines, enforced by `ServiceImportsNoOutboundTest`.
 
@@ -167,14 +172,14 @@ io.ezeebit.conversion  ConversionApplication
 ├── dto/
 │   ├── req/           ConversionReq, QuoteReq
 │   └── resp/          ApiResponse, ConversionResp, QuoteResp
-├── service/           CurrencyCatalog (shared by the use cases)
-│   ├── conversion/    ConversionAcceptance, ConversionFirstPoster, ConversionLedgerPoster, ConversionOpener, ConversionReader, ConversionReplayer, ConversionService, ConversionSettler, ConversionStarter
+├── service/           CurrencyCatalog+Impl (shared by the use cases)
+│   ├── conversion/    ConversionAcceptance, ConversionFirstPoster, ConversionLedgerPoster, ConversionOpener, ConversionReader+Impl, ConversionReplayer, ConversionService+Impl, ConversionSettler+Impl, ConversionStarter
 │   ├── port/          DeadLetter, DeadLetters, LedgerPosting, LedgerPostings, RateSource (what the use cases need from the ledger, the rate feed and the dead-letter sink, in this context's words)
-│   ├── quote/         QuoteLookup, QuotePricer, QuoteReader, QuoteService, QuoteWriter, RateCheck, RateHistory
-│   └── sweep/         DueCutoff, PendingClaimer, PendingLedgerCheck, PendingOverdueGauge, PendingResolver (resolves overdue PENDING conversions)
+│   ├── quote/         QuoteLookup+Impl, QuotePricer, QuoteReader+Impl, QuoteService+Impl, QuoteWriter, RateCheck, RateHistory
+│   └── sweep/         DueCutoff, PendingClaimer, PendingLedgerCheck, PendingOverdueGauge, PendingResolver+Impl (resolves overdue PENDING conversions)
 ├── scheduler/         PendingConversionSweeper
-├── mapper/            ConversionMapper, QuoteMapper
-├── domain/            ConversionStatus, Currency, LedgerAnswer, MarketRate, Money, PairPolicy, Priced, Pricing, Quote, RateRejection, RateRules, RateValidator, RejectionReason, Settlement, Side (no framework imports)
+├── mapper/            ConversionMapper+Impl, QuoteMapper+Impl
+├── domain/            ConversionStatus, Currency, LedgerAnswer, MarketRate, Money, PairPolicy, Priced, Pricing, Quote, RateRejection, RateRules, RateValidator+Impl, RejectionReason, Settlement, Side (no framework imports)
 ├── exception/         ConversionException, ErrorCode (codes only, no HTTP status)
 ├── outbound/
 │   ├── ledger/        LedgerGrpcClient, LedgerGuard, LedgerReplyMapper, Operation (ledger ACL over gRPC: generated messages, Resilience4j retry and breaker per operation, replies to LedgerAnswer)
@@ -183,10 +188,10 @@ io.ezeebit.conversion  ConversionApplication
 │   └── rates/         RateCall, RateClient, RateDto, RateMapper (rate-feed ACL; RateCall is one fetch with its retry)
 ├── data/
 │   ├── model/         ConversionEntity, QuoteEntity
-│   └── repo/          ConversionRepo, QuoteRepo, Timestamps
+│   └── repo/          ConversionRepo+Jdbc, QuoteRepo+Jdbc, Timestamps
 ├── common/
 │   ├── log/           LogText (log-safe caller and upstream text)
-│   └── metrics/       ConversionMetrics, ConversionSpans
+│   └── metrics/       ConversionMetrics+Impl, ConversionSpans+Impl
 └── config/            ApiVersionConfig, ClientConfig, GatewayProofConfig, KafkaConfig, OpenApiConfig
     └── properties/    ConversionProperties (served pricing policy)
 ```
@@ -198,22 +203,22 @@ api.advice         -> common.log(2), exception(6)
 api.doc            -> api.advice(1), exception(28)
 api.filter         -> exception(2)
 api.validation     -> dto.req(1)
-common.metrics      -> domain(4), exception(3)
-config              -> api.doc(2), api.filter(1), config.properties(1), domain(2), outbound.discovery(1)
-ctl                 -> dto.req(2), dto.resp(4), service.conversion(2), service.quote(1)
-data.repo           -> data.model(2)
-domain              -> exception(7)
-dto.req             -> api.json(1), api.validation(1)
-mapper              -> data.model(2), domain(6), dto.resp(2)
-outbound.deadletter -> common.log(1), common.metrics(1), config.properties(1), service.port(2)
-outbound.ledger     -> common.log(2), contracts(7), domain(2), service.port(4)
-outbound.rates      -> common.log(1), common.metrics(1), domain(6), exception(2), service.port(1)
-scheduler           -> common.metrics(2), service.sweep(2)
-service             -> config.properties(1), domain(2), exception(2)
-service.conversion  -> common.metrics(3), data.model(6), data.repo(4), domain(8), dto.req(2), dto.resp(6), exception(5), mapper(1), service.port(2), service.quote(4)
-service.port        -> domain(3)
-service.quote       -> common.metrics(1), config.properties(3), data.model(2), data.repo(3), domain(14), dto.req(2), dto.resp(3), exception(3), mapper(2), service(3), service.port(1)
-service.sweep       -> common.metrics(1), config.properties(1), data.model(1), data.repo(2), domain(2), service.conversion(1), service.port(1)
+common.metrics     -> domain(7), exception(5)
+config             -> api.doc(2), api.filter(1), config.properties(1), domain(3), outbound.discovery(1)
+ctl                -> dto.req(2), dto.resp(4), service.conversion(2), service.quote(1)
+data.repo          -> data.model(4)
+domain             -> exception(7)
+dto.req            -> api.json(1), api.validation(1)
+mapper             -> data.model(4), domain(11), dto.resp(4)
+outbound.deadletter-> common.log(1), common.metrics(1), config.properties(1), service.port(2)
+outbound.ledger    -> common.log(2), contracts(7), domain(2), service.port(4)
+outbound.rates     -> common.log(1), common.metrics(1), domain(6), exception(2), service.port(1)
+scheduler          -> common.metrics(2), service.sweep(2)
+service            -> config.properties(1), domain(4), exception(2)
+service.conversion -> common.metrics(3), data.model(8), data.repo(4), domain(10), dto.req(3), dto.resp(8), exception(5), mapper(1), service.port(2), service.quote(4)
+service.port       -> domain(3)
+service.quote      -> common.metrics(1), config.properties(3), data.model(4), data.repo(3), domain(15), dto.req(3), dto.resp(4), exception(3), mapper(2), service(3), service.port(1)
+service.sweep      -> common.metrics(1), config.properties(1), data.model(1), data.repo(2), domain(2), service.conversion(1), service.port(1)
 ```
 
 | Package | One job | Key classes |
@@ -246,7 +251,7 @@ service.sweep       -> common.metrics(1), config.properties(1), data.model(1), d
 
 ## gateway-svc
 
-18 classes in 10 packages. Routing itself is configuration (`served/gateway-svc.yml`); the code is
+21 classes in 10 packages. Routing itself is configuration (`served/gateway-svc.yml`); the code is
 the rate limiter, the error envelope and the `RetryUnsent` route filter.
 
 ```text
@@ -254,12 +259,12 @@ io.ezeebit.gateway   GatewayApplication
 ├── api/
 │   ├── advice/      EdgeRefusalAdvice, ProblemFactory, UpstreamUnavailableAdvice
 │   └── filter/      MerchantPath, RateLimitFilter, UnsentRetryFilterFunctions (MerchantPath classifies the path for the limiter; UnsentRetryFilterFunctions is the RetryUnsent route filter and the one definition of "never sent")
-├── service/         MerchantBuckets (one Redis bucket per merchant, shared by replicas)
+├── service/         MerchantBuckets+Impl (one Redis bucket per merchant, shared by replicas)
 ├── scheduler/       StorePingScheduler (Redis store ping)
 ├── domain/          Admission, LimitOutcome
 ├── exception/       EdgeRefusalException, ErrorCode (web layer only; ErrorCode keeps its status)
 ├── common/
-│   └── metrics/     RateLimitMetrics, UpstreamResendMetrics
+│   └── metrics/     RateLimitMetrics+Impl, UpstreamResendMetrics+Impl
 └── config/          RateLimitConfig, RouteFilterConfig
     └── properties/  RateLimitProperties (served limits)
 ```
@@ -269,10 +274,10 @@ Dependencies (`from -> to(import lines)`):
 ```text
 api.advice     -> api.filter(1), exception(3)
 api.filter     -> common.metrics(2), domain(2), exception(2), service(1)
-common.metrics -> domain(2)
-config         -> api.filter(2), common.metrics(2), config.properties(1), scheduler(1), service(1)
+common.metrics -> domain(4)
+config         -> api.filter(2), common.metrics(4), config.properties(1), scheduler(1), service(2)
 scheduler      -> service(1)
-service        -> config.properties(1), domain(1)
+service        -> config.properties(1), domain(2)
 ```
 
 | Package | One job | Key classes |
@@ -538,6 +543,7 @@ service rewrite.
 | code several services need, that is not business code | a top-level source directory like `persistence/` or `discovery/`, wired into exactly the services that need it by a `configure([...])` block in `build.gradle` | the JaCoCo exclusion in `build.gradle` for every service but the one that tests it (Sonar already indexes such a directory in ledger-svc only) |
 | a Kubernetes workload or setting | `k8s/base/<area>/`, labelled with the `ezeebit.io/stage` it starts in | its NetworkPolicy edges in `k8s/base/policy/` (every namespace denies by default); a third-party image identical to `compose.yaml`'s (`image-parity` gate); `docs/k8s.md` |
 | a collaborator to a bean that already has 3 | a new class for the step that needs it (split by job, or extract a cohesive collaborator) | `DependencyBudgetTest` fails the build at 4; never a holder object, a context lookup or field injection |
+| a bean another package injects | a public interface, with `XImpl` or `JdbcXRepo` beside it | `CodeToInterfaceTest` fails a concrete class injected across packages |
 
 ## Measuring it
 
@@ -547,13 +553,13 @@ same numbers (a package count includes the root package holding the application 
 a generated class from `contracts/` counts as one edge to `contracts`. For the
 refactor BEFORE and AFTER, run it in a checkout of `4e1af9a` and `19bc692`; for the
 dependency-injection BEFORE, `103e5cf`. Last run on 2026-10-16 at `e7aed35` for all three
-services: the counts, trees and edges above describe the main code at that commit. Between `e1f1682`
+services, and superseded by the 2026-11-09 re-run below. Between `e1f1682`
 and `e7aed35` only gateway-svc changed, 15 to 18 classes (`UnsentRetryFilterFunctions`,
 `UpstreamResendMetrics`, `RouteFilterConfig`), adding the edge `api.advice -> api.filter(1)` and one
 import line each to `api.filter -> common.metrics`, `config -> api.filter` and
 `config -> common.metrics`. Between the 2026-10-14 run at `719f084` and `e1f1682`, only
 conversion-svc's class count changed, 96 to 97, when `0cdc830` added `KafkaConfig`; it imports nothing
-from `io.ezeebit`, so no edge moved.
+from `io.ezeebit`, so no edge moved. On 2026-11-09 the three trees and edges were re-run for the interface extraction on `bugfix-di-code-to-interfaces` (ledger 96 to 116 classes, conversion 97 to 112, gateway 18 to 21), walking the source tree because the new files were not yet tracked.
 
 ```sh
 for s in ledger conversion gateway; do

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 
 // Translates the ledger's stored results and its gRPC refusals into this context's vocabulary.
 @Component
-public class LedgerReplyMapper {
+class LedgerReplyMapper {
 
 	static final String LEDGER_DOMAIN = "ledger.ezeebit.io";
 

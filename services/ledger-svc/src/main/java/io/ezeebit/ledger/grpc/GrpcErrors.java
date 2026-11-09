@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 
 // The code travels as ErrorInfo.reason so the caller decides on the code, never on the status alone.
 @Component
-public class GrpcErrors implements GrpcExceptionHandler {
+class GrpcErrors implements GrpcExceptionHandler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(GrpcErrors.class);
 	static final String DOMAIN = "ledger.ezeebit.io";

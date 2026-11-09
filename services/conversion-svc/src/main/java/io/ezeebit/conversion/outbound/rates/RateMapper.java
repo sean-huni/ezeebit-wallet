@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 // Anything the feed sends that cannot be read as the pair asked for, at an exact decimal and an instant, is refused.
 @Component
-public class RateMapper {
+class RateMapper {
 
 	// The spread factor adds 4 decimals and rates are stored at 18: more than 14 would be rounded silently.
 	private static final int MAX_RATE_DECIMALS = 14;

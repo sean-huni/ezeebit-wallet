@@ -42,7 +42,9 @@ public final class UnsentRetryFilterFunctions {
 		};
 	}
 
-	// Static filter functions get no injection: the bean is resolved per request, as the gateway's own lb filter does.
+	// [!CONVENTION-OVERRIDE] constructor injection (SOLID DIP, https://en.wikipedia.org/wiki/SOLID): a @Shortcut filter
+	// function is a static method the gateway finds by reflection, so nothing can inject it. The bean is resolved per
+	// request, as the gateway's own lb filter does.
 	private static void countResend(final ServerRequest request) {
 		Object route = MvcUtils.getAttribute(request, MvcUtils.GATEWAY_ROUTE_ID_ATTR);
 		MvcUtils.getApplicationContext(request).getBean(UpstreamResendMetrics.class).resent(String.valueOf(route));

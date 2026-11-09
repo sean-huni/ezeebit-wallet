@@ -8,13 +8,13 @@ import org.springframework.stereotype.Component;
 
 // Not transactional itself: a duplicate identity must be caught outside the transaction it rolled back.
 @Component
-public class ConversionPostingRecorder {
+class ConversionPostingRecorder {
 
 	private final ConversionPoster poster;
 	private final ConversionReplayer replayer;
 	private final RefusalRecorder refusals;
 
-	public ConversionPostingRecorder(final ConversionPoster poster, final ConversionReplayer replayer,
+	ConversionPostingRecorder(final ConversionPoster poster, final ConversionReplayer replayer,
 			final RefusalRecorder refusals) {
 		this.poster = poster;
 		this.replayer = replayer;

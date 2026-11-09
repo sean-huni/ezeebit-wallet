@@ -10,13 +10,13 @@ import io.ezeebit.conversion.data.repo.QuoteRepo;
 import org.springframework.stereotype.Component;
 
 @Component
-public class RateHistory {
+class RateHistory {
 
 	private final QuoteRepo quotes;
 	private final ConversionProperties properties;
 	private final Clock clock;
 
-	public RateHistory(final QuoteRepo quotes, final ConversionProperties properties, final Clock clock) {
+	RateHistory(final QuoteRepo quotes, final ConversionProperties properties, final Clock clock) {
 		this.quotes = quotes;
 		this.properties = properties;
 		this.clock = clock;

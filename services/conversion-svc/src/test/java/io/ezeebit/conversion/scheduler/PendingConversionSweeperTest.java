@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.ezeebit.conversion.common.metrics.ConversionMetrics;
+import io.ezeebit.conversion.common.metrics.ConversionMetricsImpl;
 import io.ezeebit.conversion.common.metrics.ConversionSpans;
 import io.ezeebit.conversion.service.sweep.PendingResolver;
 import io.ezeebit.conversion.service.sweep.PendingResolver.Swept;
@@ -27,7 +27,7 @@ class PendingConversionSweeperTest {
 				Optional.of(new Swept(UUID.randomUUID(), "voided")), Optional.of(new Swept(UUID.randomUUID(), "completed")),
 				Optional.empty());
 
-		new PendingConversionSweeper(resolver, new ConversionMetrics(new SimpleMeterRegistry(), observations)).sweep();
+		new PendingConversionSweeper(resolver, new ConversionMetricsImpl(new SimpleMeterRegistry(), observations)).sweep();
 
 		TestObservationRegistryAssert.assertThat(observations).hasSingleObservationThat()
 				.hasNameEqualTo(ConversionSpans.SWEEP).hasBeenStopped().hasLowCardinalityKeyValue("result", "resolved")

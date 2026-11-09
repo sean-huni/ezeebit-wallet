@@ -9,11 +9,11 @@ import org.springframework.stereotype.Component;
 
 // RFC 9457 body: stable `code` for machines, localised `detail` for people; the same envelope as the services.
 @Component
-public class ProblemFactory {
+class ProblemFactory {
 
 	private final MessageSource messages;
 
-	public ProblemFactory(final MessageSource messages) {
+	ProblemFactory(final MessageSource messages) {
 		this.messages = messages;
 	}
 

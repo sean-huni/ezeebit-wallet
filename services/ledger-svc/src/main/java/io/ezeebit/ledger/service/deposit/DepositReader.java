@@ -10,12 +10,12 @@ import io.ezeebit.ledger.mapper.StatementMapper;
 import org.springframework.stereotype.Service;
 
 @Service
-public class DepositReader {
+class DepositReader {
 
 	private final EntryRepo entries;
 	private final StatementMapper mapper;
 
-	public DepositReader(final EntryRepo entries, final StatementMapper mapper) {
+	DepositReader(final EntryRepo entries, final StatementMapper mapper) {
 		this.entries = entries;
 		this.mapper = mapper;
 	}

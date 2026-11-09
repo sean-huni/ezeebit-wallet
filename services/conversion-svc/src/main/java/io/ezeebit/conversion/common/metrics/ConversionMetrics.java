@@ -7,6 +7,7 @@ import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.domain.RejectionReason;
 import io.ezeebit.conversion.domain.Settlement;
 import io.ezeebit.conversion.exception.ConversionException;
+import io.ezeebit.conversion.exception.ErrorCode;
 
 public interface ConversionMetrics {
 
@@ -17,6 +18,7 @@ public interface ConversionMetrics {
 	String SWEEPS = "ezeebit.conversion.sweeps";
 	String DEAD_LETTERS = "ezeebit.conversion.ledger.deadletter";
 	String DEAD_LETTER_FAILURES = "ezeebit.conversion.ledger.deadletter.publish.failed";
+	String NONE = "none";
 
 	ConversionSpans spans();
 
@@ -38,6 +40,10 @@ public interface ConversionMetrics {
 
 	static String sweepAction(final LedgerAnswer answer) {
 		return answer.settlement().map(ConversionMetrics::action).orElse("unresolved");
+	}
+
+	static String detail(final ConversionException refusal) {
+		return refusal.code() == ErrorCode.RATE_REJECTED ? String.valueOf(refusal.properties().getOrDefault("reason", NONE)) : NONE;
 	}
 
 	private static String action(final Settlement settlement) {

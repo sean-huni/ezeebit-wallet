@@ -6,7 +6,6 @@ import io.ezeebit.conversion.domain.ConversionStatus;
 import io.ezeebit.conversion.domain.LedgerAnswer;
 import io.ezeebit.conversion.domain.RejectionReason;
 import io.ezeebit.conversion.exception.ConversionException;
-import io.ezeebit.conversion.exception.ErrorCode;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.ObservationRegistry;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConversionMetricsImpl implements ConversionMetrics {
 
-	private static final String NONE = "none";
 	// Spring's JDK read timeout starts at send and so covers connect: 2 s an attempt, 4.2 s for two plus 200 ms.
 	private static final Duration[] RATE_CALL_BUCKETS = { Duration.ofMillis(25), Duration.ofMillis(50),
 			Duration.ofMillis(100), Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofSeconds(1),
@@ -27,7 +25,7 @@ public class ConversionMetricsImpl implements ConversionMetrics {
 
 	public ConversionMetricsImpl(final MeterRegistry registry, final ObservationRegistry observations) {
 		this.registry = registry;
-		this.spans = new ConversionSpans(observations);
+		this.spans = new ConversionSpansImpl(observations);
 	}
 
 	// The business spans travel with the counters, so a service records both through its one telemetry dependency.
@@ -44,11 +42,7 @@ public class ConversionMetricsImpl implements ConversionMetrics {
 	// The detail is read only from a rate rejection, whose reason is always a RateRejection constant.
 	@Override
 	public void quoteRefused(final String pair, final ConversionException refusal) {
-		quote(pair, "refused", refusal.code().name(), detail(refusal));
-	}
-
-	static String detail(final ConversionException refusal) {
-		return refusal.code() == ErrorCode.RATE_REJECTED ? String.valueOf(refusal.properties().getOrDefault("reason", NONE)) : NONE;
+		quote(pair, "refused", refusal.code().name(), ConversionMetrics.detail(refusal));
 	}
 
 	@Override

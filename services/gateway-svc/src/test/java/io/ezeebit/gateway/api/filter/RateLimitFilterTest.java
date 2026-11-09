@@ -10,11 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.ezeebit.gateway.common.metrics.RateLimitMetrics;
+import io.ezeebit.gateway.common.metrics.RateLimitMetricsImpl;
 import io.ezeebit.gateway.config.properties.RateLimitProperties;
 import io.ezeebit.gateway.domain.Admission;
 import io.ezeebit.gateway.exception.EdgeRefusalException;
 import io.ezeebit.gateway.exception.ErrorCode;
 import io.ezeebit.gateway.service.MerchantBuckets;
+import io.ezeebit.gateway.service.MerchantBucketsImpl;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
@@ -37,10 +39,10 @@ class RateLimitFilterTest {
 	// A failure nobody anticipated in the limiter path is still a counted 503, never a 500 and never forwarded.
 	@Test
 	void anUnexpectedFailureIsACountedUnavailableRefusal() throws Exception {
-		MerchantBuckets broken = new MerchantBuckets(() -> {
+		MerchantBuckets broken = new MerchantBucketsImpl(() -> {
 			throw new IllegalStateException("not a store error anyone classified");
 		}, LIMITS, System::nanoTime);
-		RateLimitMetrics metrics = new RateLimitMetrics(registry, observations);
+		RateLimitMetrics metrics = new RateLimitMetricsImpl(registry, observations);
 		RateLimitFilter filter = new RateLimitFilter(broken, metrics, (request, response, handler, ex) -> {
 			resolved.add(ex);
 			return null;
@@ -64,7 +66,7 @@ class RateLimitFilterTest {
 	void anAdmittedRequestIsOneDecisionSpanThatEndsBeforeItIsForwarded() throws Exception {
 		MerchantBuckets admitting = mock(MerchantBuckets.class);
 		when(admitting.tryConsume(anyString())).thenReturn(Admission.allowed(9));
-		RateLimitFilter filter = new RateLimitFilter(admitting, new RateLimitMetrics(registry, observations),
+		RateLimitFilter filter = new RateLimitFilter(admitting, new RateLimitMetricsImpl(registry, observations),
 				(request, response, handler, ex) -> null);
 		MockFilterChain chain = new MockFilterChain() {
 			@Override

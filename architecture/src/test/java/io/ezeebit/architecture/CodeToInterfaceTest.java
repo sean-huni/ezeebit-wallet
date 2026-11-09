@@ -21,11 +21,15 @@ class CodeToInterfaceTest {
 	}
 
 	@Test
-	void flagsOnlyTheConcreteClassInjectedAcrossPackages() {
+	void flagsConcreteAcrossPackagesThroughEveryInjectionKindAndNothingElse() {
 		List<Class<?>> fixtures = DependencyBudget.beans(FIXTURES, type -> true);
 
 		assertThat(InjectedSeams.offenders(fixtures)).containsExactly(
-				"%s.caller.ConcreteAcrossCaller -> %s.callee.ConcreteCallee".formatted(FIXTURES, FIXTURES));
+				offender("BuiltAcross"), offender("ConcreteAcrossCaller"), offender("FieldAcrossCaller"), offender("ListAcrossCaller"));
+	}
+
+	private static String offender(final String caller) {
+		return "%s.caller.%s -> %s.callee.ConcreteCallee".formatted(FIXTURES, caller, FIXTURES);
 	}
 
 }

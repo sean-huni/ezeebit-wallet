@@ -215,11 +215,11 @@ None of them changes my ledger's model; each is a new caller that posts journals
 
 **Proof:**
 
-- 831 tests at release 0.4.0, 0 failures. I saw every concurrency, idempotency and
+- 865 tests at release 0.5.0, 0 failures. I saw every concurrency, idempotency and
   currency-integrity test fail with its control removed before I trusted it.
-- On a kind Kubernetes cluster at 2 replicas, my 0.4.0 sweep killed 3 pods mid-traffic over 1609
-  requests: 3 merchant failures, all inside the 20s budget, and **803 COMPLETED conversions against
-  803 POSTED journals, none posted twice**. The same run paged Slack from kind.
+- On a kind Kubernetes cluster at 2 replicas, my 0.5.0 sweep killed 3 pods mid-traffic over 1670
+  requests: 2 merchant failures, all inside the 20s budget, and **834 COMPLETED conversions against
+  834 POSTED journals, none posted twice**. The same run paged Slack from kind.
 
 **Lessons learnt:**
 
@@ -259,7 +259,7 @@ failures I know will happen: a pod killed mid-request, a replica gone, a depende
 - Least privilege: it can list and delete pods in the app and data namespaces only; never
   monitoring, never Secrets. Every sweep asks the API server to prove it (Appendix E).
 - A run counts as evidence only with traffic during the kills, a failure when it killed fewer pods
-  than asked, and the reconciliation afterwards (my 803 = 803 at 0.4.0).
+  than asked, and the reconciliation afterwards (my 834 = 834 at 0.5.0).
 
 ## Appendix B: my design against a classic high-contention problem
 

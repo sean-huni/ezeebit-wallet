@@ -20,7 +20,7 @@ How to reproduce each section:
 | Service discovery | `./k8s/kube.sh up`, the socat bridge below, then `cd docs/observability/verification && node 2026-10-16-eureka-capture.mjs` | [2026-10-16-eureka-capture.mjs](docs/observability/verification/2026-10-16-eureka-capture.mjs) reads the registry table, fails unless it holds exactly gateway-svc, ledger-svc and conversion-svc at `UP (2)` each, and takes the image |
 | SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
-| Dependency versions | `./gradlew --no-build-cache clean spotlessApply checkVersions`, and the same with `-PguavaVersion=33.6.0-jre` | [docs/supply-chain.md](docs/supply-chain.md); images under [Dependency versions](#dependency-versions-2026-11-09) |
+| Dependency versions (SCA) | `./gradlew --no-build-cache clean spotlessApply checkVersions`, and the same with `-PguavaVersion=33.6.0-jre` | [docs/supply-chain.md](docs/supply-chain.md); images under [Dependency versions](#dependency-versions-2026-11-09) |
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
 
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
@@ -553,7 +553,8 @@ checked against known vulnerabilities, plus a secrets scan of the history and th
 bill of materials (SBOM) per image. The scanners are trivy 0.74.0 and gitleaks v8.30.1, pinned by
 digest in `security/scanners.lock`; see [docs/supply-chain.md](docs/supply-chain.md). The gate fails
 only on a finding that is `HIGH` or `CRITICAL`, and fixable, and in a SERVICE layer (this repository's
-code); SHARED layers come from the buildpack base.
+code); SHARED layers come from the buildpack base. The second SCA instrument, `checkVersions`, reads Maven modules rather than
+images and has its own section, [Dependency versions](#dependency-versions-2026-11-09).
 
 | Fact | Number | Universe | Command |
 |---|---|---|---|
@@ -597,6 +598,9 @@ distinct (44 fixable, 74 raw).
 the console; the distinct totals match the console's distinct column.
 
 ## Dependency versions (2026-11-09)
+
+`checkVersions` is software composition analysis (SCA) at dependency level: it matches the modules on the services' runtime
+classpaths against OSV. The `spotlessApply` in the same command is not SCA: it formats this repository's own source.
 
 Captured at `4ff1d2c` by running the command through a pseudo-terminal and rendering its colour output to an image.
 The report text and colours are the task's own; the prompt bar is drawn to match a terminal, so it is decoration.

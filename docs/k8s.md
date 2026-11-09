@@ -446,6 +446,13 @@ from 00:09:01 to 00:23:40 +0200, the logs were last written at 00:14:20 and 00:1
 and 1 m 33 s, and gitleaks counted 278 commits, one fewer than the repository holds with `5fe4d69`. Whether
 the working tree was clean during them is not recorded.
 
+**Release 0.5.0** (dependency-injection refactor, Spotless, `checkVersions`, Paketo builder 0.0.203): one run on
+`rel-0.5.0` from a clean tree with `SLACK_WEBHOOK_URL` set, started 15:01:09Z at `4bd8ce5`, ending `sweep exit=0`
+([2026-11-09-0.5.0-sweep.log](k8s/verification/2026-11-09-0.5.0-sweep.log)): 3 kills, 1670 requests, 2 merchant
+failures (quote 504s 3.4 s and 3.7 s after the conversion-svc kill), 834 COMPLETED conversions against 834 POSTED
+journals, none posted twice; 65 of 200 burst requests admitted against a bound of 120; the outage alert fired 5 s after
+the first dead letter, and `grafana_alerting_notifications_total{integration="slack"}` rose 0 to 1.
+
 **Release 0.4.0** (Pyroscope profiling, G1 with compact object headers, Spring Boot 4.1.2, Paketo builder
 0.0.198): two runs on `rel-0.4.0`, each from a clean tree and ending `sweep exit=0`, 9 of 9 checks. The first,
 started 18:33:51Z at `9ec4107` ([2026-11-05-0.4.0-sweep.log](k8s/verification/2026-11-05-0.4.0-sweep.log)),

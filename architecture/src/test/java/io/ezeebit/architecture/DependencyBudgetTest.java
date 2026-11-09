@@ -30,8 +30,10 @@ class DependencyBudgetTest {
 				DependencyBudget.beans("io.ezeebit.architecture.fixture", type -> true));
 
 		assertThat(DependencyBudget.report(offenders)).isEqualTo(String.join("\n",
-				"2 exceed 3 injected dependencies:",
+				"4 exceed 3 injected dependencies:",
 				"  @Bean io.ezeebit.architecture.fixture.OverBudgetConfig#overBudget has 4",
+				"  @Bean io.ezeebit.architecture.fixture.OverBudgetHidden$ChildConfig#inherited has 4",
+				"  @Bean io.ezeebit.architecture.fixture.OverBudgetHidden$ConditionalConfig#conditional has 4",
 				"  bean io.ezeebit.architecture.fixture.OverBudgetConfig has 4"));
 	}
 

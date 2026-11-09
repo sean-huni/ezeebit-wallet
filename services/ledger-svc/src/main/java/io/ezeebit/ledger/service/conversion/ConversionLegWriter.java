@@ -62,7 +62,8 @@ class ConversionLegWriter {
 	private Map<UUID, AccountEntity> lockInOrder(final UUID first, final UUID second) {
 		Map<UUID, AccountEntity> locked = new HashMap<>();
 		for (UUID id : List.of(first, second).stream().sorted(LOCK_ORDER).toList()) {
-			locked.put(id, accounts.lockById(id));
+			AccountEntity account = accounts.lockById(id);
+			locked.put(id, account);
 		}
 		return locked;
 	}

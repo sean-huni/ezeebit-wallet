@@ -54,8 +54,8 @@ public final class ProblemResponses implements OpenApiCustomizer {
 	}
 
 	private Map<String, Object> example(final HttpStatus status, final ErrorCode code) {
-		return Map.of("title", status.getReasonPhrase(), "status", status.value(), "code", code.name(),
-				"detail", messages.getMessage(code.key(), null, Locale.ENGLISH));
+		String detail = messages.getMessage(code.key(), null, Locale.ENGLISH);
+		return Map.of("title", status.getReasonPhrase(), "status", status.value(), "code", code.name(), "detail", detail);
 	}
 
 }

@@ -2,6 +2,7 @@ package io.ezeebit.ledger.service.conversion.answer;
 
 import java.util.UUID;
 
+import io.ezeebit.ledger.data.model.JournalEntity;
 import io.ezeebit.ledger.data.repo.JournalRepo;
 import io.ezeebit.ledger.domain.JournalType;
 import io.ezeebit.ledger.domain.MerchantId;
@@ -29,9 +30,10 @@ class ConversionPostingReaderImpl implements ConversionPostingReader {
 
 	@Override
 	public ConversionPostingResp read(final MerchantId merchant, final UUID conversionId) {
-		return assembler.assemble(journals.findByIdentity(merchant.value(), JournalType.CONVERSION.name(),
+		JournalEntity journal = journals.findByIdentity(merchant.value(), JournalType.CONVERSION.name(),
 				conversionId.toString()).orElseThrow(() -> new LedgerException(ErrorCode.POSTING_NOT_FOUND, "conversionId",
-						conversionId.toString())));
+						conversionId.toString()));
+		return assembler.assemble(journal);
 	}
 
 }

@@ -6,6 +6,7 @@ import java.util.UUID;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.ConversionStatus;
+import io.ezeebit.conversion.domain.Quote;
 import io.ezeebit.conversion.domain.RejectionReason;
 import io.ezeebit.conversion.dto.resp.ConversionResp;
 import io.ezeebit.conversion.exception.ConversionException;
@@ -31,7 +32,8 @@ class ConversionReaderImpl implements ConversionReader {
 	public ConversionResp find(final UUID merchantId, final UUID conversionId) {
 		ConversionEntity conversion = conversions.find(conversionId, merchantId).orElseThrow(
 				() -> new ConversionException(ErrorCode.CONVERSION_NOT_FOUND, "conversionId", conversionId));
-		return mapper.toResp(conversion, quotes.of(conversion.quote()));
+		Quote quote = quotes.of(conversion.quote());
+		return mapper.toResp(conversion, quote);
 	}
 
 	@Override
@@ -45,7 +47,8 @@ class ConversionReaderImpl implements ConversionReader {
 			throw new ConversionException(RejectionReason.valueOf(conversion.reason()).answer(), null, conversion.id(), conversion.reason())
 					.with("conversionId", conversion.id()).with("reason", conversion.reason());
 		}
-		return mapper.toResp(conversion, quotes.of(conversion.quote()));
+		Quote quote = quotes.of(conversion.quote());
+		return mapper.toResp(conversion, quote);
 	}
 
 }

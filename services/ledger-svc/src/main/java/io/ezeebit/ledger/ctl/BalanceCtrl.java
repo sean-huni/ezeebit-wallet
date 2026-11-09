@@ -30,7 +30,8 @@ public class BalanceCtrl {
 	@GetMapping
 	public ApiResponse<List<BalanceResp>> balances(
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @PathVariable final UUID merchantId) {
-		return new ApiResponse<>(balances.balances(merchantId));
+		List<BalanceResp> found = balances.balances(merchantId);
+		return new ApiResponse<>(found);
 	}
 
 }

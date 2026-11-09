@@ -2,6 +2,7 @@ package io.ezeebit.conversion.service.conversion;
 
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.domain.LedgerAnswer;
+import io.ezeebit.conversion.domain.Quote;
 import io.ezeebit.conversion.service.port.LedgerPosting;
 import io.ezeebit.conversion.service.port.LedgerPostings;
 import io.ezeebit.conversion.service.quote.QuoteReader;
@@ -23,8 +24,9 @@ class ConversionLedgerPoster {
 	// The ledger keeps one journal per conversion id, POSTED, VOID or REFUSED, and replays it: posting again
 	// returns the first outcome, so money moves at most once and never after a recorded refusal.
 	public ConversionEntity postAndSettle(final ConversionEntity conversion) {
-		LedgerAnswer answer = ledger.post(new LedgerPosting(conversion.id(), conversion.merchantId(),
-				quotes.of(conversion.quote()), conversion.deadline()));
+		Quote quote = quotes.of(conversion.quote());
+		LedgerAnswer answer = ledger.post(new LedgerPosting(conversion.id(), conversion.merchantId(), quote,
+				conversion.deadline()));
 		return settler.settleCommitted(conversion, answer);
 	}
 

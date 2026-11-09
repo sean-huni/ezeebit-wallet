@@ -3,6 +3,8 @@ package io.ezeebit.ledger.grpc;
 import io.ezeebit.contracts.ledger.v1.ConversionPostingsGrpc;
 import io.ezeebit.contracts.ledger.v1.PostingRequest;
 import io.ezeebit.contracts.ledger.v1.PostingResult;
+import io.ezeebit.ledger.dto.req.ConversionPostingReq;
+import io.ezeebit.ledger.dto.resp.ConversionPostingResp;
 import io.ezeebit.ledger.service.conversion.ConversionPostingService;
 import io.grpc.stub.StreamObserver;
 import org.springframework.grpc.server.service.GrpcService;
@@ -20,7 +22,10 @@ public class ConversionPostingRpc extends ConversionPostingsGrpc.ConversionPosti
 
 	@Override
 	public void post(final PostingRequest request, final StreamObserver<PostingResult> reply) {
-		reply.onNext(messages.toResult(postings.post(messages.toRequest(request))));
+		ConversionPostingReq posting = messages.toRequest(request);
+		ConversionPostingResp posted = postings.post(posting);
+		PostingResult result = messages.toResult(posted);
+		reply.onNext(result);
 		reply.onCompleted();
 	}
 

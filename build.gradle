@@ -251,6 +251,9 @@ def javaImportsAndWhitespace = { format ->
 	format.endWithNewline()
 }
 
+apply from: 'gradle/no-nested-di-calls.gradle'
+def noNestedDiCalls = ext.noNestedDiCalls
+
 def services = subprojects.findAll { it.parent != rootProject }
 configure(services) {
 	apply plugin: 'checkstyle'
@@ -277,6 +280,10 @@ configure(services) {
 		java {
 			target 'src/**/*.java'
 			javaImportsAndWhitespace(it)
+		}
+		format 'noNestedDiCalls', {
+			target 'src/main/**/*.java'
+			custom 'noNestedDiCalls', noNestedDiCalls
 		}
 	}
 
@@ -539,6 +546,10 @@ spotless {
 	java {
 		target 'observability/src/**/*.java', 'architecture/src/**/*.java', 'discovery/src/**/*.java', 'persistence/src/**/*.java'
 		javaImportsAndWhitespace(it)
+	}
+	format 'noNestedDiCalls', {
+		target 'observability/src/main/**/*.java', 'discovery/src/main/**/*.java', 'persistence/src/main/**/*.java'
+		custom 'noNestedDiCalls', noNestedDiCalls
 	}
 }
 

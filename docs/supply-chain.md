@@ -9,7 +9,7 @@ the Gradle Plugin Portal and OSV directly.
 
 `checkSupplyChain` and `checkVersions` are the two software composition analysis (SCA) checks: the first reads the built images,
 the second reads the Maven modules before an image exists. `spotlessApply` also appears below and is not SCA: it formats this
-repository's own source.
+repository's own source, and its `noNestedDiCalls` step is a readability rule on that source.
 
 | Task | Runs in | Reads | Needs |
 |---|---|---|---|
@@ -37,7 +37,7 @@ The same run with an old Guava forced in by `-PguavaVersion=33.6.0-jre`: one HIG
 ![checkVersions failing on a HIGH advisory with a fix](evidence/versions/version-report-failed.png)
 
 ```sh
-./gradlew spotlessApply                      # fix formatting first; spotlessCheck in check fails otherwise
+./gradlew spotlessApply                      # fix formatting first; a noNestedDiCalls failure stops here until fixed by hand
 ./gradlew checkVersions                      # pins and advisories; -P<xVersion>=<v> tries a version without editing
 ./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.5.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain

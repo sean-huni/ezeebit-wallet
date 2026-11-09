@@ -17,7 +17,8 @@ final class PushRecorder {
 
 	PushRecorder(final Clock clock) {
 		this.clock = clock;
-		this.lastSuccessMillis = new AtomicLong(clock.millis());
+		long startMillis = clock.millis();
+		this.lastSuccessMillis = new AtomicLong(startMillis);
 	}
 
 	void begin() {
@@ -43,7 +44,8 @@ final class PushRecorder {
 		boolean[] state = call.get();
 		call.remove();
 		if (state != null && state[0] && !state[1]) {
-			lastSuccessMillis.set(clock.millis());
+			long now = clock.millis();
+			lastSuccessMillis.set(now);
 		}
 	}
 

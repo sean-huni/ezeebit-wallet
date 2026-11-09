@@ -1,6 +1,7 @@
 package io.ezeebit.conversion.service.conversion;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 
 import io.ezeebit.conversion.common.metrics.ConversionMetrics;
@@ -31,8 +32,9 @@ public class ConversionSettlerImpl implements ConversionSettler {
 	public Optional<Settlement> settle(final ConversionEntity conversion, final LedgerAnswer answer) {
 		return answer.settlement().filter(settlement -> {
 			RejectionReason reason = settlement.reason();
+			Instant settledAt = clock.instant();
 			return conversions.settle(conversion.id(), settlement.status().name(), reason == null ? null : reason.name(),
-					clock.instant()) == 1;
+					settledAt) == 1;
 		});
 	}
 

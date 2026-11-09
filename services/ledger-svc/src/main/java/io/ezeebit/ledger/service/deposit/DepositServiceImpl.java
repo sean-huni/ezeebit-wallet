@@ -37,7 +37,8 @@ class DepositServiceImpl implements DepositService {
 		Currency currency = null;
 		try {
 			currency = intake.currency(request);
-			Recorded recorded = recorder.record(intake.command(idempotencyKey, request, currency), currency);
+			DepositCommand command = intake.command(idempotencyKey, request, currency);
+			Recorded recorded = recorder.record(command, currency);
 			metrics.deposit(span, currency, recorded.outcome(), null);
 			LOG.info("deposit {} in {}", recorded.outcome(), currency.code().value());
 			return recorded.answer();

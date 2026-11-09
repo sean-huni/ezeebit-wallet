@@ -16,7 +16,8 @@ class BalanceMapperImpl implements BalanceMapper {
 
 	@Override
 	public BalanceResp toResp(final AccountEntity account, final Currency currency) {
-		return new BalanceResp(account.currency(), format.format(account.balance(), currency.scale()));
+		String balance = format.format(account.balance(), currency.scale());
+		return new BalanceResp(account.currency(), balance);
 	}
 
 }

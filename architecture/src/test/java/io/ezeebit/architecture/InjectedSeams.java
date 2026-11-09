@@ -11,13 +11,11 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
-import org.springframework.context.annotation.Bean;
-
 // Code to interfaces: a bean takes a concrete project class only from its own package. Records and enums are data.
 // A @Bean method's parameters are the composition root; what it builds is read from its return type and its body.
 final class InjectedSeams {
 
-	private static final String PROJECT_ROOT = "io.ezeebit.";
+	static final String PROJECT_ROOT = "io.ezeebit.";
 
 	private InjectedSeams() {
 	}
@@ -26,20 +24,12 @@ final class InjectedSeams {
 		var offenders = new TreeSet<String>();
 		for (Class<?> bean : beans) {
 			collect(bean, offenders);
-			beanMethods(bean).stream()
+			BeanBodies.beanMethods(bean).stream()
 					.flatMap(InjectedSeams::builtBy)
 					.filter(built -> built.getName().startsWith(PROJECT_ROOT))
 					.forEach(built -> collect(built, offenders));
 		}
 		return List.copyOf(offenders);
-	}
-
-	private static List<Method> beanMethods(final Class<?> config) {
-		List<Method> methods = new ArrayList<>();
-		for (Class<?> type = config; type != null && type.getName().startsWith(PROJECT_ROOT); type = type.getSuperclass()) {
-			Arrays.stream(type.getDeclaredMethods()).filter(method -> method.isAnnotationPresent(Bean.class)).forEach(methods::add);
-		}
-		return methods;
 	}
 
 	private static Stream<Class<?>> builtBy(final Method bean) {

@@ -26,8 +26,10 @@ class CodeToInterfaceTest {
 
 		assertThat(InjectedSeams.offenders(fixtures)).containsExactly(
 				offender("BuiltAcross"),
-				offender("BuiltHidden$BehindInterface"), offender("BuiltHidden$Generic"),
-				offender("BuiltHidden$InLambda"), offender("BuiltHidden$Inherited"),
+				offender("BuiltHidden$BehindInterface"), offender("BuiltHidden$ByMethodRef"),
+				offender("BuiltHidden$ConditionalBuilt"), offender("BuiltHidden$DefaultBuilt"),
+				offender("BuiltHidden$Generic"), offender("BuiltHidden$GrandBuilt"), offender("BuiltHidden$InLambda"),
+				offender("BuiltHidden$Inherited"), offender("BuiltHidden$MetaBuilt"),
 				offender("ConcreteAcrossCaller"), offender("FieldAcrossCaller"), offender("ListAcrossCaller"));
 	}
 

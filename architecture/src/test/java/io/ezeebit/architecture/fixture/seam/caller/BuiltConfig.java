@@ -1,5 +1,6 @@
 package io.ezeebit.architecture.fixture.seam.caller;
 
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.ezeebit.architecture.fixture.seam.callee.Callee;
@@ -28,6 +29,20 @@ public class BuiltConfig {
 	@Bean
 	Supplier<Object> builtInLambda(final ConcreteCallee callee) {
 		return () -> new BuiltHidden.InLambda(callee);
+	}
+
+	@Bean
+	Function<ConcreteCallee, Object> builtByMethodRef() {
+		return BuiltHidden.ByMethodRef::new;
+	}
+
+	@BuiltHidden.MetaBean
+	Object metaBuilt(final ConcreteCallee callee) {
+		return new BuiltHidden.MetaBuilt(callee);
+	}
+
+	Object builtAcross(final String notABean) {
+		return new BuiltHidden.NotABean(new ConcreteCallee());
 	}
 
 }

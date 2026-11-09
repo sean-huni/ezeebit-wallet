@@ -53,7 +53,8 @@ Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/e
 The root `check` also runs `checkSecrets` ([supply-chain.md](supply-chain.md)), `checkSingleProto`
 (see [Architecture gates](#architecture-gates)) and `checkDashboards`
 (`python3 docker/lgtm/generate.py --check`: the committed dashboards and alert rules must equal what the
-generator writes).
+generator writes), and `testVersionReport`, the offline half of `checkVersions` ([supply-chain.md](supply-chain.md)).
+When `spotlessCheck` fails, `./gradlew spotlessApply` rewrites the files it names.
 
 The first run of these gates found a real defect: conversion-svc accepted a currency code spelled
 with U+212A (Kelvin sign), which lower-cases onto `kes`. Codes are now American Standard Code for Information Interchange (ASCII) `[A-Z]{3,5}`, as in

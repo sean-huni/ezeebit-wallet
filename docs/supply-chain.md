@@ -25,7 +25,15 @@ is unverified.
 fills), and `testVersionReport`, in `check`, fails when a `*Version` property has none of those. Colour is off under `--console=plain`, `NO_COLOR`, `CI` or `TERM=dumb`;
 `build/reports/versions/report.txt` is always plain.
 
+![checkVersions passing: upgrades in orange and green, two MODERATE advisories, 0 blocking](evidence/versions/version-report-passed.png)
+
+The same run with an old Guava forced in by `-PguavaVersion=33.6.0-jre`: one HIGH advisory with a fix, so the task fails.
+
+![checkVersions failing on a HIGH advisory with a fix](evidence/versions/version-report-failed.png)
+
 ```sh
+./gradlew spotlessApply                      # fix formatting first; spotlessCheck in check fails otherwise
+./gradlew checkVersions                      # pins and advisories; -P<xVersion>=<v> tries a version without editing
 ./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.4.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed

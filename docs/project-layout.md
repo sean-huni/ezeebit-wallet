@@ -12,7 +12,7 @@ ezeebit-wallet/
 ├── services/        the five Spring Boot services, one Gradle project each (below)
 ├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, this layout, k8s.md (the kind fleet), evidence/ (security logs), fleet/ (the fleet diagram and its verification logs), superpowers/ (design specs and plans)
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
-├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml
+├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml; version_report.py behind checkVersions
 ├── docker/          local backing services: the Postgres init script, WireMock rate feed, and the Grafana LGTM image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OpenTelemetry Protocol (OTLP) settings and the logback appender, compiled into every service's main source set
 ├── persistence/     AdvisoryLockService, Liquibase's lock on a PostgreSQL advisory lock, compiled into ledger-svc and conversion-svc (below)
@@ -23,7 +23,7 @@ ezeebit-wallet/
 ├── contracts/       ledger/v1/conversion_postings.proto: the one gRPC Remote Procedure Call (gRPC) contract, compiled by ledger-svc and conversion-svc (checkSingleProto fails on a second copy)
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
 ├── build.gradle     shared conventions: test tiers, quality gates, image builds
-└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ and gradlew (wrapper), .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md, EVIDENCE.md
+└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ (wrapper, version-report.gradle) and gradlew, .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md, EVIDENCE.md
 ```
 
 | Service | Package root | One line |

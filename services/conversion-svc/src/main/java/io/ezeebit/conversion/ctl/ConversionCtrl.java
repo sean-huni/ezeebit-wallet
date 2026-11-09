@@ -69,7 +69,8 @@ public class ConversionCtrl {
 	public ApiResponse<ConversionResp> find(
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @PathVariable final UUID merchantId,
 			@PathVariable final UUID conversionId) {
-		return new ApiResponse<>(reader.find(merchantId, conversionId));
+		ConversionResp found = reader.find(merchantId, conversionId);
+		return new ApiResponse<>(found);
 	}
 
 }

@@ -23,7 +23,7 @@ ezeebit-wallet/
 ├── contracts/       ledger/v1/conversion_postings.proto: the one gRPC Remote Procedure Call (gRPC) contract, compiled by ledger-svc and conversion-svc (checkSingleProto fails on a second copy)
 ├── .circleci/       the CI job: the same Gradle commands a laptop runs
 ├── build.gradle     shared conventions: test tiers, quality gates, image builds
-└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ (wrapper, version-report.gradle) and gradlew, .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md, EVIDENCE.md
+└── compose.yaml, fleet.sh, settings.gradle, gradle.properties, gradle/ (wrapper, version-report.gradle, no-nested-di-calls.gradle) and gradlew, .sdkmanrc, README.md, ARCHITECTURE.md, SOLUTION.md, EVIDENCE.md
 ```
 
 | Service | Package root | One line |

@@ -2,6 +2,7 @@ package io.ezeebit.conversion.service.quote;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -25,7 +26,10 @@ class RateHistory {
 	// The instant is the quote's "now" too: the rate is checked and the quote expires against the same clock read.
 	public Snapshot read(final String sell, final String buy) {
 		Instant now = clock.instant();
-		return new Snapshot(now, quotes.recentRate(sell, buy, now.minus(properties.rates().jumpWindow())));
+		Duration window = properties.rates().jumpWindow();
+		Instant since = now.minus(window);
+		Optional<BigDecimal> recent = quotes.recentRate(sell, buy, since);
+		return new Snapshot(now, recent);
 	}
 
 	public record Snapshot(Instant now, Optional<BigDecimal> recent) {

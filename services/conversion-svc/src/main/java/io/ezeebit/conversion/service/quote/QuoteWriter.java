@@ -1,9 +1,11 @@
 package io.ezeebit.conversion.service.quote;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 import io.ezeebit.conversion.config.properties.ConversionProperties;
+import io.ezeebit.conversion.data.model.QuoteEntity;
 import io.ezeebit.conversion.data.repo.QuoteRepo;
 import io.ezeebit.conversion.domain.MarketRate;
 import io.ezeebit.conversion.domain.Priced;
@@ -27,8 +29,11 @@ class QuoteWriter {
 
 	public QuoteResp store(final UUID merchantId, final Priced priced, final MarketRate rate, final int spreadBps,
 			final Instant now) {
-		Quote quote = mapper.toDomain(merchantId, priced, rate, spreadBps, now.plus(properties.quoteTtl()));
-		quotes.insert(mapper.toEntity(quote));
+		Duration ttl = properties.quoteTtl();
+		Instant expiresAt = now.plus(ttl);
+		Quote quote = mapper.toDomain(merchantId, priced, rate, spreadBps, expiresAt);
+		QuoteEntity entity = mapper.toEntity(quote);
+		quotes.insert(entity);
 		return mapper.toResp(quote);
 	}
 

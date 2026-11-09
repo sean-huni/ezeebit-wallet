@@ -17,7 +17,7 @@ configure(subprojects.findAll { it.parent != rootProject }) {
 	apply plugin: 'io.spring.dependency-management'
 
 	group = 'io.ezeebit'
-	version = '0.5.0'
+	version = '0.5.1'
 
 	java {
 		sourceCompatibility = JavaVersion.VERSION_25
@@ -251,6 +251,9 @@ def javaImportsAndWhitespace = { format ->
 	format.endWithNewline()
 }
 
+apply from: 'gradle/no-nested-di-calls.gradle'
+def noNestedDiCalls = ext.noNestedDiCalls
+
 def services = subprojects.findAll { it.parent != rootProject }
 configure(services) {
 	apply plugin: 'checkstyle'
@@ -277,6 +280,10 @@ configure(services) {
 		java {
 			target 'src/**/*.java'
 			javaImportsAndWhitespace(it)
+		}
+		format 'noNestedDiCalls', {
+			target 'src/main/**/*.java'
+			custom 'noNestedDiCalls', noNestedDiCalls
 		}
 	}
 
@@ -539,6 +546,10 @@ spotless {
 	java {
 		target 'observability/src/**/*.java', 'architecture/src/**/*.java', 'discovery/src/**/*.java', 'persistence/src/**/*.java'
 		javaImportsAndWhitespace(it)
+	}
+	format 'noNestedDiCalls', {
+		target 'observability/src/main/**/*.java', 'discovery/src/main/**/*.java', 'persistence/src/main/**/*.java'
+		custom 'noNestedDiCalls', noNestedDiCalls
 	}
 }
 

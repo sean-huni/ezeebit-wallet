@@ -35,17 +35,20 @@ public class ValidationExceptionHandler {
 
 	@ExceptionHandler(BindException.class)
 	ProblemDetail invalidBody(final BindException ex) {
-		return problems.invalid(ex.getFieldErrors().stream().map(violations::of).toList());
+		List<Violation> found = ex.getFieldErrors().stream().map(violations::of).toList();
+		return problems.invalid(found);
 	}
 
 	@ExceptionHandler(HandlerMethodValidationException.class)
 	ProblemDetail invalidParameters(final HandlerMethodValidationException ex) {
-		return problems.invalid(violations.of(ex.getParameterValidationResults()));
+		List<Violation> found = violations.of(ex.getParameterValidationResults());
+		return problems.invalid(found);
 	}
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	ProblemDetail typeMismatch(final MethodArgumentTypeMismatchException ex) {
-		return problems.invalid(List.of(violations.typeMismatch(ex.getName())));
+		Violation violation = violations.typeMismatch(ex.getName());
+		return problems.invalid(List.of(violation));
 	}
 
 	@ExceptionHandler(MissingRequestHeaderException.class)
@@ -53,12 +56,14 @@ public class ValidationExceptionHandler {
 		if (IDEMPOTENCY_KEY.equals(ex.getHeaderName())) {
 			return problems.of(ErrorCode.IDEMPOTENCY_KEY_MISSING);
 		}
-		return problems.invalid(List.of(violations.typeMismatch(ex.getHeaderName())));
+		Violation violation = violations.typeMismatch(ex.getHeaderName());
+		return problems.invalid(List.of(violation));
 	}
 
 	@ExceptionHandler(MissingServletRequestParameterException.class)
 	ProblemDetail missingParameter(final MissingServletRequestParameterException ex) {
-		return problems.invalid(List.of(violations.typeMismatch(ex.getParameterName())));
+		Violation violation = violations.typeMismatch(ex.getParameterName());
+		return problems.invalid(List.of(violation));
 	}
 
 	// Valid JSON with a value of the wrong type names its field; anything else is malformed.
@@ -67,7 +72,8 @@ public class ValidationExceptionHandler {
 		if (ex.getMostSpecificCause() instanceof MismatchedInputException mismatch && !mismatch.getPath().isEmpty()) {
 			String field = mismatch.getPath().stream().map(Reference::getPropertyName).filter(Objects::nonNull)
 					.collect(Collectors.joining("."));
-			return problems.invalid(List.of(violations.typeMismatch(field)));
+			Violation violation = violations.typeMismatch(field);
+			return problems.invalid(List.of(violation));
 		}
 		return problems.of(ErrorCode.MALFORMED_REQUEST);
 	}

@@ -59,7 +59,7 @@ Boot 4.1.2, Spring Cloud 2025.1.3.
 
 ```sh
 ./gradlew clean build
-./gradlew spotlessApply     # formatting, not a scan: fixes what spotlessCheck in the build would fail on
+./gradlew spotlessApply     # formatting, not a scan: fixes what it can; a noNestedDiCalls failure names the line to fix by hand
 ./gradlew checkVersions     # SCA: pins with newer releases, shipped modules with advisories; needs network
 ```
 

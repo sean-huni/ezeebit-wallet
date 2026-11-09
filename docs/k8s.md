@@ -446,6 +446,12 @@ from 00:09:01 to 00:23:40 +0200, the logs were last written at 00:14:20 and 00:1
 and 1 m 33 s, and gitleaks counted 278 commits, one fewer than the repository holds with `5fe4d69`. Whether
 the working tree was clean during them is not recorded.
 
+**Release 0.5.1** (the `noNestedDiCalls` Spotless step and the code it required): one run on `rel-0.5.1` from a clean clone
+with `SLACK_WEBHOOK_URL` set, started 22:52:14Z at `68b5f54`, ending `sweep exit=0`
+([2026-11-10-0.5.1-sweep.log](k8s/verification/2026-11-10-0.5.1-sweep.log)): 3 kills, 1726 requests, 0 merchant
+failures, 863 COMPLETED conversions against 863 POSTED journals, none posted twice; 57 of 200 burst requests admitted against
+a bound of 120; the outage alert fired 10 s after the first dead letter, and the Slack notification counter rose 0 to 1.
+
 **Release 0.5.0** (dependency-injection refactor, Spotless, `checkVersions`, Paketo builder 0.0.203): one run on
 `rel-0.5.0` from a clean tree with `SLACK_WEBHOOK_URL` set, started 15:01:09Z at `4bd8ce5`, ending `sweep exit=0`
 ([2026-11-09-0.5.0-sweep.log](k8s/verification/2026-11-09-0.5.0-sweep.log)): 3 kills, 1670 requests, 2 merchant

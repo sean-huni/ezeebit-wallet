@@ -42,7 +42,8 @@ public class DepositCtrl {
 			@Pattern(regexp = DepositReq.NO_CONTROL_CHARACTERS, message = "{validation.idempotencyKey.control}")
 			final String idempotencyKey,
 			@Valid @RequestBody final DepositReq request) {
-		return new ApiResponse<>(deposits.deposit(idempotencyKey, request));
+		DepositResp deposit = deposits.deposit(idempotencyKey, request);
+		return new ApiResponse<>(deposit);
 	}
 
 }

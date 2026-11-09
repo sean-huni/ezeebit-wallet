@@ -75,10 +75,11 @@ What exists:
   control plane (configuration and discovery); each business service owns its own PostgreSQL database, plus `./fleet.sh` to run them. A WireMock
   container stands in for the rate service.
 
-**Tests.** **865 tests, 0 failures** at release `0.5.0`, summed from the JUnit Extensible Markup Language
+**Tests.** **865 tests, 0 failures** at release `0.5.1`, summed from the JUnit Extensible Markup Language
 (XML) reports `services/*/build/test-results/*/*.xml` across the `test`, `integrationTest` and
 `acceptanceTest` tiers; the per-service count and the command are committed in
-[2026-11-09-0.5.0-tests.log](docs/evidence/2026-11-09-0.5.0-tests.log). Earlier counts: 831 at `0.4.0`
+[2026-11-10-0.5.1-tests.log](docs/evidence/2026-11-10-0.5.1-tests.log). Earlier counts: 865 at `0.5.0`
+([2026-11-09-0.5.0-tests.log](docs/evidence/2026-11-09-0.5.0-tests.log)), 831 at `0.4.0`
 ([2026-11-05-0.4.0-tests.log](docs/evidence/2026-11-05-0.4.0-tests.log)), 641 at `0.3.2`
 ([2026-11-05-0.3.2-tests.log](docs/evidence/2026-11-05-0.3.2-tests.log)), 610 at
 `0.2.0` (2026-10-15) and 538 on 2026-10-13, before the gRPC change; no log of those was committed. The

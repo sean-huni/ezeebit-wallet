@@ -215,11 +215,11 @@ None of them changes my ledger's model; each is a new caller that posts journals
 
 **Proof:**
 
-- 865 tests at release 0.5.0, 0 failures. I saw every concurrency, idempotency and
+- 865 tests at release 0.5.1, 0 failures. I saw every concurrency, idempotency and
   currency-integrity test fail with its control removed before I trusted it.
-- On a kind Kubernetes cluster at 2 replicas, my 0.5.0 sweep killed 3 pods mid-traffic over 1670
-  requests: 2 merchant failures, all inside the 20s budget, and **834 COMPLETED conversions against
-  834 POSTED journals, none posted twice**. The same run paged Slack from kind.
+- On a kind Kubernetes cluster at 2 replicas, my 0.5.1 sweep killed 3 pods mid-traffic over 1726
+  requests: 0 merchant failures, and **863 COMPLETED conversions against
+  863 POSTED journals, none posted twice**. The same run paged Slack from kind.
 
 **Lessons learnt:**
 
@@ -259,7 +259,7 @@ failures I know will happen: a pod killed mid-request, a replica gone, a depende
 - Least privilege: it can list and delete pods in the app and data namespaces only; never
   monitoring, never Secrets. Every sweep asks the API server to prove it (Appendix E).
 - A run counts as evidence only with traffic during the kills, a failure when it killed fewer pods
-  than asked, and the reconciliation afterwards (my 834 = 834 at 0.5.0).
+  than asked, and the reconciliation afterwards (my 863 = 863 at 0.5.1).
 
 ## Appendix B: my design against a classic high-contention problem
 
@@ -348,7 +348,7 @@ then G1 with compact object headers in 0.4.0.
 | SAST | SonarQube, opt-in | runs only with `SONAR_TOKEN` |
 | SCA | trivy 0.74.0 (`checkSupplyChain`): images, CycloneDX SBOMs, misconfiguration | a fixable HIGH or CRITICAL in a service layer |
 | SCA | `checkVersions`, on demand since 0.5.0: Maven modules on the runtime classpaths against OSV, version pins against Maven Central and the Gradle Plugin Portal | an advisory with a fix that is HIGH, CRITICAL or carries no severity, on a shipped module; an unreachable source is exit 2, never a pass |
-| Format | Spotless 8.11.0 (`spotlessCheck` in `check`, `spotlessApply` to fix), not a security scan | an import-order, unused-import or whitespace violation |
+| Format | Spotless 8.11.0 (`spotlessCheck` in `check`, `spotlessApply` to fix), not a security scan | an import-order, unused-import or whitespace violation; an injected field's method run inside another call's arguments (`noNestedDiCalls`) |
 | Live | kind sweep `policy` | an unnamed pod reaches Postgres, or ledger-svc cannot |
 | Live | kind sweep `rbac`: the chaos monkey's ServiceAccount, via `kubectl auth can-i` | it can touch monitoring, read a Secret, patch a Deployment or create a pod; judged only after it is shown able to delete app and data pods |
 | Live | gateway tests and the sweep's burst | `/internal/**` not 404; Redis down not 503; a burst above capacity plus refill |

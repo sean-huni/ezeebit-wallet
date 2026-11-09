@@ -22,8 +22,10 @@ class ConversionPostingServiceImpl implements ConversionPostingService {
 
 	@Override
 	public ConversionPostingResp post(final ConversionPostingReq request) {
-		return responder.respond("post", () -> recorder.record(intake.command(request), request),
-				new MerchantId(request.merchantId()), request.conversionId());
+		return responder.respond("post", () -> {
+			ConversionPostingCommand command = intake.command(request);
+			return recorder.record(command, request);
+		}, new MerchantId(request.merchantId()), request.conversionId());
 	}
 
 }

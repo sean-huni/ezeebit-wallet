@@ -28,7 +28,8 @@ public class ViolationReader {
 			ConstraintViolation<?> violation = error.unwrap(ConstraintViolation.class);
 			return new Violation(error.getField(), key(violation), violation.getMessage());
 		}
-		return new Violation(error.getField(), TYPE_MISMATCH, problems.message(TYPE_MISMATCH, error.getField()));
+		String message = problems.message(TYPE_MISMATCH, error.getField());
+		return new Violation(error.getField(), TYPE_MISMATCH, message);
 	}
 
 	public List<Violation> of(final List<ParameterValidationResult> results) {
@@ -48,7 +49,8 @@ public class ViolationReader {
 	}
 
 	public Violation typeMismatch(final String field) {
-		return new Violation(field, TYPE_MISMATCH, problems.message(TYPE_MISMATCH, field));
+		String message = problems.message(TYPE_MISMATCH, field);
+		return new Violation(field, TYPE_MISMATCH, message);
 	}
 
 	private static String parameterName(final ParameterValidationResult result) {

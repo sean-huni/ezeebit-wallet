@@ -19,15 +19,18 @@ class StatementMapperImpl implements StatementMapper {
 
 	@Override
 	public StatementLineResp toLine(final StatementLineEntity line, final Currency currency) {
-		return new StatementLineResp(line.seq(), line.journalId(), line.type(), line.reference(), line.currency(),
-				format.format(line.amount(), currency.scale()), format.format(line.balanceAfter(), currency.scale()),
-				line.created());
+		String amount = format.format(line.amount(), currency.scale());
+		String balanceAfter = format.format(line.balanceAfter(), currency.scale());
+		return new StatementLineResp(line.seq(), line.journalId(), line.type(), line.reference(), line.currency(), amount,
+				balanceAfter, line.created());
 	}
 
 	@Override
 	public DepositResp toDeposit(final StatementLineEntity line, final UUID merchantId, final Currency currency) {
-		return new DepositResp(line.journalId(), merchantId, line.currency(), format.format(line.amount(), currency.scale()),
-				format.format(line.balanceAfter(), currency.scale()), line.reference(), line.created());
+		String amount = format.format(line.amount(), currency.scale());
+		String balanceAfter = format.format(line.balanceAfter(), currency.scale());
+		return new DepositResp(line.journalId(), merchantId, line.currency(), amount, balanceAfter, line.reference(),
+				line.created());
 	}
 
 }

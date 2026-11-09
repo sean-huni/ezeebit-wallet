@@ -1,0 +1,16 @@
+noNestedDiCalls red-proof, 2026-11-10, branch feat-no-nested-di-calls.
+Committed test: ./gradlew testNoNestedDiCalls (arms in gradle/no-nested-di-calls.gradle).
+
+== green: ./gradlew spotlessCheck testNoNestedDiCalls, exit 0
+noNestedDiCalls: 9 banned and 7 allowed arms judged correctly
+BUILD SUCCESSFUL in 520ms
+
+== mutant, constructor arm removed from the step: ./gradlew testNoNestedDiCalls, exit 1
+> noNestedDiCalls misjudged: return new Snapshot(now, quotes.recent(a));
+
+== banned line in observability/src/main, removed afterwards: ./gradlew spotlessNoNestedDiCallsCheck, exit 1
+  observability/src/main/java/io/ezeebit/observability/GateFixture.java:L9 noNestedDiCalls(java.lang.IllegalStateException) line 9: reader.one() is nested in poster.post(...): assign it to a named local first (...)
+BUILD FAILED in 304ms
+
+== banned line in a service: original ConversionFirstPoster line 26 restored, removed afterwards: ./gradlew spotlessCheck --continue, exit 1
+  src/main/java/io/ezeebit/conversion/service/conversion/ConversionFirstPoster.java:L26 noNestedDiCalls(java.lang.IllegalStateException) line 26: reader.byKey(merchantId, key).orElseThrow() is nested in a call to poster.postAndSettle(...): assign it to a named

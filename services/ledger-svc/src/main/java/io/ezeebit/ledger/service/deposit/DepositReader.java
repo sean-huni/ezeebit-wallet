@@ -2,6 +2,7 @@ package io.ezeebit.ledger.service.deposit;
 
 import java.util.UUID;
 
+import io.ezeebit.ledger.data.model.StatementLineEntity;
 import io.ezeebit.ledger.data.repo.EntryRepo;
 import io.ezeebit.ledger.domain.Currency;
 import io.ezeebit.ledger.domain.MerchantId;
@@ -21,7 +22,8 @@ class DepositReader {
 	}
 
 	public DepositResp read(final UUID journalId, final MerchantId merchant, final Currency currency) {
-		return mapper.toDeposit(entries.merchantLine(journalId), merchant.value(), currency);
+		StatementLineEntity line = entries.merchantLine(journalId);
+		return mapper.toDeposit(line, merchant.value(), currency);
 	}
 
 }

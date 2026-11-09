@@ -27,7 +27,8 @@ class PendingLedgerCheck {
 		if (answer == LedgerAnswer.ABSENT) {
 			answer = ledger.voidPosting(conversion.id(), conversion.merchantId());
 		}
-		return new Resolution(conversion.id(), answer, settler.settle(conversion, answer));
+		Optional<Settlement> moved = settler.settle(conversion, answer);
+		return new Resolution(conversion.id(), answer, moved);
 	}
 
 	public record Resolution(UUID id, LedgerAnswer answer, Optional<Settlement> moved) {

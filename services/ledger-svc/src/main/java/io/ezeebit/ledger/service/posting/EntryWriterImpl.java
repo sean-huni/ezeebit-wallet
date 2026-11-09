@@ -2,6 +2,7 @@ package io.ezeebit.ledger.service.posting;
 
 import java.util.UUID;
 
+import io.ezeebit.ledger.data.model.EntryEntity;
 import io.ezeebit.ledger.data.repo.EntryRepo;
 import io.ezeebit.ledger.domain.Money;
 import io.ezeebit.ledger.domain.PostingLine;
@@ -25,7 +26,8 @@ class EntryWriterImpl implements EntryWriter {
 	@Transactional(propagation = Propagation.MANDATORY)
 	@Override
 	public void write(final UUID journalId, final PostingLine line, @Nullable final Money balanceAfter) {
-		entries.insert(mapper.toEntity(journalId, line, balanceAfter));
+		EntryEntity entry = mapper.toEntity(journalId, line, balanceAfter);
+		entries.insert(entry);
 	}
 
 }

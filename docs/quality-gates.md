@@ -40,7 +40,7 @@ service. Tool versions are pinned in `gradle.properties` (SpotBugs Gradle plugin
 | SpotBugs 4.10.5 with Find Security Bugs 1.14.0 (`spotbugsMain`) | compiled main classes, effort max, confidence low | any finding not in `config/spotbugs/exclude.xml` |
 | `checkSpotbugsReport` (runs on every build, even when `spotbugsMain` is up to date) | the SpotBugs Extensible Markup Language (XML) report and task settings | the report is absent or empty; it does not list Find Security Bugs with `enabled="true"`; it records an analysis error or missing class; no class was analysed; any SpotBugs task sets `visitors` or `omitVisitors`, or passes `-visitors`, `-omitVisitors` or `-chooseVisitors` |
 | Checkstyle 14.3.0 (`checkstyleMain`, `checkstyleTest`, `checkstyleAcceptanceTest`) | every Java source set, against `config/checkstyle/checkstyle.xml` (tabs, static imports first, `}` alone before `catch`/`else`; main code may not catch `Exception`, `RuntimeException`, `Error` or `Throwable`, except the six files each suppression in that file names with its reason: gateway-svc's `RateLimitFilter` (the limiter's fail-closed line), `DiscoveryNameResolver` (a gRPC name resolver must answer UNAVAILABLE, never throw), `LedgerGuard` and `KafkaDeadLetterPublisher` (a dead-letter sink must never change the failed call's outcome), and `ProfilerStarter` and `SpanProfileLink` (the profiler fails open and counts the failure); tests may not catch `Error` or `Throwable`) | any violation (`maxWarnings` and `maxErrors` are 0) |
-| Spotless 8.11.0 (`spotlessCheck`, part of `check`; `spotlessApply` fixes) | every service `src`, and from the root `observability/`, `architecture/`, `discovery/`, `persistence/`: import order, unused imports, trailing whitespace, final newline; layout stays with Checkstyle | any file it would change |
+| Spotless 8.11.0 (`spotlessCheck`, part of `check`; `spotlessApply` fixes all but `noNestedDiCalls`) | every service `src`, and from the root `observability/`, `architecture/`, `discovery/`, `persistence/`: import order, unused imports, trailing whitespace, final newline; layout stays with Checkstyle. `src/main` also runs `noNestedDiCalls` (`gradle/no-nested-di-calls.gradle`), which rewrites nothing | any file it would change; a method on an injected field run inside another call's or constructor's arguments |
 | JaCoCo 0.8.15 (`jacocoTestCoverageVerification`) | one report per service, merged over every test tier it runs | line or branch coverage falls below the service's floor in `coverageFloors` |
 | `checkCoverageFloors` | the same report | a floor sits more than 5 points below the measured value (`coverageBand`; raise it to the value the message prints), a floor sits above it, a measured counter has no floor, a declared floor has nothing to measure, or the report measured no lines |
 
@@ -53,8 +53,8 @@ Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/e
 The root `check` also runs `checkSecrets` ([supply-chain.md](supply-chain.md)), `checkSingleProto`
 (see [Architecture gates](#architecture-gates)) and `checkDashboards`
 (`python3 docker/lgtm/generate.py --check`: the committed dashboards and alert rules must equal what the
-generator writes), and `testVersionReport`, the offline half of `checkVersions` ([supply-chain.md](supply-chain.md)).
-When `spotlessCheck` fails, `./gradlew spotlessApply` rewrites the files it names.
+generator writes), `testVersionReport`, the offline half of `checkVersions` ([supply-chain.md](supply-chain.md)), and `testNoNestedDiCalls`, the arms of the Spotless step.
+When `spotlessCheck` fails, `./gradlew spotlessApply` rewrites the files it names. A `noNestedDiCalls` failure is not rewritten: assign the named inner call to a local.
 
 The first run of these gates found a real defect: conversion-svc accepted a currency code spelled
 with U+212A (Kelvin sign), which lower-cases onto `kes`. Codes are now American Standard Code for Information Interchange (ASCII) `[A-Z]{3,5}`, as in
@@ -124,7 +124,7 @@ Checkstyle reports, and waits for the quality gate (`sonar.qualitygate.wait`). `
 - **DAST** (dynamic application security testing, below) reads nothing: it attacks the running edge
   the way a caller can, and finds what the code and the image both looked fine on.
 
-Spotless (`spotlessCheck` in `check`, `spotlessApply` to fix) is none of the three. It formats this repository's own source and looks for no vulnerability.
+Spotless (`spotlessCheck` in `check`, `spotlessApply` to fix) is none of the three. It formats this repository's own source and looks for no vulnerability. Its `noNestedDiCalls` step is a readability rule on the same source, tested by `testNoNestedDiCalls` in `check`: a method on an injected field may not run inside another call's or constructor's arguments. Injected here means a final, uninitialised instance field that is not a plain value (`String`, primitive, `Duration`, `Atomic*`, array), read from syntax alone, which is narrower than the injection counter in `architecture/`. Records, enums and exception classes are skipped. A lambda's statements are checked on their own, and a method reference passed directly is allowed. A collaborator passed as a method parameter, aliased to a local or held in a non-final field is not seen.
 
 ## DAST: ZAP, Schemathesis and Nuclei against the running gateway
 

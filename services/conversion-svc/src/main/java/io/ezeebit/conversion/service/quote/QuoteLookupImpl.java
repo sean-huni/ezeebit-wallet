@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.service.quote;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,9 +33,10 @@ class QuoteLookupImpl implements QuoteLookup {
 
 	@Override
 	public Instant postingDeadline(final QuoteEntity quote, final UUID quoteId) {
+		Duration grace = properties.postingGrace();
 		return reader.live(quote)
 				.orElseThrow(() -> new ConversionException(ErrorCode.QUOTE_EXPIRED, "quoteId", quoteId))
-				.postingDeadline(properties.postingGrace());
+				.postingDeadline(grace);
 	}
 
 }

@@ -619,16 +619,17 @@ Gradle exit 1 from the task's exit 3. Guava was forced back to `33.6.0-jre`, so 
 
 ## Nested collaborator calls (2026-11-10)
 
-`noNestedDiCalls` is a Spotless step over `src/main` that rewrites nothing and fails on a call on an injected collaborator
-holding a call on another one in its arguments ([gradle/no-nested-di-calls.gradle](gradle/no-nested-di-calls.gradle)).
+`noNestedDiCalls` is a Spotless step over `src/main` that rewrites nothing and fails when a method on an injected field runs
+inside another call's or constructor's arguments ([gradle/no-nested-di-calls.gradle](gradle/no-nested-di-calls.gradle)).
 It is a readability rule, not a security scan.
 
-**Proves** over 265 `src/main` files: a throwaway fixture of 10 arms failed on exactly the 4 banned arms, and the 6 allowed
-arms passed; putting the original `ConversionFirstPoster` line back failed at line 26; a file that does not parse fails closed.
-The fixture and the probe were removed afterwards, so the [log](docs/evidence/2026-11-10-no-nested-di-calls.log) is their output.
+**Proves** `testNoNestedDiCalls`, in `check`, judges 9 banned and 7 allowed one-line arms, 2 value-holder classes and an
+unparseable file. Removing the constructor arm from the step turned that test red. A banned line in a service file and in
+`observability/` each failed `spotlessCheck`; those probes were removed, so the
+[log](docs/evidence/2026-11-10-no-nested-di-calls.log) is their output.
 
-**Does not prove** anything about a collaborator passed as a method parameter or an unqualified call on `this`: the step reads
-syntax only, so it cannot see either.
+**Does not prove** anything about a collaborator passed as a method parameter, aliased to a local, or held in a non-final field,
+or a superclass field: the step reads one file's syntax only, so it cannot see them.
 
 ## What this evidence does not prove
 

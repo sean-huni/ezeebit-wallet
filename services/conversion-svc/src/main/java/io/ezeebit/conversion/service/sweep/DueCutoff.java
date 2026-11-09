@@ -1,6 +1,7 @@
 package io.ezeebit.conversion.service.sweep;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 import io.ezeebit.conversion.config.properties.ConversionProperties;
@@ -19,7 +20,8 @@ class DueCutoff {
 	}
 
 	public Instant deadlineBefore() {
-		return clock.instant().minus(properties.maxTransactionTime());
+		Duration maxAge = properties.maxTransactionTime();
+		return clock.instant().minus(maxAge);
 	}
 
 }

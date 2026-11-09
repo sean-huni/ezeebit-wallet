@@ -1,5 +1,6 @@
 package io.ezeebit.conversion.service.quote;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,7 +29,9 @@ class QuoteWriter {
 
 	public QuoteResp store(final UUID merchantId, final Priced priced, final MarketRate rate, final int spreadBps,
 			final Instant now) {
-		Quote quote = mapper.toDomain(merchantId, priced, rate, spreadBps, now.plus(properties.quoteTtl()));
+		Duration ttl = properties.quoteTtl();
+		Instant expiresAt = now.plus(ttl);
+		Quote quote = mapper.toDomain(merchantId, priced, rate, spreadBps, expiresAt);
 		QuoteEntity entity = mapper.toEntity(quote);
 		quotes.insert(entity);
 		return mapper.toResp(quote);

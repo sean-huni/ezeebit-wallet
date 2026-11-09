@@ -33,7 +33,8 @@ class DepositRecorder {
 			journalId = replayer.storedJournal(command.merchant(), command.idempotencyKey(), command.requestHash());
 			outcome = Outcome.REPLAYED;
 		}
-		return new Recorded(reader.read(journalId, command.merchant(), currency), outcome);
+		DepositResp answer = reader.read(journalId, command.merchant(), currency);
+		return new Recorded(answer, outcome);
 	}
 
 	public record Recorded(DepositResp answer, Outcome outcome) {

@@ -35,8 +35,9 @@ class ConversionReplayer {
 
 	// Same key: a concurrent copy of this request won. Otherwise the quote is taken under another key.
 	public ConversionResp afterDuplicate(final UUID merchantId, final String key, final UUID quoteId) {
-		return replay(reader.byKey(merchantId, key).orElseThrow(
-				() -> new ConversionException(ErrorCode.QUOTE_ALREADY_USED, "quoteId", quoteId)), quoteId);
+		ConversionEntity conversion = reader.byKey(merchantId, key).orElseThrow(
+				() -> new ConversionException(ErrorCode.QUOTE_ALREADY_USED, "quoteId", quoteId));
+		return replay(conversion, quoteId);
 	}
 
 	// Returns the current state. A PENDING conversion is posted again only while its quote is live: never at a

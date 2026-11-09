@@ -27,12 +27,11 @@ class ConversionPostingMapperImpl implements ConversionPostingMapper {
 				.orElse(null);
 		StatementLineEntity buy = merchantLines.stream().filter(line -> line.amount().signum() > 0).findFirst()
 				.orElse(null);
+		String sold = sell == null ? null : format.format(sell.amount().negate(), currencies.get(sell.currency()).scale());
+		String bought = buy == null ? null : format.format(buy.amount(), currencies.get(buy.currency()).scale());
 		return new ConversionPostingResp(journal.id(), UUID.fromString(journal.idempotencyKey()), journal.merchantId(),
-				journal.status(), journal.reason(), sell == null ? null : sell.currency(),
-				sell == null ? null : format.format(sell.amount().negate(), currencies.get(sell.currency()).scale()),
-				buy == null ? null : buy.currency(),
-				buy == null ? null : format.format(buy.amount(), currencies.get(buy.currency()).scale()),
-				journal.created());
+				journal.status(), journal.reason(), sell == null ? null : sell.currency(), sold,
+				buy == null ? null : buy.currency(), bought, journal.created());
 	}
 
 }

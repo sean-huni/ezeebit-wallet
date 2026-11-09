@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.service.sweep.PendingLedgerCheck.Resolution;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,8 @@ class PendingClaimer {
 	@Transactional(propagation = Propagation.MANDATORY)
 	public Optional<Resolution> claimAndResolve(final List<UUID> skip) {
 		Instant deadline = cutoff.deadlineBefore();
-		return conversions.claimDue(deadline, skip).map(check::resolve);
+		Optional<ConversionEntity> claimed = conversions.claimDue(deadline, skip);
+		return claimed.map(check::resolve);
 	}
 
 }

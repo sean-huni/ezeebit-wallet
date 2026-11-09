@@ -28,7 +28,8 @@ class CurrencyCatalogImpl implements CurrencyCatalog {
 		if (!isKnown(code)) {
 			throw new ConversionException(ErrorCode.UNKNOWN_CURRENCY, field, code);
 		}
-		return new Currency(code, properties.currencies().get(code.toLowerCase(Locale.ROOT)));
+		Integer scale = properties.currencies().get(code.toLowerCase(Locale.ROOT));
+		return new Currency(code, scale);
 	}
 
 	@Override

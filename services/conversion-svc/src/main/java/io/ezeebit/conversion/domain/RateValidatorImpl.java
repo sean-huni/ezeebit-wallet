@@ -23,13 +23,15 @@ public class RateValidatorImpl implements RateValidator {
 		if (rate.rate().signum() <= 0) {
 			throw RateValidator.rejected(RateRejection.RATE_NOT_POSITIVE);
 		}
-		if (Duration.between(rate.timestamp(), now).abs().compareTo(rules.maxAge()) > 0) {
+		Duration maxAge = rules.maxAge();
+		if (Duration.between(rate.timestamp(), now).abs().compareTo(maxAge) > 0) {
 			throw RateValidator.rejected(RateRejection.RATE_STALE);
 		}
 		if (rate.rate().compareTo(policy.min()) < 0 || rate.rate().compareTo(policy.max()) > 0) {
 			throw RateValidator.rejected(RateRejection.RATE_OUT_OF_BAND);
 		}
-		if (recent.filter(previous -> jumpPercent(previous, rate.rate()).compareTo(rules.maxJumpPercent()) > 0)
+		BigDecimal maxJumpPercent = rules.maxJumpPercent();
+		if (recent.filter(previous -> jumpPercent(previous, rate.rate()).compareTo(maxJumpPercent) > 0)
 				.isPresent()) {
 			throw RateValidator.rejected(RateRejection.RATE_JUMP);
 		}

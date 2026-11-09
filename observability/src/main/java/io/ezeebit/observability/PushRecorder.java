@@ -17,7 +17,8 @@ final class PushRecorder {
 
 	PushRecorder(final Clock clock) {
 		this.clock = clock;
-		this.lastSuccessMillis = new AtomicLong(clock.millis());
+		long startMillis = clock.millis();
+		this.lastSuccessMillis = new AtomicLong(startMillis);
 	}
 
 	void begin() {

@@ -40,14 +40,16 @@ public final class MerchantBucketsImpl implements MerchantBuckets {
 		this.connect = connect;
 		this.properties = properties;
 		this.nanos = nanos;
+		long capacity = properties.capacity();
+		long refillTokens = properties.refillTokens();
+		Duration refillPeriod = properties.refillPeriod();
+		long refillMillis = refillPeriod.toMillis();
 		this.limits = BucketConfiguration.builder()
-				.addLimit(Bandwidth.builder().capacity(properties.capacity())
-						.refillGreedy(properties.refillTokens(), properties.refillPeriod()).build())
+				.addLimit(Bandwidth.builder().capacity(capacity).refillGreedy(refillTokens, refillPeriod).build())
 				.build();
 		// The limits are part of the key: Bucket4j replaces a stored configuration only for a HIGHER version, which a
 		// value derived from the limits cannot promise, so a changed limit gets its own bucket instead.
-		this.keyPrefix = "gateway:ratelimit:%d-%d-%d:".formatted(properties.capacity(), properties.refillTokens(),
-				properties.refillPeriod().toMillis());
+		this.keyPrefix = "gateway:ratelimit:%d-%d-%d:".formatted(capacity, refillTokens, refillMillis);
 	}
 
 	@Override
@@ -104,10 +106,11 @@ public final class MerchantBucketsImpl implements MerchantBuckets {
 				retryAt = now + RETRY_AFTER.toNanos();
 				throw ex;
 			}
+			int maxRetries = properties.maxRetries();
 			// Each command is cut at the store timeout; retries bound a compare-and-swap loop that keeps losing.
 			buckets = Bucket4jLettuce.casBasedBuilder(connection)
 					.expirationAfterWrite(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(KEEP_AFTER_FULL))
-					.maxRetries(properties.maxRetries())
+					.maxRetries(maxRetries)
 					.build();
 		}
 		return buckets;

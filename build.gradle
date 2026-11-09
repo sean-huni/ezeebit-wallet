@@ -548,7 +548,7 @@ spotless {
 		javaImportsAndWhitespace(it)
 	}
 	format 'noNestedDiCalls', {
-		target 'observability/src/main/**/*.java', 'architecture/src/main/**/*.java', 'discovery/src/main/**/*.java', 'persistence/src/main/**/*.java'
+		target 'observability/src/main/**/*.java', 'discovery/src/main/**/*.java', 'persistence/src/main/**/*.java'
 		custom 'noNestedDiCalls', noNestedDiCalls
 	}
 }

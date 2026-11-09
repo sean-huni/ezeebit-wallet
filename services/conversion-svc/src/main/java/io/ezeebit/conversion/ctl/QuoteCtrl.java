@@ -37,7 +37,8 @@ public class QuoteCtrl {
 	public ApiResponse<QuoteResp> quote(
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @PathVariable final UUID merchantId,
 			@Valid @RequestBody final QuoteReq request) {
-		return new ApiResponse<>(quotes.quote(merchantId, request));
+		QuoteResp quote = quotes.quote(merchantId, request);
+		return new ApiResponse<>(quote);
 	}
 
 }

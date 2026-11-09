@@ -35,7 +35,8 @@ public class ValidationExceptionHandler {
 
 	@ExceptionHandler(BindException.class)
 	ProblemDetail invalidBody(final BindException ex) {
-		return problems.invalid(ex.getFieldErrors().stream().map(violations::of).toList());
+		List<Violation> found = ex.getFieldErrors().stream().map(violations::of).toList();
+		return problems.invalid(found);
 	}
 
 	@ExceptionHandler(HandlerMethodValidationException.class)

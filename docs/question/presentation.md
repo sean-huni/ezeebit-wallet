@@ -348,7 +348,7 @@ then G1 with compact object headers in 0.4.0.
 | SAST | SonarQube, opt-in | runs only with `SONAR_TOKEN` |
 | SCA | trivy 0.74.0 (`checkSupplyChain`): images, CycloneDX SBOMs, misconfiguration | a fixable HIGH or CRITICAL in a service layer |
 | SCA | `checkVersions`, on demand since 0.5.0: Maven modules on the runtime classpaths against OSV, version pins against Maven Central and the Gradle Plugin Portal | an advisory with a fix that is HIGH, CRITICAL or carries no severity, on a shipped module; an unreachable source is exit 2, never a pass |
-| Format | Spotless 8.11.0 (`spotlessCheck` in `check`, `spotlessApply` to fix), not a security scan | an import-order, unused-import or whitespace violation; an injected collaborator call nested in another one's arguments (`noNestedDiCalls`) |
+| Format | Spotless 8.11.0 (`spotlessCheck` in `check`, `spotlessApply` to fix), not a security scan | an import-order, unused-import or whitespace violation; an injected field's method run inside another call's arguments (`noNestedDiCalls`) |
 | Live | kind sweep `policy` | an unnamed pod reaches Postgres, or ledger-svc cannot |
 | Live | kind sweep `rbac`: the chaos monkey's ServiceAccount, via `kubectl auth can-i` | it can touch monitoring, read a Secret, patch a Deployment or create a pod; judged only after it is shown able to delete app and data pods |
 | Live | gateway tests and the sweep's burst | `/internal/**` not 404; Redis down not 503; a burst above capacity plus refill |

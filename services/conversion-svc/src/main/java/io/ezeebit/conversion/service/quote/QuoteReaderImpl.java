@@ -1,6 +1,7 @@
 package io.ezeebit.conversion.service.quote;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 
 import io.ezeebit.conversion.data.model.QuoteEntity;
@@ -33,7 +34,8 @@ class QuoteReaderImpl implements QuoteReader {
 	@Override
 	public Optional<Quote> live(final QuoteEntity entity) {
 		Quote quote = of(entity);
-		return quote.expired(clock.instant()) ? Optional.empty() : Optional.of(quote);
+		Instant now = clock.instant();
+		return quote.expired(now) ? Optional.empty() : Optional.of(quote);
 	}
 
 }

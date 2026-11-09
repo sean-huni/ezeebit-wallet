@@ -33,7 +33,8 @@ public class StatementCtrl {
 	public ApiResponse<StatementResp> entries(
 			@Parameter(description = DocExamples.MERCHANT_ID, example = DocExamples.MERCHANT) @PathVariable final UUID merchantId,
 			@ParameterObject @Valid final StatementReq request) {
-		return new ApiResponse<>(statements.statement(merchantId, request));
+		StatementResp statement = statements.statement(merchantId, request);
+		return new ApiResponse<>(statement);
 	}
 
 }

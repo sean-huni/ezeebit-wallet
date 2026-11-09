@@ -3,8 +3,10 @@ import com.sun.source.tree.CompilationUnitTree
 import com.sun.source.tree.ExpressionTree
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.LambdaExpressionTree
+import com.sun.source.tree.MemberReferenceTree
 import com.sun.source.tree.MemberSelectTree
 import com.sun.source.tree.MethodInvocationTree
+import com.sun.source.tree.NewClassTree
 import com.sun.source.tree.Tree
 import com.sun.source.tree.VariableTree
 import com.sun.source.util.JavacTask
@@ -19,15 +21,16 @@ import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
 import javax.tools.ToolProvider
 
-// A Spotless step that rewrites nothing: it fails on poster.post(reader.find(id)), a call on an injected
-// collaborator holding a call on an injected collaborator. Injected means a final, uninitialised instance field.
+// A Spotless step that rewrites nothing: a method on an injected field never runs inside another call's or
+// constructor's arguments. Injected means a final, uninitialised instance field that is not a plain value.
 // Parsed with javac, so it reads every language level the build compiles; a regex cannot balance the brackets.
 class CollaboratorScopes {
 
+	private static final String VALUE_TYPES = /byte|short|int|long|float|double|boolean|char|String|Duration|Atomic\w+|.*\[\]/
 	private final Deque<Map<String, String>> scopes = new ArrayDeque<>()
 
 	void push(ClassTree type) {
-		scopes.push(type.kind == Tree.Kind.RECORD ? [:] : collaborators(type))
+		scopes.push(holdsOnlyValues(type) ? [:] : collaborators(type))
 	}
 
 	void pop() {
@@ -38,6 +41,14 @@ class CollaboratorScopes {
 		call.methodSelect instanceof MemberSelectTree && isCollaborator(root(call.methodSelect.expression))
 	}
 
+	boolean referencesCollaborator(MemberReferenceTree reference) {
+		isCollaborator(root(reference.qualifierExpression))
+	}
+
+	private static boolean holdsOnlyValues(ClassTree type) {
+		type.kind in [Tree.Kind.RECORD, Tree.Kind.ENUM] || type.extendsClause?.toString()?.endsWith('Exception')
+	}
+
 	private static Map<String, String> collaborators(ClassTree type) {
 		type.members.findAll { it instanceof VariableTree && injected(it) }.collectEntries { [it.name.toString(), it.type.toString()] }
 	}
@@ -45,12 +56,11 @@ class CollaboratorScopes {
 	private static boolean injected(VariableTree field) {
 		def flags = field.modifiers.flags
 		flags.contains(Modifier.FINAL) && !flags.contains(Modifier.STATIC) && field.initializer == null
+				&& !(field.type.toString() ==~ VALUE_TYPES)
 	}
 
-	// A *Properties record is typed configuration: reading it does no work.
 	private boolean isCollaborator(String name) {
-		def type = scopes.findResult { it[name] }
-		type != null && !type.endsWith('Properties')
+		scopes.any { it.containsKey(name) }
 	}
 
 	private static String root(ExpressionTree expression) {
@@ -75,14 +85,14 @@ class CollaboratorScopes {
 class ArgumentScanner extends TreeScanner<Void, Void> {
 
 	private final CollaboratorScopes scopes
-	private final List<MethodInvocationTree> nested
+	private final List<Tree> nested
 
-	ArgumentScanner(CollaboratorScopes scopes, List<MethodInvocationTree> nested) {
+	ArgumentScanner(CollaboratorScopes scopes, List<Tree> nested) {
 		this.scopes = scopes
 		this.nested = nested
 	}
 
-	// A lambda body runs later, and it is scanned as its own statements.
+	// A lambda body is scanned as its own statements.
 	@Override
 	Void visitLambdaExpression(LambdaExpressionTree tree, Void unused) {
 		null
@@ -90,6 +100,14 @@ class ArgumentScanner extends TreeScanner<Void, Void> {
 
 	@Override
 	Void visitClass(ClassTree tree, Void unused) {
+		null
+	}
+
+	@Override
+	Void visitMemberReference(MemberReferenceTree tree, Void unused) {
+		if (scopes.referencesCollaborator(tree)) {
+			nested.add(tree)
+		}
 		null
 	}
 
@@ -125,18 +143,27 @@ class NestedCollaboratorCalls extends TreeScanner<Void, Void> {
 
 	@Override
 	Void visitMethodInvocation(MethodInvocationTree tree, Void unused) {
-		if (scopes.calledOnCollaborator(tree)) {
-			def nested = []
-			def scanner = new ArgumentScanner(scopes, nested)
-			tree.arguments.each { scanner.scan(it, null) }
-			nested.each { findings << describe(tree, it) }
-		}
+		check(tree.methodSelect.toString(), tree.arguments)
 		super.visitMethodInvocation(tree, unused)
 	}
 
-	private String describe(MethodInvocationTree outer, MethodInvocationTree inner) {
+	@Override
+	Void visitNewClass(NewClassTree tree, Void unused) {
+		check("new ${tree.identifier}", tree.arguments)
+		super.visitNewClass(tree, unused)
+	}
+
+	// A method reference handed straight to a call, like map(mapper::toResp), is the call's function, not a nested call.
+	private void check(String outer, List<? extends ExpressionTree> arguments) {
+		def nested = []
+		def scanner = new ArgumentScanner(scopes, nested)
+		arguments.findAll { !(it instanceof MemberReferenceTree) }.each { scanner.scan(it, null) }
+		nested.each { findings << describe(outer, it) }
+	}
+
+	private String describe(String outer, Tree inner) {
 		def line = unit.lineMap.getLineNumber(positions.getStartPosition(unit, inner))
-		"line ${line}: ${inner} is nested in a call to ${outer.methodSelect}(...): assign it to a named local first"
+		"line ${line}: ${inner} is nested in ${outer}(...): assign it to a named local first"
 	}
 }
 
@@ -165,4 +192,78 @@ ext.noNestedDiCalls = { String source ->
 		throw new IllegalStateException(findings.join('; '))
 	}
 	source
+}
+
+// Every arm is one line in one class, so each result has one cause.
+def noNestedDiCallsArms = [
+	banned : [
+		'poster.post(reader.byKey(1, 2).orElseThrow());',
+		'this.poster.post(this.reader.byKey(1, 2));',
+		'poster.post(Optional.of(reader.one()));',
+		'poster.a().post(reader.one());',
+		'poster.post(properties.limits().max());',
+		'return new Snapshot(now, quotes.recent(a));',
+		'format(reader.one());',
+		'List.of(reader.one());',
+		'poster.post(items.stream().map(reader::one).toList());',
+	],
+	allowed: [
+		'poster.post(dto.amount());',
+		'poster.post(() -> reader.one());',
+		'poster.post(List.of(dto.amount()));',
+		'poster.post(parameter.one());',
+		'items.stream().map(reader::one).toList();',
+		'poster.post(name.length());',
+		'poster.post(counter.get());',
+	],
+]
+
+tasks.register('testNoNestedDiCalls') {
+	group = 'verification'
+	description = 'Proves the noNestedDiCalls Spotless step refuses every banned arm and passes every allowed arm.'
+	doLast {
+		def inClass = { String arm ->
+			'''class Fixture {
+				private final Poster poster;
+				private final Reader reader;
+				private final Repo quotes;
+				private final LedgerProperties properties;
+				private final String name;
+				private final AtomicLong counter;
+				Object arms(Dto dto, Reader parameter, List items, Object now, Object a) {
+			''' + arm + '''
+				}
+			}'''
+		}
+		def refused = { String source ->
+			try {
+				noNestedDiCalls(source)
+				return false
+			}
+			catch (IllegalStateException expected) {
+				return expected.message.contains('assign it to a named local first')
+			}
+		}
+		def wrong = noNestedDiCallsArms.banned.findAll { !refused(inClass(it)) } + noNestedDiCallsArms.allowed.findAll { refused(inClass(it)) }
+		def valueHolders = ['record Fixture(Reader reader, Poster poster) { void a() { poster.post(reader.one()); } }',
+				'enum Fixture { A; private final Reader reader; private final Poster poster; void a() { poster.post(reader.one()); } }']
+		wrong += valueHolders.findAll { refused(it) }
+		try {
+			noNestedDiCalls('class Broken { void a( {')
+			wrong << 'an unparseable file passed'
+		}
+		catch (IllegalStateException expected) {
+			if (!expected.message.contains('could not parse')) {
+				wrong << expected.message
+			}
+		}
+		if (wrong) {
+			throw new GradleException("noNestedDiCalls misjudged: ${wrong.join(' | ')}")
+		}
+		logger.lifecycle("noNestedDiCalls: ${noNestedDiCallsArms.banned.size()} banned and ${noNestedDiCallsArms.allowed.size()} allowed arms judged correctly")
+	}
+}
+
+pluginManager.withPlugin('base') {
+	tasks.named('check') { dependsOn 'testNoNestedDiCalls' }
 }

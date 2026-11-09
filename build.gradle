@@ -5,6 +5,7 @@ plugins {
 	id 'org.springframework.boot' version "${springBootVersion}" apply false
 	id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
 	id 'com.github.spotbugs' version "${spotbugsPluginVersion}" apply false
+	id 'com.diffplug.spotless' version "${spotlessPluginVersion}" apply false
 	id 'com.google.protobuf' version "${protobufPluginVersion}" apply false
 	id 'org.sonarqube' version "${sonarPluginVersion}"
 }
@@ -242,11 +243,20 @@ def coverageFloors = [
 def coverageBand = new BigDecimal('0.05')
 def findsecbugsPluginId = 'com.h3xstream.findsecbugs'
 
+// Spotless fixes what Checkstyle only reports. Whole-file reformatting is left out: the tab style is Checkstyle's.
+def javaImportsAndWhitespace = { format ->
+	format.removeUnusedImports()
+	format.importOrder('\\#', 'java|javax', '')
+	format.trimTrailingWhitespace()
+	format.endWithNewline()
+}
+
 def services = subprojects.findAll { it.parent != rootProject }
 configure(services) {
 	apply plugin: 'checkstyle'
 	apply plugin: 'jacoco'
 	apply plugin: 'com.github.spotbugs'
+	apply plugin: 'com.diffplug.spotless'
 
 	def serviceName = project.name
 	def floors = coverageFloors[serviceName]
@@ -261,6 +271,13 @@ configure(services) {
 		ignoreFailures = false
 		maxWarnings = 0
 		maxErrors = 0
+	}
+
+	spotless {
+		java {
+			target 'src/**/*.java'
+			javaImportsAndWhitespace(it)
+		}
 	}
 
 	spotbugs {
@@ -511,6 +528,19 @@ configure(services) {
 }
 
 apply plugin: 'base'
+apply plugin: 'com.diffplug.spotless'
+
+repositories {
+	mavenCentral()
+}
+
+// Compiled into the services from here, and Spotless refuses a target outside the project: the root owns them.
+spotless {
+	java {
+		target 'observability/src/**/*.java', 'architecture/src/**/*.java', 'discovery/src/**/*.java', 'persistence/src/**/*.java'
+		javaImportsAndWhitespace(it)
+	}
+}
 
 tasks.register('bootBuildImageAll') {
 	group = 'supply chain'

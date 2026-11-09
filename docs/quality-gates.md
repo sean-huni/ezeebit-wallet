@@ -118,10 +118,13 @@ Checkstyle reports, and waits for the quality gate (`sonar.qualitygate.wait`). `
 ## SAST and software composition analysis (SCA) read different things
 
 - **SAST** (SpotBugs with Find Security Bugs, Checkstyle, SonarQube) reads this repository's own code. It finds **unknown** defects that no Common Vulnerabilities and Exposures (CVE) entry describes.
-- **SCA** (trivy, in [supply-chain.md](supply-chain.md)) reads the shipped image: jars, operating system
-  (OS) packages, the Java Runtime Environment (JRE), buildpack binaries. It finds **known** CVEs in code nobody here wrote.
+- **SCA** ([supply-chain.md](supply-chain.md)) finds **known** CVEs in code nobody here wrote, with two instruments.
+  `checkSupplyChain` (trivy) reads the shipped image: jars, operating system (OS) packages, the Java Runtime Environment (JRE),
+  buildpack binaries. `checkVersions` (OSV) reads the Maven modules on the services' runtime classpaths before an image exists, and runs only when asked.
 - **DAST** (dynamic application security testing, below) reads nothing: it attacks the running edge
   the way a caller can, and finds what the code and the image both looked fine on.
+
+Spotless (`spotlessCheck` in `check`, `spotlessApply` to fix) is none of the three. It formats this repository's own source and looks for no vulnerability.
 
 ## DAST: ZAP, Schemathesis and Nuclei against the running gateway
 

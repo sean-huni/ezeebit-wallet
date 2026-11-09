@@ -12,7 +12,7 @@ ezeebit-wallet/
 ├── services/        the five Spring Boot services, one Gradle project each (below)
 ├── docs/            quality gates, supply chain, continuous integration (CI), observability, OpenAPI snapshots, this layout, k8s.md (the kind fleet), evidence/ (security logs), fleet/ (the fleet diagram and its verification logs), superpowers/ (design specs and plans)
 ├── config/          checkstyle/checkstyle.xml and spotbugs/exclude.xml, read by every service
-├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml; version_report.py behind checkVersions
+├── security/        the supply-chain gate: pinned scanners, scan.sh, report.py, trivy-ignore.yaml; version_report.py behind checkVersions (dependency SCA)
 ├── docker/          local backing services: the Postgres init script, WireMock rate feed, and the Grafana LGTM image with Grafana, Prometheus, Loki, Tempo, Pyroscope and an OpenTelemetry collector (lgtm/generate.py writes its dashboards and rules)
 ├── observability/   OpenTelemetry Protocol (OTLP) settings and the logback appender, compiled into every service's main source set
 ├── persistence/     AdvisoryLockService, Liquibase's lock on a PostgreSQL advisory lock, compiled into ledger-svc and conversion-svc (below)

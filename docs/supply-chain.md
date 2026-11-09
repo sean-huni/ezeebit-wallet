@@ -39,7 +39,7 @@ The same run with an old Guava forced in by `-PguavaVersion=33.6.0-jre`: one HIG
 ```sh
 ./gradlew spotlessApply                      # fix formatting first; a noNestedDiCalls failure stops here until fixed by hand
 ./gradlew checkVersions                      # pins and advisories; -P<xVersion>=<v> tries a version without editing
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.5.0, one per service, Paketo only
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.5.1, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
@@ -161,7 +161,7 @@ Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) fil
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.5.0 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.5.1 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

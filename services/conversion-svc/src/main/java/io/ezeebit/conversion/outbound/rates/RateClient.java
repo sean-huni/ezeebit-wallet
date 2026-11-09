@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 // Fails closed: a timeout, a refused connection or an error status is 503, never a cached or default rate.
 @Component
-public class RateClient implements RateSource {
+class RateClient implements RateSource {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RateClient.class);
 
@@ -27,7 +27,7 @@ public class RateClient implements RateSource {
 	private final RateMapper mapper;
 	private final ConversionMetrics metrics;
 
-	public RateClient(final RateCall call, final RateMapper mapper, final ConversionMetrics metrics) {
+	RateClient(final RateCall call, final RateMapper mapper, final ConversionMetrics metrics) {
 		this.call = call;
 		this.mapper = mapper;
 		this.metrics = metrics;

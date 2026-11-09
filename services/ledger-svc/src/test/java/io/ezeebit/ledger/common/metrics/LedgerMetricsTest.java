@@ -24,7 +24,7 @@ class LedgerMetricsTest {
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 	private final TestObservationRegistry observations = TestObservationRegistry.create();
-	private final LedgerMetrics metrics = new LedgerMetrics(registry, observations);
+	private final LedgerMetrics metrics = new LedgerMetricsImpl(registry, observations);
 
 	@Test
 	void aPostedDepositIsCountedByCurrencyWithNoCode() {

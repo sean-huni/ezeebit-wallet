@@ -11,13 +11,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-public class PendingClaimer {
+class PendingClaimer {
 
 	private final ConversionRepo conversions;
 	private final DueCutoff cutoff;
 	private final PendingLedgerCheck check;
 
-	public PendingClaimer(final ConversionRepo conversions, final DueCutoff cutoff, final PendingLedgerCheck check) {
+	PendingClaimer(final ConversionRepo conversions, final DueCutoff cutoff, final PendingLedgerCheck check) {
 		this.conversions = conversions;
 		this.cutoff = cutoff;
 		this.check = check;

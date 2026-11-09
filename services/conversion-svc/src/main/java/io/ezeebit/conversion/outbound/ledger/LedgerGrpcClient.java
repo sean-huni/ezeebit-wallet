@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 
 // Any transport failure is UNKNOWN: the posting may have committed.
 @Component
-public class LedgerGrpcClient implements LedgerPostings {
+class LedgerGrpcClient implements LedgerPostings {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LedgerGrpcClient.class);
 	private static final long ATTEMPT_MILLIS = 2_000;
@@ -31,7 +31,7 @@ public class LedgerGrpcClient implements LedgerPostings {
 	private final LedgerReplyMapper replies;
 	private final LedgerGuard guard;
 
-	public LedgerGrpcClient(@Qualifier("ledgerChannel") final ManagedChannel channel, final LedgerReplyMapper replies,
+	LedgerGrpcClient(@Qualifier("ledgerChannel") final ManagedChannel channel, final LedgerReplyMapper replies,
 			final LedgerGuard guard) {
 		this.channel = channel;
 		this.replies = replies;

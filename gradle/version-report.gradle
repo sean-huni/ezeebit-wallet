@@ -1,0 +1,87 @@
+// ./gradlew checkVersions: which pins have newer releases, and which shipped modules have published advisories.
+// Asks the network, so it runs only when asked. docs/supply-chain.md says what it reads and what fails it.
+
+// The build files are the only record of what each *Version property versions: nothing here names an artifact.
+def buildFiles = ([rootProject.buildFile] + subprojects*.buildFile).findAll { it.isFile() }
+def buildText = buildFiles.collect { it.getText('UTF-8').replaceAll(/(?m)^\s*\/\/.*$/, '') }.join('\n')
+
+def pinnedBy = [:]
+(buildText =~ /id\s+'([\w.-]+)'\s+version\s+"\$\{(\w+Version)\}"/).each { match, pluginId, property ->
+	pinnedBy.putIfAbsent(property, "plugin:${pluginId}".toString())
+}
+(buildText =~ /"([\w.-]+:[\w.-]+):\$\{(\w+Version)\}"/).each { match, coordinate, property ->
+	pinnedBy.putIfAbsent(property, coordinate)
+}
+// A tool's coordinate is not in the build: its plugin adds it to one of these configurations.
+def toolProperties = (buildText =~ /toolVersion\s*=\s*(\w+Version)\b/).collect { it[1] } as Set
+def toolConfigurations = ['checkstyle', 'spotbugs', 'jacocoAgent']
+
+def verifyEveryPinIsRead = {
+	def properties = new Properties()
+	rootProject.file('gradle.properties').withInputStream { properties.load(it) }
+	def unread = properties.stringPropertyNames().findAll { it.endsWith('Version') } - pinnedBy.keySet() - toolProperties
+	if (unread) {
+		throw new GradleException("No build file names what ${unread.sort()} versions: expected a \"group:artifact:\${property}\" coordinate, a plugin id or a toolVersion")
+	}
+}
+
+def reportedServices = subprojects.findAll { it.parent != rootProject }
+
+configure(reportedServices) {
+	tasks.register('listVersionInputs') {
+		group = 'supply chain'
+		description = 'Writes the external modules on the runtime classpath, and the build tools pinned by a toolVersion.'
+		def modulesFile = layout.buildDirectory.file('version-report/runtime-modules.txt')
+		def toolsFile = layout.buildDirectory.file('version-report/tool-pins.txt')
+		def runtime = configurations.named('runtimeClasspath')
+		def tools = toolConfigurations.collect { configurations.named(it) }
+		def toolVersions = toolProperties.collect { rootProject.findProperty(it) } as Set
+		outputs.upToDateWhen { false }
+		doLast {
+			def ids = runtime.get().incoming.resolutionResult.allComponents*.id
+			def modules = ids.findAll { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+			modulesFile.get().asFile.parentFile.mkdirs()
+			modulesFile.get().asFile.text = modules.collect { "${it.group}:${it.module}:${it.version}" }.sort().join('\n') + '\n'
+			def toolPins = tools.collectMany { tool -> tool.get().incoming.dependencies.findAll { it.version in toolVersions } }
+			toolsFile.get().asFile.text = toolPins.collect { "${it.group}:${it.name}=${it.version}" }.sort().join('\n') + '\n'
+		}
+	}
+}
+
+tasks.register('checkVersions', Exec) {
+	group = 'supply chain'
+	description = 'Prints pins with newer releases and shipped modules with advisories. Fails on a HIGH or CRITICAL advisory that has a fix.'
+	dependsOn reportedServices.collect { "${it.path}:listVersionInputs" }
+	def toolFiles = reportedServices.collect { it.layout.buildDirectory.file('version-report/tool-pins.txt').get().asFile }
+	doFirst {
+		verifyEveryPinIsRead()
+		def listed = toolFiles.collectMany { it.readLines() }
+		def missing = toolProperties.findAll { property -> !listed.any { it.endsWith("=${rootProject.findProperty(property)}") } }
+		if (missing) {
+			throw new GradleException("No tool configuration in ${toolConfigurations} carries ${missing.sort()}")
+		}
+	}
+	environment 'PYTHONDONTWRITEBYTECODE', '1'
+	def pinArguments = pinnedBy.collectMany { property, coordinate -> ['--pin', "${coordinate}=${rootProject.findProperty(property)}".toString()] }
+	def toolArguments = toolFiles.collectMany { ['--pins-file', it.path] }
+	def moduleArguments = reportedServices.collectMany {
+		['--modules', it.layout.buildDirectory.file('version-report/runtime-modules.txt').get().asFile.path]
+	}
+	def plainConsole = gradle.startParameter.consoleOutput == org.gradle.api.logging.configuration.ConsoleOutput.Plain
+	def colorArguments = plainConsole || System.getenv('NO_COLOR') != null || System.getenv('CI') != null || System.getenv('TERM') == 'dumb' ? [] : ['--color']
+	def report = layout.buildDirectory.file('reports/versions/report.txt').get().asFile.path
+	commandLine(['python3', 'security/version_report.py', '--report', report] + pinArguments + toolArguments + moduleArguments + colorArguments)
+}
+
+def testVersionReport = tasks.register('testVersionReport', Exec) {
+	group = 'verification'
+	description = 'Runs security/test/version_report_test.py against fake registries, and fails when a *Version property has no reading in the build files.'
+	inputs.files 'security/version_report.py', 'security/test/version_report_test.py', 'gradle.properties'
+	doFirst { verifyEveryPinIsRead() }
+	environment 'PYTHONDONTWRITEBYTECODE', '1'
+	commandLine 'python3', 'security/test/version_report_test.py'
+}
+
+tasks.named('check') {
+	dependsOn testVersionReport
+}

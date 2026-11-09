@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class CurrencyCatalogTest {
 
-	private final CurrencyCatalog catalog = new CurrencyCatalog(
+	private final CurrencyCatalog catalog = new CurrencyCatalogImpl(
 			new ConversionProperties(null, null, null, null, null, null, Map.of("kes", 2, "zar", 2), Map.of()));
 
 	@Test

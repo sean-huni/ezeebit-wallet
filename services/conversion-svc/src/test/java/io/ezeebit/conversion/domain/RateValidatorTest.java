@@ -20,7 +20,7 @@ class RateValidatorTest {
 	private static final Instant NOW = Instant.parse("2026-10-13T10:00:00Z");
 	private static final PairPolicy USDT_ZAR = new PairPolicy(new BigDecimal("10"), new BigDecimal("30"), 50);
 
-	private final RateValidator validator = new RateValidator(new RateRules(Duration.ofSeconds(10), new BigDecimal("5")));
+	private final RateValidator validator = new RateValidatorImpl(new RateRules(Duration.ofSeconds(10), new BigDecimal("5")));
 
 	@Test
 	void aFreshPositiveRateInsideTheBandIsAccepted() {

@@ -11,12 +11,12 @@ import io.ezeebit.conversion.service.port.LedgerPostings;
 import org.springframework.stereotype.Component;
 
 @Component
-public class PendingLedgerCheck {
+class PendingLedgerCheck {
 
 	private final LedgerPostings ledger;
 	private final ConversionSettler settler;
 
-	public PendingLedgerCheck(final LedgerPostings ledger, final ConversionSettler settler) {
+	PendingLedgerCheck(final LedgerPostings ledger, final ConversionSettler settler) {
 		this.ledger = ledger;
 		this.settler = settler;
 	}

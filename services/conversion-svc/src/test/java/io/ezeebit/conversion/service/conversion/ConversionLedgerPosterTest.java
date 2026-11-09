@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.ezeebit.conversion.common.metrics.ConversionMetrics;
+import io.ezeebit.conversion.common.metrics.ConversionMetricsImpl;
 import io.ezeebit.conversion.data.model.ConversionEntity;
 import io.ezeebit.conversion.data.repo.ConversionRepo;
 import io.ezeebit.conversion.domain.LedgerAnswer;
@@ -30,7 +31,7 @@ class ConversionLedgerPosterTest {
 	private final ConversionRepo conversions = mock(ConversionRepo.class);
 	private final LedgerPostings ledger = mock(LedgerPostings.class);
 	private final ConversionLedgerPoster poster = new ConversionLedgerPoster(ledger, mock(QuoteReader.class),
-			new ConversionSettler(conversions, Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetrics(registry,
+			new ConversionSettlerImpl(conversions, Clock.fixed(NOW, ZoneOffset.UTC), new ConversionMetricsImpl(registry,
 					ObservationRegistry.NOOP)));
 	private final ConversionEntity pending = new ConversionEntity(UUID.randomUUID(), UUID.randomUUID(),
 			UUID.randomUUID(), "k1", "PENDING", null, NOW.plusSeconds(45), NOW, null, null);

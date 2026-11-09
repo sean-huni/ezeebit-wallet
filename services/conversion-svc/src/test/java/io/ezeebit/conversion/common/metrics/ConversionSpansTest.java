@@ -19,7 +19,7 @@ import org.springframework.transaction.TransactionSystemException;
 class ConversionSpansTest {
 
 	private final TestObservationRegistry observations = TestObservationRegistry.create();
-	private final ConversionSpans spans = new ConversionSpans(observations);
+	private final ConversionSpans spans = new ConversionSpansImpl(observations);
 
 	@Test
 	void anIssuedQuoteIsOneSpanTaggedWithItsPairAndOutcomeOnly() {

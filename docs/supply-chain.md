@@ -10,9 +10,31 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 |---|---|---|---|
 | `checkSecrets` | every `./gradlew build` (root `check`) | the git history and the working tree | Docker; no images |
 | `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
+| `checkVersions` | only when asked | every `*Version` pin against Maven Central and the Gradle Plugin Portal; every module on the services' runtime classpaths against OSV | network; no Docker, no images |
+
+`checkVersions` prints `UPGRADE` for a pin with a newer release on its own line (a release pin is never offered a
+pre-release, a `-jre` pin never `-android`), and `CVE` for a module with an advisory, with the highest first fix
+across its advisories or `No Upgrades`. It fails, exit 3, on any one advisory with a fix on a shipped module that is
+HIGH, CRITICAL or carries no severity, a stricter form of the `checkSupplyChain` test applied before an image exists.
+An unreachable source is exit 2, never a pass. It does not read the image pins in `gradle.properties`, the operating
+system, the JRE, or classes shaded inside a jar (the Pyroscope agent vendors protobuf, kotlin and okhttp under its own
+package, with no coordinates for OSV to match). `checkSupplyChain` reads the first three; whether it sees shaded classes
+is unverified.
+`gradle/version-report.gradle` holds no list of artifacts: it reads each pin's coordinate from the build files
+(a `group:artifact:${xVersion}` string, a plugin `id ... version`, or a `toolVersion` and the configuration its plugin
+fills), and `testVersionReport`, in `check`, fails when a `*Version` property has none of those. Colour is off under `--console=plain`, `NO_COLOR`, `CI` or `TERM=dumb`;
+`build/reports/versions/report.txt` is always plain.
+
+![checkVersions passing: upgrades in orange and green, two MODERATE advisories, 0 blocking](evidence/versions/version-report-passed.png)
+
+The same run with an old Guava forced in by `-PguavaVersion=33.6.0-jre`: one HIGH advisory with a fix, so the task fails.
+
+![checkVersions failing on a HIGH advisory with a fix](evidence/versions/version-report-failed.png)
 
 ```sh
-./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.4.0, one per service, Paketo only
+./gradlew spotlessApply                      # fix formatting first; spotlessCheck in check fails otherwise
+./gradlew checkVersions                      # pins and advisories; -P<xVersion>=<v> tries a version without editing
+./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.5.0, one per service, Paketo only
 ./gradlew bootBuildImageAll checkSupplyChain
 cat build/reports/supply-chain/console.txt   # the console text, saved as printed
 ```
@@ -69,7 +91,15 @@ quoting an older console.
 
 ## State
 
-Latest recorded verdict, release 0.4.0: PASSED on 2026-11-05 on `rel-0.4.0` with the builder pin moved to
+Latest recorded verdict, release 0.5.0: PASSED on 2026-11-09 on `rel-0.5.0` at `4bd8ce5` with the builder pin moved to
+0.0.203 (the newest tag at least two weeks old that day), 5 of 5 images scanned, trivy database
+2026-11-09T13:58Z, nothing suppressed. On 0.0.198 there were 24 distinct SHARED findings, 7 of them HIGH rows; on 0.0.203
+there are 5, 2 of them HIGH. **0.5.0 still ships two fixable HIGH findings in the SHARED layers**, in the builder's helper
+binaries on all 5 images: Go `stdlib` 1.27.2 (CVE-2026-111943, fixed in 1.27.3) and `golang.org/x/net` 0.61.0
+(CVE-2026-78661, fixed in 0.62.0). No builder clears them under the pin rule yet. The SERVICE layers carry the same two
+MEDIUM findings as 0.4.0, neither gating.
+
+Previous verdict, release 0.4.0: PASSED on 2026-11-05 on `rel-0.4.0` with the builder pin moved to
 0.0.198 (the newest tag at least two weeks old that day), 5 of 5 images scanned, trivy database
 2026-11-05T13:09Z, nothing suppressed. The same gate on builder 0.0.197 also passed, with 39 distinct SHARED
 findings, 9 of them HIGH rows; on 0.0.198 there are 26, 6 of them HIGH. **0.4.0 still ships fixable HIGH
@@ -126,7 +156,7 @@ Reports land in `build/supply-chain/` (one JavaScript Object Notation (JSON) fil
 scanner):
 
 ```sh
-SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.4.0 \
+SERVICES="config-svc conversion-svc eureka-svc gateway-svc ledger-svc" IMAGE_VERSION=0.5.0 \
   OUT_DIR=build/supply-chain CONSOLE_FILE=build/reports/supply-chain/console.txt \
   ./security/scan.sh gate secrets,sbom,images,config
 ```

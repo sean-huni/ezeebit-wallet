@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
-public class KafkaDeadLetterPublisher implements DeadLetters {
+class KafkaDeadLetterPublisher implements DeadLetters {
 
 	private static final Logger LOG = LoggerFactory.getLogger(KafkaDeadLetterPublisher.class);
 	private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -21,7 +21,7 @@ public class KafkaDeadLetterPublisher implements DeadLetters {
 	private final ConversionMetrics metrics;
 	private final String topic;
 
-	public KafkaDeadLetterPublisher(final KafkaTemplate<String, String> template, final ConversionMetrics metrics,
+	KafkaDeadLetterPublisher(final KafkaTemplate<String, String> template, final ConversionMetrics metrics,
 			final ConversionProperties properties) {
 		this.template = template;
 		this.metrics = metrics;

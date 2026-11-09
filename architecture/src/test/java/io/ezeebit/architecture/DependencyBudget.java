@@ -1,13 +1,14 @@
 package io.ezeebit.architecture;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ClassUtils;
@@ -27,8 +28,14 @@ final class DependencyBudget {
 	}
 
 	static List<Class<?>> beans(final String basePackage, final Predicate<Class<?>> include) {
-		var scanner = new ClassPathScanningCandidateComponentProvider(false);
-		scanner.addIncludeFilter(new AnnotationTypeFilter(Component.class));
+		var component = new AnnotationTypeFilter(Component.class);
+		// The default also evaluates @Conditional, so a configuration switched off under test would go unchecked.
+		var scanner = new ClassPathScanningCandidateComponentProvider(false) {
+			@Override
+			protected boolean isCandidateComponent(final MetadataReader reader) throws IOException {
+				return component.match(reader, getMetadataReaderFactory());
+			}
+		};
 		ClassLoader loader = DependencyBudget.class.getClassLoader();
 		return scanner.findCandidateComponents(basePackage).stream()
 				.<Class<?>>map(definition -> ClassUtils.resolveClassName(definition.getBeanClassName(), loader))
@@ -43,8 +50,8 @@ final class DependencyBudget {
 			if (injected > MAX_INJECTED) {
 				offenders.put("bean %s".formatted(bean.getName()), injected);
 			}
-			for (Method method : bean.getDeclaredMethods()) {
-				if (method.isAnnotationPresent(Bean.class) && method.getParameterCount() > MAX_INJECTED) {
+			for (Method method : BeanBodies.beanMethods(bean)) {
+				if (method.getParameterCount() > MAX_INJECTED) {
 					offenders.put("@Bean %s#%s".formatted(bean.getName(), method.getName()), method.getParameterCount());
 				}
 			}

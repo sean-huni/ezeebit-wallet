@@ -13,13 +13,13 @@ import io.ezeebit.conversion.service.quote.QuoteReader;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ConversionReplayer {
+class ConversionReplayer {
 
 	private final ConversionReader reader;
 	private final QuoteReader quotes;
 	private final ConversionLedgerPoster poster;
 
-	public ConversionReplayer(final ConversionReader reader, final QuoteReader quotes, final ConversionLedgerPoster poster) {
+	ConversionReplayer(final ConversionReader reader, final QuoteReader quotes, final ConversionLedgerPoster poster) {
 		this.reader = reader;
 		this.quotes = quotes;
 		this.poster = poster;
@@ -51,5 +51,4 @@ public class ConversionReplayer {
 		}
 		return reader.answer(conversion);
 	}
-
 }

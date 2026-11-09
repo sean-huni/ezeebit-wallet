@@ -14,14 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 // VOID and REFUSED journals have no entries. Each occupies the conversion's identity, so a later posting conflicts.
 @Service
-public class ConversionVoider {
+class ConversionVoider {
 
 	private static final String VOID = "VOID";
 
 	private final JournalRepo journals;
 	private final RequestFingerprint fingerprint;
 
-	public ConversionVoider(final JournalRepo journals, final RequestFingerprint fingerprint) {
+	ConversionVoider(final JournalRepo journals, final RequestFingerprint fingerprint) {
 		this.journals = journals;
 		this.fingerprint = fingerprint;
 	}

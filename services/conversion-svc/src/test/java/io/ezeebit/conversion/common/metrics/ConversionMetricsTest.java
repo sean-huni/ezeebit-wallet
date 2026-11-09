@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class ConversionMetricsTest {
 
 	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-	private final ConversionMetrics metrics = new ConversionMetrics(registry, ObservationRegistry.NOOP);
+	private final ConversionMetrics metrics = new ConversionMetricsImpl(registry, ObservationRegistry.NOOP);
 
 	@Test
 	void anIssuedQuoteIsCountedByPairWithNoReason() {

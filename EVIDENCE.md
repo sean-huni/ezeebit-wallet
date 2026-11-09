@@ -20,6 +20,7 @@ How to reproduce each section:
 | Service discovery | `./k8s/kube.sh up`, the socat bridge below, then `cd docs/observability/verification && node 2026-10-16-eureka-capture.mjs` | [2026-10-16-eureka-capture.mjs](docs/observability/verification/2026-10-16-eureka-capture.mjs) reads the registry table, fails unless it holds exactly gateway-svc, ledger-svc and conversion-svc at `UP (2)` each, and takes the image |
 | SAST | `./gradlew --no-build-cache --rerun-tasks clean build` | [docs/quality-gates.md](docs/quality-gates.md); result lines in [2026-10-13-gate-summary.log](docs/evidence/security/2026-10-13-gate-summary.log) |
 | SCA | `./gradlew bootBuildImageAll checkSupplyChain` | [docs/supply-chain.md](docs/supply-chain.md); console in [2026-10-13-supply-chain-console.txt](docs/evidence/security/2026-10-13-supply-chain-console.txt), exit codes in [2026-10-13-supply-chain-status.txt](docs/evidence/security/2026-10-13-supply-chain-status.txt) |
+| Dependency versions | `./gradlew --no-build-cache clean spotlessApply checkVersions`, and the same with `-PguavaVersion=33.6.0-jre` | [docs/supply-chain.md](docs/supply-chain.md); images under [Dependency versions](#dependency-versions-2026-11-09) |
 | SAST and SCA images | from `docs/observability/verification` run `node ../../evidence/security/2026-10-13-capture.mjs <repo root> ledger-svc` | [2026-10-13-capture.mjs](docs/evidence/security/2026-10-13-capture.mjs) copies only the four HTML report directories it renders into a temporary directory, serves that on 127.0.0.1 (never the repository root, which holds `.env` and `.git`), and writes the images to `docs/evidence/security/` |
 
 Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet Overview](#fleet-overview) ·
@@ -27,6 +28,7 @@ Contents: [Monitoring and observability](#monitoring-and-observability) ([Fleet 
 [Ledger outage over gRPC](#ledger-outage-over-grpc-2026-10-14)) ·
 [Service discovery](#service-discovery-eureka-on-kind-2026-10-16) ·
 [SAST](#static-application-security-testing-sast) · [SCA](#software-composition-analysis-sca) ·
+[Dependency versions](#dependency-versions-2026-11-09) ·
 [What this evidence does not prove](#what-this-evidence-does-not-prove)
 
 ## Monitoring and observability
@@ -593,6 +595,22 @@ distinct (44 fixable, 74 raw).
 
 **Proves** 0 `CRITICAL` in all 5 images and 9 `HIGH` in each, all fixable and all in SHARED layers per
 the console; the distinct totals match the console's distinct column.
+
+## Dependency versions (2026-11-09)
+
+Captured at `4ff1d2c` by running the command through a pseudo-terminal and rendering its colour output to an image.
+The report text and colours are the task's own; the prompt bar is drawn to match a terminal, so it is decoration.
+Times and counts move with Maven Central and OSV: re-run rather than quoting these.
+
+![checkVersions passing](docs/evidence/versions/version-report-passed.png)
+
+Exit 0. 25 pins and 291 shipped modules were read: 11 pins have newer releases, 14 are current, and two modules have
+MODERATE advisories, neither blocking.
+
+![checkVersions failing](docs/evidence/versions/version-report-failed.png)
+
+Gradle exit 1 from the task's exit 3. Guava was forced back to `33.6.0-jre`, so `CVE-2026-102554` (HIGH, fixed in
+33.7.2) blocks. It proves the failing path on a real advisory; this pin is not what ships.
 
 ## What this evidence does not prove
 

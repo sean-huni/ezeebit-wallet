@@ -10,12 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 // PENDING is written before the ledger is called, so a crash between the two leaves a row the sweeper resolves.
 @Service
-public class ConversionStarter {
+class ConversionStarter {
 
 	private final ConversionRepo conversions;
 	private final QuoteRepo quotes;
 
-	public ConversionStarter(final ConversionRepo conversions, final QuoteRepo quotes) {
+	ConversionStarter(final ConversionRepo conversions, final QuoteRepo quotes) {
 		this.conversions = conversions;
 		this.quotes = quotes;
 	}

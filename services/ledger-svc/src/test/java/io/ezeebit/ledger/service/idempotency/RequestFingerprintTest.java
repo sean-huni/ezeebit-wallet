@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 class RequestFingerprintTest {
 
-	private final RequestFingerprint fingerprint = new RequestFingerprint();
+	private final RequestFingerprint fingerprint = new RequestFingerprintImpl();
 
 	@Test
 	void identicalPartsGiveTheSameFingerprint() {

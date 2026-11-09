@@ -16,13 +16,13 @@ import io.ezeebit.conversion.service.quote.RateCheck.CheckedRate;
 import org.springframework.stereotype.Component;
 
 @Component
-public class QuotePricer {
+class QuotePricer {
 
 	private final CurrencyCatalog catalog;
 	private final RateCheck rates;
 	private final QuoteWriter writer;
 
-	public QuotePricer(final CurrencyCatalog catalog, final RateCheck rates, final QuoteWriter writer) {
+	QuotePricer(final CurrencyCatalog catalog, final RateCheck rates, final QuoteWriter writer) {
 		this.catalog = catalog;
 		this.rates = rates;
 		this.writer = writer;

@@ -1,0 +1,20 @@
+Test count for release 0.5.1, measured 2026-11-10 on rel-0.5.1 at 68b5f54 (the version bump; the later
+release commits change only documentation), in a clean clone of the repository.
+
+Command:
+  ./gradlew --console=plain --no-build-cache clean build integrationTest acceptanceTest --continue      BUILD SUCCESSFUL in 4m, 136 of 136 tasks executed, exit 0
+Count: tests and failures summed from every <testsuite> in services/*/build/test-results/*/TEST-*.xml
+
+service          tier             tests failures
+config-svc       test                58 0
+conversion-svc   acceptanceTest      49 0
+conversion-svc   integrationTest     35 0
+conversion-svc   test               213 0
+eureka-svc       test                57 0
+gateway-svc      integrationTest     70 0
+gateway-svc      test               109 0
+ledger-svc       acceptanceTest      61 0
+ledger-svc       integrationTest     61 0
+ledger-svc       test               152 0
+
+TOTAL 865 tests, 0 failures

@@ -53,7 +53,7 @@ Every SpotBugs exclusion carries a comment with its reason in `config/spotbugs/e
 The root `check` also runs `checkSecrets` ([supply-chain.md](supply-chain.md)), `checkSingleProto`
 (see [Architecture gates](#architecture-gates)) and `checkDashboards`
 (`python3 docker/lgtm/generate.py --check`: the committed dashboards and alert rules must equal what the
-generator writes), and `testVersionReport`, the offline half of `checkVersions` ([supply-chain.md](supply-chain.md)).
+generator writes), `testVersionReport`, the offline half of `checkVersions` ([supply-chain.md](supply-chain.md)), and `testNoNestedDiCalls`, the arms of the Spotless step.
 When `spotlessCheck` fails, `./gradlew spotlessApply` rewrites the files it names. A `noNestedDiCalls` failure is not rewritten: assign the named inner call to a local.
 
 The first run of these gates found a real defect: conversion-svc accepted a currency code spelled

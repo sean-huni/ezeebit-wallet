@@ -607,3 +607,5 @@ tasks.register('checkSupplyChain', Exec) {
 	environment supplyChainEnv
 	commandLine './security/scan.sh', 'all'
 }
+
+apply from: 'gradle/version-report.gradle'

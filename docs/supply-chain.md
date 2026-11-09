@@ -10,6 +10,20 @@ Two Gradle tasks, split by cost. Both run the scanners as containers pinned by t
 |---|---|---|---|
 | `checkSecrets` | every `./gradlew build` (root `check`) | the git history and the working tree | Docker; no images |
 | `checkSupplyChain` | only when asked | secrets again, then the five images, their software bills of materials (SBOMs) and the compose and docker files | `bootBuildImageAll`, which it depends on |
+| `checkVersions` | only when asked | every `*Version` pin against Maven Central and the Gradle Plugin Portal; every module on the services' runtime classpaths against OSV | network; no Docker, no images |
+
+`checkVersions` prints `UPGRADE` for a pin with a newer release on its own line (a release pin is never offered a
+pre-release, a `-jre` pin never `-android`), and `CVE` for a module with an advisory, with the highest first fix
+across its advisories or `No Upgrades`. It fails, exit 3, on any one advisory with a fix on a shipped module that is
+HIGH, CRITICAL or carries no severity, a stricter form of the `checkSupplyChain` test applied before an image exists.
+An unreachable source is exit 2, never a pass. It does not read the image pins in `gradle.properties`, the operating
+system, the JRE, or classes shaded inside a jar (the Pyroscope agent vendors protobuf, kotlin and okhttp under its own
+package, with no coordinates for OSV to match). `checkSupplyChain` reads the first three; whether it sees shaded classes
+is unverified.
+`gradle/version-report.gradle` holds no list of artifacts: it reads each pin's coordinate from the build files
+(a `group:artifact:${xVersion}` string, a plugin `id ... version`, or a `toolVersion` and the configuration its plugin
+fills), and `testVersionReport`, in `check`, fails when a `*Version` property has none of those. Colour is off under `--console=plain`, `NO_COLOR`, `CI` or `TERM=dumb`;
+`build/reports/versions/report.txt` is always plain.
 
 ```sh
 ./gradlew bootBuildImageAll                  # ezeebit/<svc>:0.4.0, one per service, Paketo only

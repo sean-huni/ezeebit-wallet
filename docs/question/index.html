@@ -156,11 +156,15 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 .step p { font-size: .95rem; color: var(--ink-soft) }
 
 /* timeline (releases) */
-.tl { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
+.tl { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 1.4rem; position: relative; padding-top: 2.6rem }
 .tl::before { content: ""; position: absolute; top: 1.05rem; left: .6rem; right: .6rem; height: 3px; background: var(--green-ink); opacity: .55 }
 .rel { position: relative }
 .rel::before { content: ""; position: absolute; top: -2.05rem; left: 0; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--green-ink); box-shadow: 0 0 0 3px var(--paper) }
 .rel.last::before { background: var(--red-ink) }
+@media (min-width: 1000px) and (max-width: 1279px) {
+  .tl { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-top: 0 }
+  .tl::before, .rel::before { display: none }
+}
 .rel .v { font: 800 1.9rem/1 var(--display) }
 .rel .d { font: 500 .78rem/1.6 var(--mono); color: var(--red-ink) }
 .rel p { margin-top: .4rem; font-size: .93rem; color: var(--ink-soft) }
@@ -288,7 +292,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <div class="meta">
     <strong>Kudzai Sean Huni</strong>
     <span>Senior Software Engineer (Java &amp; Spring)</span>
-    <span>Release 0.5.0 · Java 25 · Spring Boot 4.1.2 · 9 November 2026</span>
+    <span>Release 0.5.1 · Java 25 · Spring Boot 4.1.2 · 10 November 2026</span>
   </div>
   <div><span class="label-plate">Journal Vol. I · Tasks 1 and 2 · 22 folios</span></div>
 </section>
@@ -332,7 +336,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="grid g2">
       <div class="stat"><span class="n">~3 h</span><span class="l">of my own attention, directing AI agents (Claude Code) under review gates</span></div>
-      <div class="stat red"><span class="n">28 days</span><span class="l">13 October to 9 November: the agent working window, releases 0.1.0 to 0.5.0</span></div>
+      <div class="stat red"><span class="n">29 days</span><span class="l">13 October to 10 November: the agent working window, releases 0.1.0 to 0.5.1</span></div>
       <div class="stat"><span class="n">2 of 6</span><span class="l">tasks in scope; extras beyond the brief are listed as optional in SOLUTION.md</span></div>
       <div class="stat"><span class="n">5</span><span class="l">currencies: ZAR, NGN, KES, USDT, USDC</span></div>
     </div>
@@ -552,7 +556,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
   <p class="lede">Every concurrency, idempotency and currency test was seen failing with its control removed.</p>
   <div class="split">
     <div>
-      <div class="stat big"><span class="n">865</span><span class="l">tests, 0 failures, at release 0.5.0: unit, integration and Cucumber acceptance scenarios</span></div>
+      <div class="stat big"><span class="n">865</span><span class="l">tests, 0 failures, at release 0.5.1: unit, integration and Cucumber acceptance scenarios</span></div>
       <p class="after">conversion-svc’s scenarios run against the real ledger jar, with WireMock and a gRPC proxy scripting faults.</p>
     </div>
     <div class="grid g2">
@@ -624,13 +628,13 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
 
 <section class="sheet" id="chaos" data-tab="15">
   <header class="head"><span class="acct">Resilience</span><h2>Chaos and resilience</h2><span class="folio">Fo. 15</span></header>
-  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.5.0.</p>
-  <span class="stamp green pass">10/10 pass<small>kind sweep · 0.5.0</small></span>
+  <p class="lede">One sweep, from no cluster to a deleted one. Release 0.5.1.</p>
+  <span class="stamp green pass">10/10 pass<small>kind sweep · 0.5.1</small></span>
   <div class="grid g4">
-    <div class="stat"><span class="n">1670</span><span class="l">merchant requests during 3 pod kills; 2 failed, within the 20 s budget</span></div>
-    <div class="stat"><span class="n">834 / 834</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
-    <div class="stat"><span class="n">65 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
-    <div class="stat red"><span class="n">5 s</span><span class="l">from the dead letter to a firing alert, with the ledger scaled to zero</span></div>
+    <div class="stat"><span class="n">1726</span><span class="l">merchant requests during 3 pod kills; 0 failed</span></div>
+    <div class="stat"><span class="n">863 / 863</span><span class="l">completed conversions matched by posted journals; none twice</span></div>
+    <div class="stat"><span class="n">57 / 200</span><span class="l">burst requests admitted, against a bound of 120</span></div>
+    <div class="stat red"><span class="n">10 s</span><span class="l">from the dead letter to a firing alert, with the ledger scaled to zero</span></div>
   </div>
   <div class="split" style="margin-top:1.6rem">
     <div class="scroll">
@@ -646,7 +650,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     </div>
     <div class="item"><h3>The chaos monkey ships paused</h3><p><code>./k8s/kube.sh chaos on | off | run | status</code>. When on, a random pod is killed every 10 minutes. It cannot reach the monitoring namespace or read Secrets, and every sweep asks the API server to prove it.</p></div>
   </div>
-  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-09-0.5.0-sweep.log</code>. With the Slack webhook set, Grafana’s Slack notification counter rose 0 to 1 on the dead-letter alert; 0.3.2 captured the page in the channel. The compose fleet proved firing and resolved on 14 October.</p>
+  <p class="note"><b>Evidence</b>Committed log: <code>docs/k8s/verification/2026-11-10-0.5.1-sweep.log</code>. With the Slack webhook set, Grafana’s Slack notification counter rose 0 to 1 on the dead-letter alert; 0.3.2 captured the page in the channel. The compose fleet proved firing and resolved on 14 October.</p>
 </section>
 
 <section class="sheet" id="releases" data-tab="16">
@@ -659,7 +663,8 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
     <div class="rel"><div class="v">0.3.1</div><div class="d">16 Oct</div><p>Base-image CVE fix (openssl), virtual threads with a gate.</p></div>
     <div class="rel"><div class="v">0.3.2</div><div class="d">4 Nov</div><p>guava and snappy-java pinned for three HIGH CVEs, OpenAPI patterns, Slack proven on kind.</p></div>
     <div class="rel"><div class="v">0.4.0</div><div class="d">5 Nov</div><p>Continuous profiling with Pyroscope, G1 with compact object headers, Spring Boot 4.1.2.</p></div>
-    <div class="rel last"><div class="v">0.5.0</div><div class="d">9 Nov</div><p>Dependency-injection refactor, Spotless formatting, version SCA, Paketo builder 0.0.203.</p></div>
+    <div class="rel"><div class="v">0.5.0</div><div class="d">9 Nov</div><p>Dependency-injection refactor, Spotless formatting, version SCA, Paketo builder 0.0.203.</p></div>
+    <div class="rel last"><div class="v">0.5.1</div><div class="d">10 Nov</div><p>Build fails on an injected call nested in another call.</p></div>
   </div>
   <p class="note"><b>Rules</b>Tags are digits only and pushed. The qa/stg stage was skipped because no such environment exists yet. 0.3.1 fixed an openssl HIGH that 0.3.0 shipped in the Paketo base layer.</p>
 </section>
@@ -781,7 +786,7 @@ figcaption { margin-top: .7rem; font: 400 .8rem/1.45 var(--mono); color: var(--p
         <tr><td><span class="capk cp">SAST</span></td><td><strong>Checkstyle 14.3.0</strong></td><td>every Java source set</td><td>any violation</td></tr>
         <tr><td><span class="capk cp">SAST</span></td><td><strong>gitleaks 8.30.1 and trivy secret scan</strong> (<code>checkSecrets</code>)</td><td>the whole git history and the tree</td><td>any secret found, or a scan that left no evidence</td></tr>
         <tr><td><span class="capk cp">SAST</span></td><td><strong>SonarQube</strong>, opt-in</td><td>source and coverage</td><td>runs only with <code>SONAR_TOKEN</code>; otherwise skipped with the reason printed</td></tr>
-        <tr><td><span class="capk mix">SCA</span></td><td><strong>trivy 0.74.0</strong> (<code>checkSupplyChain</code>)</td><td>the 5 shipped images, a CycloneDX SBOM per image, manifest misconfiguration</td><td>a HIGH or CRITICAL with a fix, in a service layer. 0.5.0 passed; 2 Go HIGHs in the buildpack’s own binaries ship, named in <code>docs/supply-chain.md</code></td></tr>
+        <tr><td><span class="capk mix">SCA</span></td><td><strong>trivy 0.74.0</strong> (<code>checkSupplyChain</code>)</td><td>the 5 shipped images, a CycloneDX SBOM per image, manifest misconfiguration</td><td>a HIGH or CRITICAL with a fix, in a service layer. 0.5.1 passed; 2 Go HIGHs in the buildpack’s own binaries ship, named in <code>docs/supply-chain.md</code></td></tr>
         <tr><td><span class="capk mix">SCA</span></td><td><strong><code>checkVersions</code></strong>, on demand since 0.5.0</td><td>Maven modules on the runtime classpaths against OSV; version pins against Maven Central and the Gradle Plugin Portal</td><td>an advisory with a fix that is HIGH, CRITICAL or carries no severity, on a shipped module; an unreachable source is exit 2, never a pass</td></tr>
         <tr><td><span class="capk cp">Format</span></td><td><strong>Spotless 8.11.0</strong> (<code>spotlessCheck</code> in <code>check</code>, <code>spotlessApply</code> to fix), not a security scan</td><td>Java sources of every service and the shared modules</td><td>an import-order, unused-import or whitespace violation; an injected field's method run inside another call's arguments</td></tr>
         <tr><td><span class="capk ap">Live</span></td><td><strong>kind sweep, <code>policy</code></strong></td><td>the running cluster, default-deny with 20 NetworkPolicies</td><td>an unnamed pod reaches Postgres, or ledger-svc cannot; the refused arm runs only after a control connection succeeds, so a broken probe is not read as a refusal</td></tr>

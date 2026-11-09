@@ -96,7 +96,13 @@ quoting an older console.
 
 ## State
 
-Latest recorded verdict, release 0.5.0: PASSED on 2026-11-09 on `rel-0.5.0` at `4bd8ce5` with the builder pin moved to
+Latest recorded verdict, release 0.5.1: PASSED on 2026-11-10 on `rel-0.5.1` at `68b5f54` with the builder pin unchanged at
+0.0.203, 5 of 5 images scanned, trivy database 2026-11-09T13:58Z, nothing suppressed. The HIGH rows are unchanged: **0.5.1 still ships
+the two fixable HIGH findings in the SHARED layers**, Go `stdlib` 1.27.2 (CVE-2026-111943) and `golang.org/x/net` 0.61.0
+(CVE-2026-78661), on all 5 images. Builder 0.0.204 reached the two-week pin rule on 2026-11-10 and was not tried in this release.
+The SERVICE layers carry the same two MEDIUM findings.
+
+Previous verdict, release 0.5.0: PASSED on 2026-11-09 on `rel-0.5.0` at `4bd8ce5` with the builder pin moved to
 0.0.203 (the newest tag at least two weeks old that day), 5 of 5 images scanned, trivy database
 2026-11-09T13:58Z, nothing suppressed. On 0.0.198 there were 24 distinct SHARED findings, 7 of them HIGH rows; on 0.0.203
 there are 5, 2 of them HIGH. **0.5.0 still ships two fixable HIGH findings in the SHARED layers**, in the builder's helper

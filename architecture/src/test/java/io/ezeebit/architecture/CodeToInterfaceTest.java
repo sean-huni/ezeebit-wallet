@@ -25,7 +25,10 @@ class CodeToInterfaceTest {
 		List<Class<?>> fixtures = DependencyBudget.beans(FIXTURES, type -> true);
 
 		assertThat(InjectedSeams.offenders(fixtures)).containsExactly(
-				offender("BuiltAcross"), offender("ConcreteAcrossCaller"), offender("FieldAcrossCaller"), offender("ListAcrossCaller"));
+				offender("BuiltAcross"),
+				offender("BuiltHidden$BehindInterface"), offender("BuiltHidden$Generic"),
+				offender("BuiltHidden$InLambda"), offender("BuiltHidden$Inherited"),
+				offender("ConcreteAcrossCaller"), offender("FieldAcrossCaller"), offender("ListAcrossCaller"));
 	}
 
 	private static String offender(final String caller) {
